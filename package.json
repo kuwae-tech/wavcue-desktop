@@ -4,12 +4,38 @@
   "description": "WavCue Electron desktop prototype",
   "main": "main.js",
   "scripts": {
-    "dev": "electron ."
+    "dev": "electron .",
+    "dist": "electron-builder",
+    "pack": "electron-builder --dir"
   },
   "dependencies": {
-    "electron-store": "^9.0.0"
+    "electron-store": "5.2.0"
   },
   "devDependencies": {
-    "electron": "^29.0.0"
+    "electron": "^29.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "productName": "WavCue",
+    "appId": "com.wavcue.app",
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**",
+      "package.json"
+    ],
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ]
+    },
+    "win": {
+      "target": [
+        "nsis",
+        "zip"
+      ]
+    },
+    "artifactName": "WavCue-${os}-${arch}-${version}.${ext}"
   }
 }
