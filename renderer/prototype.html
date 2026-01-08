@@ -34,14 +34,66 @@
     --bad:#fb7185;
     --shadow: 0 18px 48px rgba(0,0,0,.45);
     --r:16px;
+    --app-pad: 10px;
+    --app-gap: 10px;
+    --titlebar-height: 40px;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
-  .app{height:100%;display:flex;flex-direction:column;gap:10px;padding:10px}
+  .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
+  .titlebar{
+    height:var(--titlebar-height);
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:0 12px;
+    border:1px solid var(--line);
+    border-radius:var(--r);
+    background:linear-gradient(180deg, rgba(20,21,26,.96), rgba(15,16,20,.85));
+    box-shadow:var(--shadow);
+    -webkit-app-region: drag;
+    position: sticky;
+    top: var(--app-pad);
+    z-index: 70;
+  }
+  .titlebarTitle{
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:.2px;
+    color:rgba(229,231,235,.85);
+    user-select:none;
+  }
+  .titlebarControls{
+    display:flex;
+    gap:6px;
+    -webkit-app-region: no-drag;
+  }
+  .winBtn{
+    appearance:none;
+    width:36px;
+    height:28px;
+    border-radius:10px;
+    border:1px solid rgba(255,255,255,.12);
+    background:rgba(255,255,255,.06);
+    color:var(--text);
+    font-size:12px;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    transition:background .12s ease, transform .08s ease;
+  }
+  .winBtn:hover{background:rgba(255,255,255,.12)}
+  .winBtn:active{transform:translateY(1px)}
+  .winBtn.close{
+    border-color:rgba(251,113,133,.45);
+    background:rgba(251,113,133,.16);
+  }
+  .winBtn.close:hover{background:rgba(251,113,133,.25)}
   .topbar{
     display:flex;align-items:center;justify-content:space-between;gap:10px;
     padding:10px 12px;background:rgba(15,26,46,.80);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
-    -webkit-app-region: drag;
+    -webkit-app-region: no-drag;
   }
   .topbar .noDrag{ -webkit-app-region: no-drag; }
   .topbarActions{ display:flex;align-items:center;gap:8px; }
@@ -1260,8 +1312,8 @@
   /* Topbar: tighter, more “app-like” */
   .topbar{
     position: sticky;
-    top: 0;
-    z-index: 50;
+    top: calc(var(--app-pad) + var(--titlebar-height) + var(--app-gap));
+    z-index: 60;
     padding: 14px 14px 10px;
     margin-bottom: 10px;
     background: linear-gradient(180deg, rgba(20,21,26,.92), rgba(20,21,26,.72));
@@ -2121,7 +2173,16 @@
     <div class="sub" id="progSub"> </div><div class="rowBetween" style="margin-top:10px;gap:10px"><div class="muted" id="progHint" style="font-size:11px;color:rgba(229,231,235,.72)"></div><button class="btn" id="btnProgCancel" type="button" style="display:none">キャンセル</button></div>
   </div>
 </div>
-<div aria-atomic="true" aria-live="polite" id="toastHost"></div><div class="topbar"><div class="brand"><img alt="WavCue" class="brandLogo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4NjAgMjU2IiBhcmlhLWxhYmVsPSJXYXZDdWUiIHJvbGU9ImltZyI+CjxzdHlsZT4KICA6cm9vdHsKICAgIC0td2MtdGlsZTojMTQxNTFhOwogICAgLS13Yy1pbms6I2U2ZThlZTsKICAgIC0td2Mtd2F2ZTojZTZlOGVlOwogICAgLS13Yy1hY2NlbnQ6I2ZmZDI0YTsKICB9CiAgLndjLXNoYWRvd3sgZmlsdGVyOiBkcm9wLXNoYWRvdygwIDEwcHggMThweCByZ2JhKDAsMCwwLC40NSkpIGRyb3Atc2hhZG93KDAgNHB4IDlweCByZ2JhKDAsMCwwLC4zNSkpOyB9CiAgLndjLWdsb3d7IGZpbHRlcjogZHJvcC1zaGFkb3coMCAwIDEwcHggcmdiYSgyNTUsMjEwLDc0LC4yNSkpOyB9Cjwvc3R5bGU+CiAgPGcgY2xhc3M9IndjLXNoYWRvdyI+CiAgICA8cmVjdCB4PSIyNCIgeT0iMjQiIHdpZHRoPSIyMDgiIGhlaWdodD0iMjA4IiByeD0iNDgiIGZpbGw9InZhcigtLXdjLXRpbGUpIi8+CiAgICA8cGF0aCBkPSJNNTYgMTQ4IEM3MiAxNDggNzIgMTEyIDg4IDExMiBTMTA0IDE4NCAxMjAgMTg0IFMxMzYgNzYgMTUyIDc2IFMxNjggMTg0IDE4NCAxODQgUzE5MiAxNDggMjAwIDE0OCIKICAgICAgICAgIHN0cm9rZT0idmFyKC0td2Mtd2F2ZSkiIHN0cm9rZS13aWR0aD0iMTQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgogICAgPGcgY2xhc3M9IndjLWdsb3ciPgogICAgICA8Y2lyY2xlIGN4PSI1NiIgY3k9IjE0OCIgcj0iMTAiIGZpbGw9InZhcigtLXdjLWFjY2VudCkiLz4KICAgICAgPGNpcmNsZSBjeD0iMjAwIiBjeT0iMTQ4IiByPSIxMCIgZmlsbD0idmFyKC0td2MtYWNjZW50KSIvPgogICAgPC9nPgoKICAgIDxnIGZpbGw9InZhcigtLXdjLWluaykiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDI3MC4wMDAsMTMyLjAwMCkiPgogICAgICA8cGF0aCBkPSJNMjAuOTEwIC0wLjAwMCBMMzUuMTYwIC0wLjAwMCBMNDguNDIwIC00NS4zNzUgTDQ4LjYxNSAtNDUuMzc1IEw2MS45MjAgLTAuMDAwIEw3Ni4xNzAgLTAuMDAwIEw5NS45MTAgLTY5LjAwMCBMNzkuOTY1IC02OS4wMDAgTDY4LjI5NSAtMjEuMDQ1IEw2OC4yMDUgLTIxLjA0NSBMNTUuMzY1IC02OS4wMDAgTDQxLjcxNSAtNjkuMDAwIEwyOC44MzAgLTIxLjA0NSBMMjguNzQwIC0yMS4wNDUgTDE3LjA3MCAtNjkuMDAwIEwxLjEyNSAtNjkuMDAwIEwyMC45MTAgLTAuMDAwIFogTTExNi4zOTYgMC43NTAgQzEyMy43NDYgMC43NTAgMTI4LjU3NiAtMi4wMTAgMTMxLjI5MSAtNi45OTAgTDEzMS40ODYgLTYuOTkwIEwxMzEuNDg2IC0wLjAwMCBMMTQ1LjEyMSAtMC4wMDAgTDE0NS4xMjEgLTMzLjk0NSBDMTQ1LjEyMSAtNDMuMzY1IDEzNi44MjYgLTUwLjI1MCAxMjMuMzI2IC01MC4yNTAgQzEwOS4zNjEgLTUwLjI1MCAxMDEuNTc2IC00Mi44ODUgMTAxLjAyMSAtMzMuNjYwIEwxMTQuNjU2IC0zMy42NjAgQzExNS4wMzEgLTM3LjQ1NSAxMTguMzYxIC0zOS43OTUgMTIzLjE0NiAtMzkuNzk1IEMxMjcuODcxIC0zOS43OTUgMTMwLjg3MSAtMzcuNTQ1IDEzMC44NzEgLTMzLjk5MCBMMTMwLjg3MSAtMzMuNzUwIEMxMzAuODcxIC0zMC42MTUgMTI3LjY5MSAtMzAuMTM1IDExOC42OTEgLTI5LjI5NSBDMTA4LjI4MSAtMjguNDEwIDk5LjM3MSAtMjUuMDgwIDk5LjM3MSAtMTMuOTIwIEM5OS4zNzEgLTQuMDM1IDEwNi40OTYgMC43NTAgMTE2LjM5NiAwLjc1MCBaIE0xMjAuNTIxIC05LjA0NSBDMTE2LjA2NiAtOS4wNDUgMTEzLjE1NiAtMTEuMDEwIDExMy4xNTYgLTE0LjM4NSBDMTEzLjE1NiAtMTguMTM1IDExNi43MjYgLTIwLjAxMCAxMjEuMzE2IC0yMC42NzAgQzEyNS42NjYgLTIxLjI4NSAxMjkuMzcxIC0yMi4wMzUgMTMwLjk3NiAtMjIuODc1IEwxMzAuOTc2IC0xOC4wMDAgQzEzMC45NzYgLTEyLjc5NSAxMjYuODUxIC05LjA0NSAxMjAuNTIxIC05LjA0NSBaIE0yMDIuMDM5IC00OS41MDAgTDE4Ni45MzQgLTQ5LjUwMCBMMTc2LjA1OSAtMTQuNzE1IEwxNzUuODc5IC0xNC43MTUgTDE2NC45MTQgLTQ5LjUwMCBMMTQ5Ljc2NCAtNDkuNTAwIEwxNjcuODA5IC0wLjAwMCBMMTgzLjk3OSAtMC4wMDAgTDIwMi4wMzkgLTQ5LjUwMCBaIE0yMzguMTIzIDEuMTI1IEMyNTUuMzI4IDEuMTI1IDI2Ny43OTMgLTEwLjI2MCAyNjguNjQ4IC0yNi4xMTUgTDI1My43MzggLTI2LjExNSBDMjUyLjk0MyAtMTcuMzQwIDI0Ni44OTggLTExLjgyMCAyMzguNDk4IC0xMS44MjAgQzIyNi45MTggLTExLjgyMCAyMjAuNTQzIC0yMC4yNTAgMjIwLjU0MyAtMzQuNTAwIEMyMjAuNTQzIC00OC43OTUgMjI3LjAyMyAtNTcuMTk1IDIzOC40NTMgLTU3LjE5NSBDMjQ2LjcwMyAtNTcuMTk1IDI1Mi41NjggLTUxLjg0MCAyNTMuNzM4IC00Mi44ODUgTDI2OC42NDggLTQyLjg4NSBDMjY3LjYxMyAtNTkuMzg1IDI1NC42NjggLTcwLjEyNSAyMzguMTIzIC03MC4xMjUgQzIxOS4wNDMgLTcwLjEyNSAyMDUuMjEzIC01Ny4wOTAgMjA1LjI3MyAtMzQuNTAwIEMyMDUuMjEzIC0xMi4wMDAgMjE4Ljg2MyAxLjEyNSAyMzguMTIzIDEuMTI1IFogTTMwOC40ODggLTIxLjcwNSBDMzA4LjQ4OCAtMTQuNjcwIDMwNC40MDggLTExLjE2MCAyOTguNzgzIC0xMS4xNjAgQzI5Mi45NjMgLTExLjE2MCAyODkuMzYzIC0xNC43NjAgMjg5LjM2MyAtMjEuMjQwIEwyODkuMzYzIC00OS41MDAgTDI3NC45NjMgLTQ5LjUwMCBMMjc0Ljk2MyAtMTguNzA1IEMyNzQuOTYzIC02LjY2MCAyODIuNzQ4IDAuNzUwIDI5My4zOTggMC43NTAgQzMwMS4wMzMgMC43NTAgMzA2LjUyMyAtMy4xOTUgMzA4Ljc3MyAtOS4wNDUgTDMwOC45NTMgLTkuMDQ1IEwzMDguOTUzIC0wLjAwMCBMMzIyLjkxOCAtMC4wMDAgTDMyMi45MTggLTQ5LjUwMCBMMzA4LjQ4OCAtNDkuNTAwIEwzMDguNDg4IC0yMS43MDUgWiBNMzUzLjM5MiAwLjc1MCBDMzY1LjgxMiAwLjc5NSAzNzQuNDgyIC01LjcxNSAzNzYuMjY3IC0xNS42MTUgTDM2My4zMjIgLTE1LjYxNSBDMzYyLjEwNyAtMTEuOTEwIDM1OC4yMjIgLTkuNjE1IDM1My41MjcgLTkuNTcwIEMzNDYuNzc3IC05LjYxNSAzNDIuNzU3IC0xNC42MjUgMzQyLjgwMyAtMjEuMDQ1IEwzNDIuODAzIC0yMS40MjAgTDM3Ni42ODggLTIxLjQyMCBMMzc2LjY4OCAtMjQuNzUwIEMzNzYuNjg4IC00MC4xNzAgMzY3LjU1MyAtNTAuMjA1IDM1My4wNjIgLTUwLjI1MCBDMzM4LjM5MiAtNTAuMjA1IDMyOC45MjggLTM5Ljg4NSAzMjguOTI4IC0yNC43MDUgQzMyOC45MjggLTkuMTM1IDMzOC4zNDcgMC43OTUgMzUzLjM5MiAwLjc1MCBaIE0zNDIuODAzIC0zMC4wMDAgQzM0My4wNzIgLTM1LjQ5MCAzNDcuMTk3IC0zOS44ODUgMzUzLjI1NyAtMzkuOTQ1IEMzNTguOTcyIC0zOS44ODUgMzYzLjQyOCAtMzUuODY1IDM2My42MDcgLTMwLjAwMCBMMzQyLjgwMyAtMzAuMDAwIFoiLz4KICAgIDwvZz4KCiAgICA8cGF0aCBjbGFzcz0id2MtZ2xvdyIgZD0iTTI3MC4wMDAgMTcwLjAwMCBDMzM0LjAzNyAxNTkuMDAwIDM5NC4zMDcgMTU5LjAwMCA0NTguMzQ0IDE3MC4wMDAgUzU4Mi42NTEgMTgxLjAwMCA2NDYuNjg4IDE3MC4wMDAiIHN0cm9rZT0idmFyKC0td2MtYWNjZW50KSIgc3Ryb2tlLXdpZHRoPSIxMCIKICAgICAgICAgIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgogIDwvZz4KPC9zdmc+"/><div class="small"><span>WAVキュー / 添付 / 規格チェック</span><span class="verPill" id="verPill">v5_10_31</span><button class="linkBtn" id="btnChangelog" type="button">変更点</button></div><div class="topbarActions"><button class="btn noDrag" id="btnSettings" type="button">⚙ Settings</button></div></div><div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div><div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div></div><div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
+<div aria-atomic="true" aria-live="polite" id="toastHost"></div>
+<div class="titlebar">
+  <div class="titlebarTitle">WavCue</div>
+  <div class="titlebarControls">
+    <button class="winBtn" id="winMinBtn" type="button" aria-label="最小化">—</button>
+    <button class="winBtn" id="winMaxBtn" type="button" aria-label="最大化">▢</button>
+    <button class="winBtn close" id="winCloseBtn" type="button" aria-label="閉じる">✕</button>
+  </div>
+</div>
+<div class="topbar"><div class="brand"><img alt="WavCue" class="brandLogo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4NjAgMjU2IiBhcmlhLWxhYmVsPSJXYXZDdWUiIHJvbGU9ImltZyI+CjxzdHlsZT4KICA6cm9vdHsKICAgIC0td2MtdGlsZTojMTQxNTFhOwogICAgLS13Yy1pbms6I2U2ZThlZTsKICAgIC0td2Mtd2F2ZTojZTZlOGVlOwogICAgLS13Yy1hY2NlbnQ6I2ZmZDI0YTsKICB9CiAgLndjLXNoYWRvd3sgZmlsdGVyOiBkcm9wLXNoYWRvdygwIDEwcHggMThweCByZ2JhKDAsMCwwLC40NSkpIGRyb3Atc2hhZG93KDAgNHB4IDlweCByZ2JhKDAsMCwwLC4zNSkpOyB9CiAgLndjLWdsb3d7IGZpbHRlcjogZHJvcC1zaGFkb3coMCAwIDEwcHggcmdiYSgyNTUsMjEwLDc0LC4yNSkpOyB9Cjwvc3R5bGU+CiAgPGcgY2xhc3M9IndjLXNoYWRvdyI+CiAgICA8cmVjdCB4PSIyNCIgeT0iMjQiIHdpZHRoPSIyMDgiIGhlaWdodD0iMjA4IiByeD0iNDgiIGZpbGw9InZhcigtLXdjLXRpbGUpIi8+CiAgICA8cGF0aCBkPSJNNTYgMTQ4IEM3MiAxNDggNzIgMTEyIDg4IDExMiBTMTA0IDE4NCAxMjAgMTg0IFMxMzYgNzYgMTUyIDc2IFMxNjggMTg0IDE4NCAxODQgUzE5MiAxNDggMjAwIDE0OCIKICAgICAgICAgIHN0cm9rZT0idmFyKC0td2Mtd2F2ZSkiIHN0cm9rZS13aWR0aD0iMTQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgogICAgPGcgY2xhc3M9IndjLWdsb3ciPgogICAgICA8Y2lyY2xlIGN4PSI1NiIgY3k9IjE0OCIgcj0iMTAiIGZpbGw9InZhcigtLXdjLWFjY2VudCkiLz4KICAgICAgPGNpcmNsZSBjeD0iMjAwIiBjeT0iMTQ4IiByPSIxMCIgZmlsbD0idmFyKC0td2MtYWNjZW50KSIvPgogICAgPC9nPgoKICAgIDxnIGZpbGw9InZhcigtLXdjLWluaykiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDI3MC4wMDAsMTMyLjAwMCkiPgogICAgICA8cGF0aCBkPSJNMjAuOTEwIC0wLjAwMCBMMzUuMTYwIC0wLjAwMCBMNDguNDIwIC00NS4zNzUgTDQ4LjYxNSAtNDUuMzc1IEw2MS45MjAgLTAuMDAwIEw3Ni4xNzAgLTAuMDAwIEw5NS45MTAgLTY5LjAwMCBMNzkuOTY1IC02OS4wMDAgTDY4LjI5NSAtMjEuMDQ1IEw2OC4yMDUgLTIxLjA0NSBMNTUuMzY1IC02OS4wMDAgTDQxLjcxNSAtNjkuMDAwIEwyOC44MzAgLTIxLjA0NSBMMjguNzQwIC0yMS4wNDUgTDE3LjA3MCAtNjkuMDAwIEwxLjEyNSAtNjkuMDAwIEwyMC45MTAgLTAuMDAwIFogTTExNi4zOTYgMC43NTAgQzEyMy43NDYgMC43NTAgMTI4LjU3NiAtMi4wMTAgMTMxLjI5MSAtNi45OTAgTDEzMS40ODYgLTYuOTkwIEwxMzEuNDg2IC0wLjAwMCBMMTQ1LjEyMSAtMC4wMDAgTDE0NS4xMjEgLTMzLjk0NSBDMTQ1LjEyMSAtNDMuMzY1IDEzNi44MjYgLTUwLjI1MCAxMjMuMzI2IC01MC4yNTAgQzEwOS4zNjEgLTUwLjI1MCAxMDEuNTc2IC00Mi44ODUgMTAxLjAyMSAtMzMuNjYwIEwxMTQuNjU2IC0zMy42NjAgQzExNS4wMzEgLTM3LjQ1NSAxMTguMzYxIC0zOS43OTUgMTIzLjE0NiAtMzkuNzk1IEMxMjcuODcxIC0zOS43OTUgMTMwLjg3MSAtMzcuNTQ1IDEzMC44NzEgLTMzLjk5MCBMMTMwLjg3MSAtMzMuNzUwIEMxMzAuODcxIC0zMC42MTUgMTI3LjY5MSAtMzAuMTM1IDExOC42OTEgLTI5LjI5NSBDMTA4LjI4MSAtMjguNDEwIDk5LjM3MSAtMjUuMDgwIDk5LjM3MSAtMTMuOTIwIEM5OS4zNzEgLTQuMDM1IDEwNi40OTYgMC43NTAgMTE2LjM5NiAwLjc1MCBaIE0xMjAuNTIxIC05LjA0NSBDMTE2LjA2NiAtOS4wNDUgMTEzLjE1NiAtMTEuMDEwIDExMy4xNTYgLTE0LjM4NSBDMTEzLjE1NiAtMTguMTM1IDExNi43MjYgLTIwLjAxMCAxMjEuMzE2IC0yMC42NzAgQzEyNS42NjYgLTIxLjI4NSAxMjkuMzcxIC0yMi4wMzUgMTMwLjk3NiAtMjIuODc1IEwxMzAuOTc2IC0xOC4wMDAgQzEzMC45NzYgLTEyLjc5NSAxMjYuODUxIC05LjA0NSAxMjAuNTIxIC05LjA0NSBaIE0yMDIuMDM5IC00OS41MDAgTDE4Ni45MzQgLTQ5LjUwMCBMMTc2LjA1OSAtMTQuNzE1IEwxNzUuODc5IC0xNC43MTUgTDE2NC45MTQgLTQ5LjUwMCBMMTQ5Ljc2NCAtNDkuNTAwIEwxNjcuODA5IC0wLjAwMCBMMTgzLjk3OSAtMC4wMDAgTDIwMi4wMzkgLTQ5LjUwMCBaIE0yMzguMTIzIDEuMTI1IEMyNTUuMzI4IDEuMTI1IDI2Ny43OTMgLTEwLjI2MCAyNjguNjQ4IC0yNi4xMTUgTDI1My43MzggLTI2LjExNSBDMjUyLjk0MyAtMTcuMzQwIDI0Ni44OTggLTExLjgyMCAyMzguNDk4IC0xMS44MjAgQzIyNi45MTggLTExLjgyMCAyMjAuNTQzIC0yMC4yNTAgMjIwLjU0MyAtMzQuNTAwIEMyMjAuNTQzIC00OC43OTUgMjI3LjAyMyAtNTcuMTk1IDIzOC40NTMgLTU3LjE5NSBDMjQ2LjcwMyAtNTcuMTk1IDI1Mi41NjggLTUxLjg0MCAyNTMuNzM4IC00Mi44ODUgTDI2OC42NDggLTQyLjg4NS BD..."></div><div class="small"><span>WAVキュー / 添付 / 規格チェック</span><span class="verPill" id="verPill">v5_10_31</span><button class="linkBtn" id="btnChangelog" type="button">変更点</button></div><div class="topbarActions"><button class="btn noDrag" id="btnSettings" type="button">⚙ Settings</button></div></div><div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div><div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div></div><div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
@@ -2245,8 +2306,8 @@
 <span class="muted" id="ec_range">—</span>
 </div>
 <div class="row" style="gap:10px;align-items:center;justify-content:flex-end">
-  <label class="chk"><input type="checkbox" id="ec_autoReport"> レポート自動ダウンロード</label>
   <button class="btn good" id="exportCheckRun" style="padding:8px 12px;border-radius:999px" type="button">書き出し</button>
+  <label class="chk"><input type="checkbox" id="ec_autoReport"> レポート自動ダウンロード</label>
 </div>
 </div>
 <div class="modalBody">
@@ -6509,6 +6570,32 @@ $("fileInput").addEventListener("change", async (e)=>{
 
 $("btnPlay").addEventListener("click", play);
 $("btnPause").addEventListener("click", pause);
+
+const winMinBtn = $("winMinBtn");
+const winMaxBtn = $("winMaxBtn");
+const winCloseBtn = $("winCloseBtn");
+
+const updateWinMaxIcon = async ()=>{
+  if(!winMaxBtn || !window.wavcue?.winIsMaximized) return;
+  const isMax = await window.wavcue.winIsMaximized();
+  winMaxBtn.textContent = isMax ? "❐" : "▢";
+  winMaxBtn.setAttribute("aria-label", isMax ? "元に戻す" : "最大化");
+};
+
+if(winMinBtn){
+  winMinBtn.addEventListener("click", ()=> window.wavcue?.winMinimize?.());
+}
+if(winMaxBtn){
+  winMaxBtn.addEventListener("click", async ()=>{
+    window.wavcue?.winToggleMaximize?.();
+    setTimeout(updateWinMaxIcon, 120);
+  });
+}
+if(winCloseBtn){
+  winCloseBtn.addEventListener("click", ()=> window.wavcue?.winClose?.());
+}
+window.addEventListener("resize", ()=>{ updateWinMaxIcon(); });
+updateWinMaxIcon();
 
 const settingsButton = document.getElementById("btnSettings");
 const settingsDialog = $("settingsDialog");
