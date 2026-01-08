@@ -12,10 +12,11 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      matrix:
-        os:
-          - macos-latest
-          - windows-latest
+     matrix:
+  os:
+    - macos-13
+    - windows-latest
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
