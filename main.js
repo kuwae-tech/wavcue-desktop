@@ -107,6 +107,7 @@ const createSettingsWindow = () => {
     width: 720,
     height: 520,
     title: 'WavCue Settings',
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -115,6 +116,7 @@ const createSettingsWindow = () => {
   });
 
   settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
+  settingsWindow.setMenuBarVisibility(false);
 
   settingsWindow.on('closed', () => {
     settingsWindow = null;
@@ -125,6 +127,7 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
+    autoHideMenuBar: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -133,27 +136,8 @@ const createWindow = () => {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'prototype.html'));
+  mainWindow.setMenuBarVisibility(false);
   mainWindow.webContents.openDevTools({ mode: 'detach' });
-};
-
-const buildMenu = () => {
-  const template = [
-    {
-      label: app.name,
-      submenu: [
-        {
-          label: 'Settings',
-          accelerator: 'CmdOrCtrl+,',
-          click: () => createSettingsWindow(),
-        },
-        { type: 'separator' },
-        { role: 'quit' },
-      ],
-    },
-  ];
-
-  const menu = Menu.buildFromTemplate(template);
-  Menu.setApplicationMenu(menu);
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -360,7 +344,7 @@ const buildCleanupLog = (payload) => {
 };
 
 app.whenReady().then(async () => {
-  buildMenu();
+  Menu.setApplicationMenu(null);
   await ensureDefaultFolders();
   createWindow();
 
@@ -380,6 +364,9 @@ app.on('window-all-closed', () => {
 ipcMain.handle('settings:get', () => getSettings());
 ipcMain.handle('settings:set', (_event, patch) => setSettings(patch || {}));
 ipcMain.handle('settings:ensure-default-folders', () => ensureDefaultFolders());
+ipcMain.handle('settings:open', () => {
+  createSettingsWindow();
+});
 ipcMain.handle('settings:open-folder', async (_event, kind) => {
   const settings = getSettings();
   const paths = settings.paths || {};
