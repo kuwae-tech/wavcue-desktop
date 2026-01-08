@@ -9,6 +9,7 @@ const store = new Store({
   defaults: {
     settings: {
       autoCleanup: false,
+      autoReport: false,
       retentionDays: 30,
       backupQuotaGB: 25,
       minKeepCount: 20,
@@ -103,11 +104,23 @@ const createSettingsWindow = () => {
     return;
   }
 
+  const isWindows = process.platform === 'win32';
   settingsWindow = new BrowserWindow({
     width: 720,
     height: 520,
     title: 'WavCue Settings',
     autoHideMenuBar: true,
+    ...(isWindows
+      ? {
+          backgroundColor: '#0b0c0f',
+          titleBarStyle: 'hidden',
+          titleBarOverlay: {
+            color: '#0f1a2e',
+            symbolColor: '#e9ecf1',
+            height: 32,
+          },
+        }
+      : {}),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -117,6 +130,8 @@ const createSettingsWindow = () => {
 
   settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
   settingsWindow.setMenuBarVisibility(false);
+  settingsWindow.removeMenu();
+  Menu.setApplicationMenu(null);
 
   settingsWindow.on('closed', () => {
     settingsWindow = null;
@@ -124,10 +139,22 @@ const createSettingsWindow = () => {
 };
 
 const createWindow = () => {
+  const isWindows = process.platform === 'win32';
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     autoHideMenuBar: true,
+    ...(isWindows
+      ? {
+          backgroundColor: '#0b0c0f',
+          titleBarStyle: 'hidden',
+          titleBarOverlay: {
+            color: '#0f1a2e',
+            symbolColor: '#e9ecf1',
+            height: 32,
+          },
+        }
+      : {}),
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -137,6 +164,8 @@ const createWindow = () => {
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'prototype.html'));
   mainWindow.setMenuBarVisibility(false);
+  mainWindow.removeMenu();
+  Menu.setApplicationMenu(null);
   mainWindow.webContents.openDevTools({ mode: 'detach' });
 };
 
