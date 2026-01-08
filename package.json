@@ -34,7 +34,13 @@
       "target": [
         "nsis",
         "zip"
-      ]
+      ],
+      "icon": "build/icons/wavcue_app.ico"
+    },
+    "nsis": {
+      "installerIcon": "build/icons/wavcue_installer.ico",
+      "uninstallerIcon": "build/icons/wavcue_installer.ico",
+      "shortcutName": "WavCue"
     },
     "artifactName": "WavCue-${os}-${arch}-${version}.${ext}"
   }

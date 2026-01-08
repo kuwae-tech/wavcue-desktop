@@ -9,6 +9,9 @@ const store = new Store({
   defaults: {
     settings: {
       autoCleanup: false,
+      autoCleanupOnExport: false,
+      autoCleanupOnQuit: false,
+      autoCleanupOnStartup: false,
       autoReport: false,
       retentionDays: 30,
       backupQuotaGB: 25,
