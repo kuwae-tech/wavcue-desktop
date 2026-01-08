@@ -47,6 +47,19 @@
         font-size: 13px;
         white-space: pre-wrap;
       }
+      .progress {
+        margin-top: 12px;
+        font-size: 13px;
+        color: #4b5563;
+      }
+      .cleanup-result {
+        margin-top: 12px;
+        background: #f8fafc;
+        border-radius: 8px;
+        padding: 12px;
+        font-size: 13px;
+        color: #1f2937;
+      }
       .paths {
         margin-top: 16px;
         font-size: 13px;
@@ -67,12 +80,38 @@
         <button class="secondary" id="cleanup-now">今すぐクリーンアップを実行</button>
       </div>
       <div class="paths" id="paths"></div>
+      <div class="cleanup-result" id="cleanup-result">Last cleanup: not run yet.</div>
+      <div class="progress" id="cleanup-progress">Idle.</div>
       <div class="log" id="log">Ready.</div>
     </div>
     <script>
       const log = (message) => {
         const logEl = document.getElementById('log');
         logEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}\n${logEl.textContent}`;
+      };
+
+      const formatBytes = (bytes) => {
+        if (!bytes) return '0 B';
+        const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+        let value = bytes;
+        let unitIndex = 0;
+        while (value >= 1024 && unitIndex < units.length - 1) {
+          value /= 1024;
+          unitIndex += 1;
+        }
+        return `${value.toFixed(1)} ${units[unitIndex]}`;
+      };
+
+      const updateCleanupResult = (result) => {
+        const resultEl = document.getElementById('cleanup-result');
+        if (!result || !result.timestamp) {
+          resultEl.textContent = 'Last cleanup: not run yet.';
+          return;
+        }
+        const when = new Date(result.timestamp).toLocaleString();
+        resultEl.textContent = `Last cleanup (${when}): deleted ${result.deletedCount} jobs, freed ${formatBytes(
+          result.deletedBytes,
+        )}, errors ${result.errorCount}.`;
       };
 
       const updatePaths = async () => {
@@ -87,6 +126,7 @@
         ]
           .map((line) => `<span>${line}</span>`)
           .join('');
+        updateCleanupResult(settings.cleanupLastResult);
       };
 
       document.querySelectorAll('button[data-folder]').forEach((button) => {
@@ -102,8 +142,26 @@
       });
 
       document.getElementById('cleanup-now').addEventListener('click', async () => {
-        await window.wavcue.runCleanupNow();
-        log('Cleanup started (dummy).');
+        const progressEl = document.getElementById('cleanup-progress');
+        progressEl.textContent = 'Starting cleanup...';
+        log('Cleanup started.');
+        const result = await window.wavcue.runCleanupNow();
+        if (result.ok) {
+          log(
+            `Cleanup finished. Deleted ${result.summary.deletedCount} jobs, freed ${formatBytes(
+              result.summary.deletedBytes,
+            )}. Errors: ${result.summary.errorCount}.`,
+          );
+        } else {
+          log(`Cleanup finished with errors. Errors: ${result.summary.errorCount}.`);
+        }
+        updateCleanupResult(result.summary);
+      });
+
+      window.wavcue.onCleanupProgress((payload) => {
+        if (payload?.message) {
+          document.getElementById('cleanup-progress').textContent = payload.message;
+        }
       });
 
       window.wavcue.ensureDefaultFolders().then(() => {

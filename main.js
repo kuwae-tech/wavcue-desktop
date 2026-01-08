@@ -155,6 +155,209 @@ const buildMenu = () => {
   Menu.setApplicationMenu(menu);
 };
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const formatIsoTimestamp = (date) => date.toISOString();
+
+const isValidDate = (value) => Number.isFinite(value?.getTime?.());
+
+const getFolderSize = async (targetPath) => {
+  try {
+    const entries = await fs.readdir(targetPath, { withFileTypes: true });
+    const sizes = await Promise.all(
+      entries.map(async (entry) => {
+        const entryPath = path.join(targetPath, entry.name);
+        if (entry.isDirectory()) {
+          return getFolderSize(entryPath);
+        }
+        if (entry.isFile()) {
+          const stats = await fs.stat(entryPath);
+          return stats.size;
+        }
+        return 0;
+      }),
+    );
+    return sizes.reduce((sum, value) => sum + value, 0);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return 0;
+    }
+    throw error;
+  }
+};
+
+const safeStat = async (targetPath) => {
+  try {
+    return await fs.stat(targetPath);
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return null;
+    }
+    throw error;
+  }
+};
+
+const safeReadJson = async (targetPath) => {
+  try {
+    const raw = await fs.readFile(targetPath, 'utf8');
+    return { ok: true, value: JSON.parse(raw) };
+  } catch (error) {
+    if (error.code === 'ENOENT') {
+      return { ok: false, error: 'missing' };
+    }
+    return { ok: false, error: error.message };
+  }
+};
+
+const listJobs = async (paths) => {
+  const entries = await fs.readdir(paths.reports, { withFileTypes: true });
+  const jobs = [];
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const jobId = entry.name;
+    const reportsPath = path.join(paths.reports, jobId);
+    const backupsPath = path.join(paths.backups, jobId);
+    const jobJsonPath = path.join(reportsPath, 'Job.json');
+    const jobJsonResult = await safeReadJson(jobJsonPath);
+    const reportStat = await safeStat(reportsPath);
+    if (!reportStat) {
+      continue;
+    }
+    let createdAt = reportStat.mtime;
+    let orphanReason = null;
+    if (jobJsonResult.ok) {
+      const parsed = new Date(jobJsonResult.value.createdAt);
+      if (isValidDate(parsed)) {
+        createdAt = parsed;
+      } else {
+        orphanReason = 'invalid createdAt';
+      }
+    } else {
+      orphanReason = jobJsonResult.error;
+    }
+    const reportSize = await getFolderSize(reportsPath);
+    const backupSize = await getFolderSize(backupsPath);
+    jobs.push({
+      jobId,
+      reportsPath,
+      backupsPath,
+      createdAt,
+      reportSize,
+      backupSize,
+      orphanReason,
+    });
+  }
+  return jobs.sort((a, b) => a.createdAt - b.createdAt);
+};
+
+const ensureUniquePath = async (basePath) => {
+  const stat = await safeStat(basePath);
+  if (!stat) {
+    return basePath;
+  }
+  const suffix = new Date().toISOString().replace(/[:.]/g, '-');
+  return `${basePath}-${suffix}`;
+};
+
+const movePath = async (source, destination) => {
+  try {
+    await fs.rename(source, destination);
+  } catch (error) {
+    if (error.code === 'EXDEV') {
+      await fs.cp(source, destination, { recursive: true });
+      await fs.rm(source, { recursive: true, force: true });
+      return;
+    }
+    throw error;
+  }
+};
+
+const deleteJob = async (job, options) => {
+  const { deleteMethod, trashRoot } = options;
+  const errors = [];
+  const totalBytes = job.reportSize + job.backupSize;
+  const pathsToDelete = [
+    { label: 'reports', path: job.reportsPath },
+    { label: 'backups', path: job.backupsPath },
+  ];
+
+  if (deleteMethod === 'hard') {
+    for (const item of pathsToDelete) {
+      const stat = await safeStat(item.path);
+      if (!stat) {
+        continue;
+      }
+      try {
+        await fs.rm(item.path, { recursive: true, force: true });
+      } catch (error) {
+        errors.push(`${item.label}: ${error.message}`);
+      }
+    }
+    return { deletedBytes: totalBytes, errors };
+  }
+
+  const targetTrashBase = await ensureUniquePath(path.join(trashRoot, job.jobId));
+  await fs.mkdir(targetTrashBase, { recursive: true });
+
+  for (const item of pathsToDelete) {
+    const stat = await safeStat(item.path);
+    if (!stat) {
+      continue;
+    }
+
+    if (deleteMethod === 'trash') {
+      try {
+        await shell.trashItem(item.path);
+        continue;
+      } catch (error) {
+        errors.push(`${item.label}: trash failed (${error.message}), falling back to appTrash`);
+      }
+    }
+
+    const destination = path.join(targetTrashBase, item.label);
+    try {
+      await movePath(item.path, destination);
+    } catch (error) {
+      errors.push(`${item.label}: appTrash failed (${error.message})`);
+    }
+  }
+
+  return { deletedBytes: totalBytes, errors };
+};
+
+const buildCleanupLog = (payload) => {
+  const lines = [];
+  lines.push(`[${formatIsoTimestamp(payload.startedAt)}] Cleanup run started`);
+  lines.push(
+    `Settings: retentionDays=${payload.retentionDays}, backupQuotaGB=${payload.backupQuotaGB}, minKeepCount=${payload.minKeepCount}, deleteMethod=${payload.deleteMethod}`,
+  );
+  lines.push(`Jobs scanned: ${payload.jobCount}`);
+  lines.push(`Protected jobs: ${payload.protectedCount}`);
+  if (payload.orphanJobs.length > 0) {
+    for (const orphan of payload.orphanJobs) {
+      lines.push(`Orphan candidate: ${orphan.jobId} (${orphan.orphanReason || 'missing Job.json'})`);
+    }
+  }
+  if (payload.deletions.length === 0) {
+    lines.push('No jobs scheduled for deletion.');
+  }
+  for (const deletion of payload.deletions) {
+    const base = `Delete ${deletion.jobId} reason=${deletion.reason} backupSize=${deletion.backupSize} reportSize=${deletion.reportSize}`;
+    if (deletion.errors.length > 0) {
+      lines.push(`${base} failed=${deletion.errors.join('; ')}`);
+    } else {
+      lines.push(`${base} ok`);
+    }
+  }
+  lines.push(
+    `Summary: deletedJobs=${payload.deletedCount}, deletedBytes=${payload.deletedBytes}, errors=${payload.errorCount}`,
+  );
+  lines.push(`Cleanup run finished at ${formatIsoTimestamp(payload.finishedAt)}`);
+  return `${lines.join('\n')}\n`;
+};
+
 app.whenReady().then(async () => {
   buildMenu();
   await ensureDefaultFolders();
@@ -190,7 +393,116 @@ ipcMain.handle('settings:open-folder', async (_event, kind) => {
   const result = await shell.openPath(resolved);
   return result ? { ok: false, message: result } : { ok: true };
 });
-ipcMain.handle('settings:run-cleanup-now', () => {
-  console.log('Cleanup invoked from settings UI.');
-  return { ok: true };
+ipcMain.handle('settings:run-cleanup-now', async (event) => {
+  const startedAt = new Date();
+  const progress = (message) => {
+    event.sender.send('settings:cleanup-progress', { message });
+  };
+
+  progress('Scanning...');
+
+  const settings = await ensureDefaultFolders();
+  const { retentionDays, backupQuotaGB, minKeepCount, deleteMethod } = settings;
+  const { backups, reports, root } = settings.paths;
+
+  const jobs = await listJobs({ backups, reports });
+  const protectedJobs = new Set(jobs.slice(-minKeepCount).map((job) => job.jobId));
+  const orphanJobs = jobs.filter((job) => job.orphanReason);
+  const retentionThreshold = retentionDays * DAY_MS;
+  const quotaBytes = backupQuotaGB * 1024 * 1024 * 1024;
+  const totalBackupBytes = jobs.reduce((sum, job) => sum + job.backupSize, 0);
+
+  const deletions = [];
+  const deletionLookup = new Set();
+  for (const job of jobs) {
+    if (protectedJobs.has(job.jobId)) {
+      continue;
+    }
+    if (job.orphanReason) {
+      deletions.push({ ...job, reason: 'orphan (missing Job.json)' });
+      deletionLookup.add(job.jobId);
+      continue;
+    }
+    const age = Date.now() - job.createdAt.getTime();
+    if (age > retentionThreshold) {
+      deletions.push({ ...job, reason: `retentionDays ${retentionDays}d exceeded` });
+      deletionLookup.add(job.jobId);
+    }
+  }
+
+  let projectedBytes = totalBackupBytes - deletions.reduce((sum, job) => sum + job.backupSize, 0);
+  if (projectedBytes > quotaBytes) {
+    for (const job of jobs) {
+      if (protectedJobs.has(job.jobId) || deletionLookup.has(job.jobId)) {
+        continue;
+      }
+      deletions.push({ ...job, reason: `backupQuota ${backupQuotaGB}GB exceeded` });
+      deletionLookup.add(job.jobId);
+      projectedBytes -= job.backupSize;
+      if (projectedBytes <= quotaBytes) {
+        break;
+      }
+    }
+  }
+
+  if (deletions.length === 0) {
+    progress('No cleanup needed.');
+  }
+
+  const trashRoot = path.join(root, 'Trash');
+  await fs.mkdir(trashRoot, { recursive: true });
+
+  let deletedBytes = 0;
+  let errorCount = 0;
+  const deletionResults = [];
+  for (let index = 0; index < deletions.length; index += 1) {
+    const job = deletions[index];
+    progress(`Deleting ${index + 1}/${deletions.length} ...`);
+    const result = await deleteJob(job, { deleteMethod, trashRoot });
+    if (result.errors.length > 0) {
+      errorCount += 1;
+    } else {
+      deletedBytes += result.deletedBytes;
+    }
+    deletionResults.push({ ...job, errors: result.errors, reason: job.reason });
+  }
+
+  const finishedAt = new Date();
+  const cleanupLastResult = {
+    timestamp: finishedAt.toISOString(),
+    deletedCount: deletions.length - errorCount,
+    deletedBytes,
+    errorCount,
+  };
+  setSettings({ cleanupLastResult });
+
+  const logPayload = {
+    startedAt,
+    finishedAt,
+    retentionDays,
+    backupQuotaGB,
+    minKeepCount,
+    deleteMethod,
+    jobCount: jobs.length,
+    protectedCount: protectedJobs.size,
+    orphanJobs,
+    deletions: deletionResults,
+    deletedCount: cleanupLastResult.deletedCount,
+    deletedBytes,
+    errorCount,
+  };
+  const logPath = path.join(reports, 'CleanupLog.txt');
+  await fs.appendFile(logPath, buildCleanupLog(logPayload), 'utf8');
+
+  progress('Cleanup finished.');
+
+  return {
+    ok: errorCount === 0,
+    summary: cleanupLastResult,
+    deletions: deletionResults.map((job) => ({
+      jobId: job.jobId,
+      reason: job.reason,
+      errors: job.errors,
+    })),
+  };
 });
