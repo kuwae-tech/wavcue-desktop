@@ -2,7 +2,7 @@ name: Build Desktop Apps
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
     tags:
       - "v*"
   workflow_dispatch:
@@ -12,10 +12,10 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-     matrix:
-  os:
-    - macos-13
-    - windows-latest
+      matrix:
+        os:
+          - macos-13
+          - windows-latest
 
     steps:
       - name: Checkout
@@ -29,6 +29,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+
+      # 保険（macだけ実行権限を付与）
+      - name: Fix permissions for app-builder (macOS)
+        if: runner.os == 'macOS'
+        run: chmod +x node_modules/app-builder-bin/mac/app-builder_*
 
       - name: Build
         run: npx electron-builder --publish never
