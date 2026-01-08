@@ -343,6 +343,20 @@ const buildCleanupLog = (payload) => {
   return `${lines.join('\n')}\n`;
 };
 
+const ensureWavExtension = (targetPath) => {
+  if (!targetPath) {
+    return targetPath;
+  }
+  const ext = path.extname(targetPath);
+  if (!ext) {
+    return `${targetPath}.wav`;
+  }
+  if (ext.toLowerCase() === '.wav') {
+    return targetPath;
+  }
+  return `${targetPath.slice(0, -ext.length)}.wav`;
+};
+
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   await ensureDefaultFolders();
@@ -501,14 +515,16 @@ ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) =>
       title: '書き出し先を選択',
       defaultPath: defaultName,
       buttonLabel: '保存',
+      filters: [{ name: 'WAV', extensions: ['wav'] }],
     });
     if (canceled || !filePath) {
       return { ok: false, canceled: true };
     }
 
+    const resolvedPath = ensureWavExtension(filePath);
     const buf = Buffer.from(dataBase64, 'base64');
-    fsSync.writeFileSync(filePath, buf);
-    return { ok: true, filePath };
+    fsSync.writeFileSync(resolvedPath, buf);
+    return { ok: true, filePath: resolvedPath };
   } catch (error) {
     return { ok: false, error: String(error?.message || error) };
   }
