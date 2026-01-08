@@ -6,6 +6,7 @@ contextBridge.exposeInMainWorld('wavcue', {
   ensureDefaultFolders: () => ipcRenderer.invoke('settings:ensure-default-folders'),
   openFolder: (kind) => ipcRenderer.invoke('settings:open-folder', kind),
   runCleanupNow: () => ipcRenderer.invoke('settings:run-cleanup-now'),
+  saveExportFile: (payload) => ipcRenderer.invoke('export:saveFile', payload),
   onCleanupProgress: (handler) => {
     const listener = (_event, payload) => handler(payload);
     ipcRenderer.on('settings:cleanup-progress', listener);
