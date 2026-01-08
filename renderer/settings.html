@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>WavCue Settings</title>
+    <style>
+      body {
+        font-family: "Segoe UI", sans-serif;
+        margin: 24px;
+        color: #1f2a44;
+        background: #f5f7fb;
+      }
+      h1 {
+        margin-top: 0;
+      }
+      .panel {
+        background: #ffffff;
+        padding: 20px;
+        border-radius: 12px;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      }
+      .button-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+        gap: 12px;
+        margin-bottom: 16px;
+      }
+      button {
+        padding: 12px 16px;
+        border: none;
+        border-radius: 8px;
+        background: #3953f2;
+        color: #fff;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #4c6fff;
+      }
+      .log {
+        margin-top: 16px;
+        background: #eef2ff;
+        border-radius: 8px;
+        padding: 12px;
+        min-height: 80px;
+        font-size: 13px;
+        white-space: pre-wrap;
+      }
+      .paths {
+        margin-top: 16px;
+        font-size: 13px;
+        color: #4b5563;
+      }
+      .paths span {
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Settings</h1>
+    <div class="panel">
+      <div class="button-grid">
+        <button data-folder="exports">Exportsを開く</button>
+        <button data-folder="backups">Backupsを開く</button>
+        <button data-folder="reports">Reportsを開く</button>
+        <button class="secondary" id="cleanup-now">今すぐクリーンアップを実行</button>
+      </div>
+      <div class="paths" id="paths"></div>
+      <div class="log" id="log">Ready.</div>
+    </div>
+    <script>
+      const log = (message) => {
+        const logEl = document.getElementById('log');
+        logEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}\n${logEl.textContent}`;
+      };
+
+      const updatePaths = async () => {
+        const settings = await window.wavcue.getSettings();
+        const paths = settings.paths || {};
+        const container = document.getElementById('paths');
+        container.innerHTML = [
+          `Root: ${paths.root || 'Not set'}`,
+          `Exports: ${paths.exports || 'Not set'}`,
+          `Backups: ${paths.backups || 'Not set'}`,
+          `Reports: ${paths.reports || 'Not set'}`,
+        ]
+          .map((line) => `<span>${line}</span>`)
+          .join('');
+      };
+
+      document.querySelectorAll('button[data-folder]').forEach((button) => {
+        button.addEventListener('click', async () => {
+          const kind = button.dataset.folder;
+          const result = await window.wavcue.openFolder(kind);
+          if (result.ok) {
+            log(`Opened ${kind} folder.`);
+          } else {
+            log(`Failed to open ${kind} folder: ${result.message || 'unknown error'}`);
+          }
+        });
+      });
+
+      document.getElementById('cleanup-now').addEventListener('click', async () => {
+        await window.wavcue.runCleanupNow();
+        log('Cleanup started (dummy).');
+      });
+
+      window.wavcue.ensureDefaultFolders().then(() => {
+        updatePaths();
+      });
+    </script>
+  </body>
+</html>

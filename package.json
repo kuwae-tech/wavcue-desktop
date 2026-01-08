@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "electron ."
   },
+  "dependencies": {
+    "electron-store": "^9.0.0"
+  },
   "devDependencies": {
     "electron": "^29.0.0"
   }
