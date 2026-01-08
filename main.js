@@ -96,65 +96,17 @@ const ensureDefaultFolders = async () => {
   return setSettings({ paths: fallbackPaths });
 };
 
-let settingsWindow = null;
-
-const createSettingsWindow = () => {
-  if (settingsWindow) {
-    settingsWindow.focus();
-    return;
-  }
-
-  const isWindows = process.platform === 'win32';
-  settingsWindow = new BrowserWindow({
-    width: 720,
-    height: 520,
-    title: 'WavCue Settings',
-    autoHideMenuBar: true,
-    ...(isWindows
-      ? {
-          backgroundColor: '#0b0c0f',
-          titleBarStyle: 'hidden',
-          titleBarOverlay: {
-            color: '#0f1a2e',
-            symbolColor: '#e9ecf1',
-            height: 32,
-          },
-        }
-      : {}),
-    webPreferences: {
-      nodeIntegration: false,
-      contextIsolation: true,
-      preload: path.join(__dirname, 'preload.js'),
-    },
-  });
-
-  settingsWindow.loadFile(path.join(__dirname, 'renderer', 'settings.html'));
-  settingsWindow.setMenuBarVisibility(false);
-  settingsWindow.removeMenu();
-  Menu.setApplicationMenu(null);
-
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
-  });
-};
-
 const createWindow = () => {
-  const isWindows = process.platform === 'win32';
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     autoHideMenuBar: true,
-    ...(isWindows
-      ? {
-          backgroundColor: '#0b0c0f',
-          titleBarStyle: 'hidden',
-          titleBarOverlay: {
-            color: '#0f1a2e',
-            symbolColor: '#e9ecf1',
-            height: 32,
-          },
-        }
-      : {}),
+    backgroundColor: '#0b0c0f',
+    frame: false,
+    resizable: true,
+    minimizable: true,
+    maximizable: true,
+    closable: true,
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -404,12 +356,37 @@ app.on('window-all-closed', () => {
   }
 });
 
+ipcMain.on('window:minimize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) {
+    win.minimize();
+  }
+});
+ipcMain.on('window:toggle-maximize', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (!win) {
+    return;
+  }
+  if (win.isMaximized()) {
+    win.unmaximize();
+  } else {
+    win.maximize();
+  }
+});
+ipcMain.on('window:close', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  if (win) {
+    win.close();
+  }
+});
+ipcMain.handle('window:is-maximized', (event) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
+  return win ? win.isMaximized() : false;
+});
+
 ipcMain.handle('settings:get', () => getSettings());
 ipcMain.handle('settings:set', (_event, patch) => setSettings(patch || {}));
 ipcMain.handle('settings:ensure-default-folders', () => ensureDefaultFolders());
-ipcMain.handle('settings:open', () => {
-  createSettingsWindow();
-});
 ipcMain.handle('settings:open-folder', async (_event, kind) => {
   const settings = getSettings();
   const paths = settings.paths || {};
