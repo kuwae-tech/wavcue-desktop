@@ -1,93 +1,198 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ja">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>WavCue Settings</title>
     <style>
+      :root {
+        --bg: #0b0c0f;
+        --panel: #121417;
+        --panel2: #171a1f;
+        --line: #242a33;
+        --text: #e9ecf1;
+        --muted: #aab2bd;
+        --accent: #ffd24a;
+        --good: #7ee7a2;
+        --shadow: 0 18px 48px rgba(0, 0, 0, 0.45);
+        --r: 16px;
+      }
+      * {
+        box-sizing: border-box;
+      }
       body {
-        font-family: "Segoe UI", sans-serif;
-        margin: 24px;
-        color: #1f2a44;
-        background: #f5f7fb;
+        margin: 0;
+        min-height: 100vh;
+        font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "Hiragino Kaku Gothic ProN",
+          "Meiryo", sans-serif;
+        background: radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);
+        color: var(--text);
+      }
+      .app {
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        padding: 20px;
+      }
+      .pageHeader {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
       }
       h1 {
-        margin-top: 0;
+        margin: 0;
+        font-size: 22px;
+        letter-spacing: 0.3px;
       }
-      .panel {
-        background: #ffffff;
-        padding: 20px;
-        border-radius: 12px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+      h2 {
+        margin: 0 0 8px;
+        font-size: 14px;
+        letter-spacing: 0.3px;
+      }
+      .subtitle {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+        gap: 14px;
+      }
+      .card {
+        background: linear-gradient(180deg, rgba(23, 26, 31, 0.9), rgba(18, 20, 23, 0.9));
+        border: 1px solid var(--line);
+        border-radius: var(--r);
+        padding: 14px;
+        box-shadow: var(--shadow);
+      }
+      .muted {
+        color: var(--muted);
       }
       .button-grid {
         display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-        gap: 12px;
-        margin-bottom: 16px;
+        grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+        gap: 10px;
       }
-      button {
-        padding: 12px 16px;
-        border: none;
-        border-radius: 8px;
-        background: #3953f2;
-        color: #fff;
-        font-size: 14px;
+      .btn {
+        appearance: none;
+        border: 1px solid var(--line);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text);
+        padding: 10px 12px;
+        border-radius: 12px;
         cursor: pointer;
+        font-size: 12px;
+        line-height: 1;
+        transition: background 0.15s ease, transform 0.08s ease;
       }
-      button.secondary {
-        background: #4c6fff;
+      .btn:hover {
+        background: rgba(255, 255, 255, 0.08);
       }
-      .log {
-        margin-top: 16px;
-        background: #eef2ff;
-        border-radius: 8px;
-        padding: 12px;
-        min-height: 80px;
-        font-size: 13px;
-        white-space: pre-wrap;
+      .btn:active {
+        transform: translateY(1px);
       }
-      .progress {
-        margin-top: 12px;
-        font-size: 13px;
-        color: #4b5563;
+      .btn.primary {
+        border-color: rgba(126, 231, 162, 0.45);
+        background: rgba(126, 231, 162, 0.12);
       }
-      .cleanup-result {
-        margin-top: 12px;
-        background: #f8fafc;
-        border-radius: 8px;
-        padding: 12px;
-        font-size: 13px;
-        color: #1f2937;
+      .btn.primary:hover {
+        background: rgba(126, 231, 162, 0.18);
       }
       .paths {
-        margin-top: 16px;
-        font-size: 13px;
-        color: #4b5563;
+        display: grid;
+        gap: 8px;
+        font-size: 12px;
       }
       .paths span {
         display: block;
+        padding: 8px 10px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(0, 0, 0, 0.2);
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        color: rgba(229, 231, 235, 0.9);
+      }
+      .cleanup-result,
+      .progress {
+        margin-top: 8px;
+        font-size: 12px;
+        color: var(--muted);
+      }
+      .logCard {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+      .logHeader {
+        display: flex;
+        align-items: baseline;
+        justify-content: space-between;
+        gap: 10px;
+      }
+      .log {
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        padding: 12px;
+        min-height: 140px;
+        max-height: 260px;
+        overflow: auto;
+        font-size: 12px;
+        white-space: pre-wrap;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+        color: rgba(229, 231, 235, 0.9);
       }
     </style>
   </head>
   <body>
-    <h1>Settings</h1>
-    <div class="panel">
-      <div class="button-grid">
-        <button data-folder="exports">Exportsを開く</button>
-        <button data-folder="backups">Backupsを開く</button>
-        <button data-folder="reports">Reportsを開く</button>
-        <button class="secondary" id="cleanup-now">今すぐクリーンアップを実行</button>
+    <div class="app">
+      <header class="pageHeader">
+        <div>
+          <h1>Settings</h1>
+          <p class="subtitle">Storage / Paths / Cleanup</p>
+        </div>
+      </header>
+
+      <div class="grid">
+        <section class="card">
+          <h2>Storage</h2>
+          <p class="subtitle">Exports / Backups / Reports を開く</p>
+          <div class="button-grid">
+            <button class="btn" data-folder="exports">Exportsを開く</button>
+            <button class="btn" data-folder="backups">Backupsを開く</button>
+            <button class="btn" data-folder="reports">Reportsを開く</button>
+          </div>
+        </section>
+
+        <section class="card">
+          <h2>Paths</h2>
+          <div class="paths" id="paths"></div>
+        </section>
+
+        <section class="card">
+          <h2>Cleanup</h2>
+          <button class="btn primary" id="cleanup-now">今すぐクリーンアップを実行</button>
+          <div class="cleanup-result" id="cleanup-result">Last cleanup: not run yet.</div>
+          <div class="progress" id="cleanup-progress">Idle.</div>
+        </section>
       </div>
-      <div class="paths" id="paths"></div>
-      <div class="cleanup-result" id="cleanup-result">Last cleanup: not run yet.</div>
-      <div class="progress" id="cleanup-progress">Idle.</div>
-      <div class="log" id="log">Ready.</div>
+
+      <section class="card logCard">
+        <div class="logHeader">
+          <h2>Logs</h2>
+          <span class="muted">Cleanup / Actions</span>
+        </div>
+        <div class="log" id="log">Ready.</div>
+      </section>
     </div>
+
     <script>
       const log = (message) => {
         const logEl = document.getElementById('log');
-        logEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}\n${logEl.textContent}`;
+        logEl.textContent = `[${new Date().toLocaleTimeString()}] ${message}
+${logEl.textContent}`;
       };
 
       const formatBytes = (bytes) => {
