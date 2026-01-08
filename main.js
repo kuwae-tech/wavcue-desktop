@@ -1,6 +1,7 @@
 const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron');
 const path = require('path');
 const fs = require('fs/promises');
+const fsSync = require('fs');
 const Store = require('electron-store');
 
 const store = new Store({
@@ -505,4 +506,23 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
       errors: job.errors,
     })),
   };
+});
+
+ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) => {
+  try {
+    const { canceled, filePath } = await dialog.showSaveDialog({
+      title: '書き出し先を選択',
+      defaultPath: defaultName,
+      buttonLabel: '保存',
+    });
+    if (canceled || !filePath) {
+      return { ok: false, canceled: true };
+    }
+
+    const buf = Buffer.from(dataBase64, 'base64');
+    fsSync.writeFileSync(filePath, buf);
+    return { ok: true, filePath };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
 });

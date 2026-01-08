@@ -6275,7 +6275,7 @@ async function exportWav(){
         const diffs = (state._diff && state._diff.diffs) ? state._diff.diffs : diffSnapshots(state.originalSnapshot, takeSnapshot());
         const stamp = _tsStamp();
         // レポートのファイル名は、可能なら「書き出し時に確定した出力ファイル名」を優先（保存ダイアログで名称変更した場合に追従）
-        const _outNameForReport = (_saveRes?.mode === "picker") ? (_saveRes?.handle?.name || _saveRes?.suggested) : (_saveRes?.suggested || suggested);
+        const _outNameForReport = _saveRes?.filePath ? _baseNameFromPath(_saveRes.filePath) : (_saveRes?.suggested || suggested);
         const _reportBase = _baseNameNoExt(String(_outNameForReport || state.fileName || "output"));
         const reportName = `${_reportBase}_WavCue_Report_${stamp}.txt`;
 const lines = [];
@@ -6285,10 +6285,8 @@ const lines = [];
         // Output filename: pickerなら実際に確定した名前（handle.name）を優先。downloadはユーザーが保存ダイアログで変更し得るため、名称は省略する。
         const _outMode = String(_saveRes?.mode||"");
         let _outName = "";
-        if(_outMode === "picker"){
-          _outName = String(_saveRes?.handle?.name || _saveRes?.suggested || suggested || "");
-        }else if(_outMode === "download"){
-          _outName = ""; // 取得不能（ブラウザ保存ダイアログで変更され得る）
+        if(_outMode === "ipc"){
+          _outName = String(_baseNameFromPath(_saveRes?.filePath) || _saveRes?.suggested || suggested || "");
         }else{
           _outName = String(_saveRes?.suggested || suggested || "");
         }
@@ -6296,7 +6294,6 @@ const lines = [];
           lines.push(`Output: ${_outName} (${_outMode})`);
         }else{
           lines.push(`Output: — (${_outMode})`);
-          if(_outMode === "download") lines.push(`Note: download方式では最終的な保存ファイル名を取得できないため、出力名は省略しています。`);
         }
 if(makeBackup) lines.push(`Backup: ${String(backupName || "—")} (${String(_backupRes?.mode||"")})`);
         try{
@@ -6324,8 +6321,10 @@ lines.push("");
         const logLines = String(logTxt||"").split("\n");
         lines.push(logLines.slice(Math.max(0, logLines.length-200)).join("\n"));
 
-        downloadTextFile(reportName, lines.join("\n"));
-        log(`OK: レポートを書き出しました: ${reportName}`);
+        const reportRes = await downloadTextFile(reportName, lines.join("\n"));
+        if(reportRes?.mode !== "cancel"){
+          log(`OK: レポートを書き出しました: ${reportName}`);
+        }
       }catch(e){
         log(`WARN: レポート生成に失敗: ${e?.name||"Error"} ${e?.message||""}`);
       }
@@ -6661,20 +6660,18 @@ function _baseNameNoExt(name){
   const n = String(name||"output.wav");
   return n.replace(/\.[^/.]+$/,"");
 }
-function downloadTextFile(filename, text){
+async function downloadTextFile(filename, text){
   try{
-    const blob = new Blob([String(text||"")], {type:"text/plain"});
-    const a = document.createElement("a");
-    a.href = URL.createObjectURL(blob);
-    a.download = filename || "report.txt";
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>{
-      try{ URL.revokeObjectURL(a.href); }catch(_){}
-      try{ a.remove(); }catch(_){}
-    }, 500);
+    const encoder = new TextEncoder();
+    const payload = encoder.encode(String(text || ""));
+    const res = await saveExportBytes(payload, filename || "report.txt");
+    if(res?.mode === "cancel"){
+      return res;
+    }
+    return res;
   }catch(e){
     log(`WARN: テキスト書き出しに失敗: ${e?.message||e}`);
+    return null;
   }
 }
 function getLogText(){
@@ -7810,7 +7807,7 @@ function _cmcdEnsureLoaded(){
   try{ _cmcdLoadPresetOrder(); }catch(_){}
 }
 
-function _cmcdExportUserPresets(ids){
+async function _cmcdExportUserPresets(ids){
   _cmcdEnsureLoaded();
   const list = Array.isArray(state.cmcdUserPresets) ? state.cmcdUserPresets : [];
   const ord = Array.isArray(state.cmcdPresetOrder) ? state.cmcdPresetOrder : list.map(p=>p.id);
@@ -7819,7 +7816,7 @@ function _cmcdExportUserPresets(ids){
   const order = ord.filter(id=>set.has(id));
   for(const id of set){ if(!order.includes(id)) order.push(id); }
   const payload = JSON.stringify({kind:"cmcd_presets", version:1, presets, order}, null, 2);
-  downloadTextFile(`WavCue_cmcd_presets_${_tsStamp()}.json`, payload);
+  await downloadTextFile(`WavCue_cmcd_presets_${_tsStamp()}.json`, payload);
 }
 
 function _cmcdWirePresetExportSelector(){
@@ -7838,13 +7835,13 @@ function _cmcdWirePresetExportSelector(){
   $("cmcd_es_none")?.addEventListener("click", ()=>{
     ov.querySelectorAll('input[type="checkbox"][data-id]').forEach(cb=>{ cb.checked = false; });
   });
-  $("cmcd_es_export")?.addEventListener("click", ()=>{
+  $("cmcd_es_export")?.addEventListener("click", async()=>{
     const ids = Array.from(ov.querySelectorAll('input[type="checkbox"][data-id]'))
       .filter(cb=>cb.checked)
       .map(cb=>cb.dataset.id)
       .filter(Boolean);
     if(ids.length===0){ alert("エクスポートするプリセットを選択してください。"); return; }
-    _cmcdExportUserPresets(ids);
+    await _cmcdExportUserPresets(ids);
     _cmcdClosePresetExportSelector();
     window.safeToast && window.safeToast("cmcdプリセットをエクスポートしました。","ok");
   });
@@ -9910,46 +9907,12 @@ async function pdfDownloadAttach(){
     const kind = obj.kind || _fileKindFromName(obj.name) || _fileKindFromMime(obj.mime) || "FILE";
     const mime = obj.mime || _fileMimeForKind(kind) || "application/octet-stream";
     const name = (obj.name && String(obj.name).trim()) ? String(obj.name) : ("attached" + (_fileExtForKind(kind) || ""));
-    const blob = new Blob([obj.bytes], {type:mime});
-
-    // Prefer File System Access API when available
-    if(window.showSaveFilePicker){
-      try{
-        const ext = _fileExtForKind(kind) || (name.includes(".") ? ("."+name.split(".").pop()) : "");
-        const accept = {};
-        accept[mime] = ext ? [ext] : [];
-        _prog.set(0.88, "書き出し中…", "保存先を選択中");
-    const handle = await window.showSaveFilePicker({
-          suggestedName: name,
-          types: [{ description: kind, accept }]
-        });
-      try{ onPhase && onPhase("picked"); }catch(_){ }
-        const writable = await handle.createWritable();
-      try{ onPhase && onPhase("writing"); }catch(_){ }
-        await writable.write(blob);
-        await writable.close();
-        log(`OK: 添付ファイルを保存しました: ${name}`);
-        return;
-      }catch(err){
-        if(err && err.name==="AbortError"){
-          log("INFO: 保存をキャンセルしました。");
-          return;
-        }
-        // fall through to anchor download
-      }
+    const res = await saveExportBytes(obj.bytes, name);
+    if(res?.mode === "cancel"){
+      log("INFO: 保存をキャンセルしました。");
+      return;
     }
-
-    // Fallback download
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = name;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    try{ onPhase && onPhase("download_done"); }catch(_){}
-    setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){ } }, 1500);
-    log(`OK: 添付ファイルをダウンロードしました: ${name}`);
+    log(`OK: 添付ファイルを保存しました: ${name}`);
   }catch(err){
     console.error(err);
     log("ERR: ダウンロードに失敗しました。");
@@ -10144,86 +10107,76 @@ function _exportCueId(label){
 // ===== PDF_ATTACH_V1_END =====
 
 
-// ===== SAVE JSON (picker -> fallback download) =====
-async function _saveJsonWithFallback(blob, filename){
-  const canPicker = !!window.showSaveFilePicker && !!window.isSecureContext;
-  const suggested = (filename && String(filename).trim()) ? filename : "BWFJ_qc_presets.json";
-  if(canPicker){
-    try{
-      const handle = await window.showSaveFilePicker({
-        suggestedName: suggested,
-        types: [{ description: "JSON", accept: { "application/json": [".json"] } }]
-      });
-      const writable = await handle.createWritable();
-      try{ onPhase && onPhase("writing"); }catch(_){}
-      await writable.write(blob);
-      await writable.close();
-      log(`OK: JSONを書き出しました: ${suggested}`);
-      return { mode: "picker" };
-    }catch(e){
-      if(e && e.name === "AbortError"){
-        log("INFO: JSON書き出しをキャンセルしました");
-        return { mode: "abort" };
-      }
-      log("WARN: JSON保存ダイアログに失敗。ダウンロードにフォールバックします。");
-    }
+function _base64FromUint8(u8){
+  let s = "";
+  const chunk = 0x8000;
+  for(let i=0; i<u8.length; i+=chunk){
+    s += String.fromCharCode.apply(null, u8.subarray(i, i+chunk));
   }
-  // fallback: browser download (Save As may appear depending on settings)
-  try{ onPhase && onPhase("download_start"); }catch(_){ }
-    const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = suggested;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 1500);
-  log(`OK: JSONをダウンロードしました: ${suggested}`);
-  return { mode: "download" };
+  return btoa(s);
 }
 
-// ===== SAVE (picker -> fallback download) =====
-async function _saveBlobWithFallback(blob, filename, onPhase){
-  const canPicker = !!window.showSaveFilePicker && !!window.isSecureContext;
-  if(canPicker){
-    try{
-      const suggested = (filename && String(filename).trim()) ? filename : "output.wav";
-      try{ onPhase && onPhase("picker_open"); }catch(_){}
-      const handle = await window.showSaveFilePicker({
-        suggestedName: suggested,
-        types: [{ description: "WAV Audio", accept: { "audio/wav": [".wav"] } }]
-      });
-      try{ onPhase && onPhase("picked"); }catch(_){}
-      const writable = await handle.createWritable();
-      try{ onPhase && onPhase("writing"); }catch(_){}
-      await writable.write(blob);
-      await writable.close();
-      try{ onPhase && onPhase("done"); }catch(_){}
-      log(`OK: 保存しました（保存ダイアログ）: ${suggested}`);
-      return { mode: "picker", handle, suggested };
-    }catch(e){
-      if(e && e.name === "AbortError"){
-        try{ onPhase && onPhase("cancel"); }catch(_){}
-        log("INFO: 保存をキャンセルしました。");
-        return { mode: "cancel" };
-      }
-      log(`WARN: 保存ダイアログに失敗したため通常DLに切替: ${e?.name||"Error"} ${e?.message||""}`);
-    }
+function _base64FromArrayBuffer(ab){
+  return _base64FromUint8(new Uint8Array(ab));
+}
+
+function _baseNameFromPath(pathLike){
+  return String(pathLike || "").split(/[\\/]/).pop();
+}
+
+async function saveExportBytes(bytes, defaultName, onPhase){
+  if(!window.wavcue || !window.wavcue.saveExportFile){
+    throw new Error("saveExportFile is unavailable.");
   }
+  const u8 = bytes instanceof Uint8Array ? bytes : new Uint8Array(bytes);
+  try{ onPhase && onPhase("picker_open"); }catch(_){}
+  const res = await window.wavcue.saveExportFile({
+    defaultName,
+    dataBase64: _base64FromUint8(u8),
+  });
+  if(res?.canceled){
+    try{ onPhase && onPhase("cancel"); }catch(_){}
+    return { mode: "cancel" };
+  }
+  if(!res?.ok){
+    throw new Error(res?.error || "save failed");
+  }
+  try{ onPhase && onPhase("picked"); }catch(_){}
+  try{ onPhase && onPhase("writing"); }catch(_){}
+  try{ onPhase && onPhase("done"); }catch(_){}
+  return { mode: "ipc", filePath: res.filePath, suggested: defaultName };
+}
+
+// ===== SAVE JSON (Electron dialog) =====
+async function _saveJsonWithFallback(blob, filename){
+  const suggested = (filename && String(filename).trim()) ? filename : "BWFJ_qc_presets.json";
+  try{
+    const res = await saveExportBytes(await blob.arrayBuffer(), suggested);
+    if(res?.mode === "cancel"){
+      log("INFO: JSON書き出しをキャンセルしました");
+      return { mode: "cancel" };
+    }
+    const savedName = _baseNameFromPath(res?.filePath) || suggested;
+    log(`OK: JSONを書き出しました: ${savedName}`);
+    return res;
+  }catch(e){
+    log(`WARN: JSON保存に失敗: ${e?.message || e}`);
+    throw e;
+  }
+}
+
+// ===== SAVE (Electron dialog) =====
+async function _saveBlobWithFallback(blob, filename, onPhase){
   try{
     const suggested = (filename && String(filename).trim()) ? filename : "output.wav";
-    try{ onPhase && onPhase("download_start"); }catch(_){}
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = suggested;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(()=>{ try{ URL.revokeObjectURL(url); }catch(_){} }, 1500);
-    try{ onPhase && onPhase("done"); }catch(_){ }
-    log(`OK: 保存しました（通常DL）: ${suggested}`);
-    return { mode: "download", suggested };
+    try{ onPhase && onPhase("writing"); }catch(_){}
+    const res = await saveExportBytes(await blob.arrayBuffer(), suggested, onPhase);
+    if(res?.mode === "cancel"){
+      return { mode: "cancel" };
+    }
+    const savedName = _baseNameFromPath(res?.filePath) || suggested;
+    log(`OK: 保存しました: ${savedName}`);
+    return res;
   }catch(e){
     log(`ERROR: 保存に失敗: ${e?.name||"Error"} ${e?.message||""}`);
     throw e;
@@ -10515,13 +10468,15 @@ function refreshChunkDialogViews(){
 
   const btnLogExport = $("btnLogExport");
   if(btnLogExport){
-    btnLogExport.addEventListener("click", ()=>{
+    btnLogExport.addEventListener("click", async()=>{
       const name = `WavCue_Log_${_tsStamp()}.txt`;
       const snap = collectDiagnosticText([`trigger: log-export`]);
       const body = getLogText() || "";
       const text = snap + "\n\n---\n\n" + body;
-      downloadTextFile(name, text);
-      log(`OK: ログを書き出しました: ${name}`);
+      const logRes = await downloadTextFile(name, text);
+      if(logRes?.mode !== "cancel"){
+        log(`OK: ログを書き出しました: ${name}`);
+      }
     });
   }
 })();
