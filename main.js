@@ -113,11 +113,12 @@ const createWindow = () => {
           titleBarStyle: 'hiddenInset',
         }
       : {
-          frame: false,
+          frame: true,
+          titleBarStyle: 'hidden',
           titleBarOverlay: {
-            color: '#0b0f16',
+            color: 'transparent',
             symbolColor: '#ffffff',
-            height: 36,
+            height: 44,
           },
         }),
     resizable: true,
