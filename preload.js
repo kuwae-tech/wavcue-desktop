@@ -50,6 +50,25 @@ const injectWindowsDragStyles = () => {
       transition: none !important;
       animation: none !important;
     }
+
+    .appHeader .brandLogo {
+      height: 38px !important;
+      width: auto !important;
+      max-height: 40px !important;
+    }
+
+    html,
+    body {
+      -webkit-user-select: none !important;
+      user-select: none !important;
+    }
+
+    input,
+    textarea,
+    [contenteditable="true"] {
+      -webkit-user-select: text !important;
+      user-select: text !important;
+    }
   `;
 
   document.head.appendChild(style);
