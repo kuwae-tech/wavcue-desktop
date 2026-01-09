@@ -37,53 +37,65 @@ jobs:
         shell: bash
         run: npm ci
 
-      # ===== macOS: app-builder の状態を確認 =====
-      - name: Diagnose app-builder (macOS)
+      # ===== macOS: ICO から ICNS を生成（app-builderのアイコン変換を避ける）=====
+      - name: Prepare macOS icon (ICNS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euxo pipefail
-          echo "== OS info =="
-          sw_vers || true
-          uname -a || true
-          uname -m || true
+          python3 -m pip install --user pillow
+          python3 - <<'PY'
+          from PIL import Image
+          import os, pathlib, subprocess
 
-          echo "== app-builder files =="
-          ls -la node_modules/app-builder-bin/mac || true
-          file node_modules/app-builder-bin/mac/app-builder_* || true
+          ico_path = "build/icons/wavcue_app.ico"
+          out_icns = "build/icons/wavcue_macos.icns"
+          iconset_dir = pathlib.Path("build/icons/wavcue.iconset")
+          iconset_dir.mkdir(parents=True, exist_ok=True)
 
-          echo "== xattr (quarantine etc.) =="
-          xattr -l node_modules/app-builder-bin/mac/app-builder_* || true
+          img = Image.open(ico_path)
 
-          echo "== spctl assess (Gatekeeper) =="
-          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_arm64 || true
+          # いちばん大きいフレームを選ぶ
+          best_i = 0
+          best_size = 0
+          try:
+            for i in range(getattr(img, "n_frames", 1)):
+              img.seek(i)
+              s = img.size[0]
+              if s > best_size:
+                best_size = s
+                best_i = i
+          except Exception:
+            pass
 
-          echo "== codesign info =="
-          codesign -dv --verbose=4 node_modules/app-builder-bin/mac/app-builder_arm64 || true
+          img.seek(best_i)
+          base = img.convert("RGBA")
 
-      # ===== macOS: ブロック解除（arm64だけ対象にする）=====
-      - name: Unblock app-builder (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          chmod +x node_modules/app-builder-bin/mac/app-builder_arm64
-          xattr -dr com.apple.quarantine node_modules/app-builder-bin/mac/app-builder_arm64 || true
-          codesign --force --sign - node_modules/app-builder-bin/mac/app-builder_arm64 || true
+          def save(sz, name):
+            base.resize((sz, sz), Image.LANCZOS).save(iconset_dir / name, format="PNG")
 
-          echo "== reassess after unblock =="
-          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_arm64 || true
-          xattr -l node_modules/app-builder-bin/mac/app-builder_arm64 || true
+          # Apple標準のiconset構成
+          save(16,  "icon_16x16.png")
+          save(32,  "icon_16x16@2x.png")
+          save(32,  "icon_32x32.png")
+          save(64,  "icon_32x32@2x.png")
+          save(128, "icon_128x128.png")
+          save(256, "icon_128x128@2x.png")
+          save(256, "icon_256x256.png")
+          save(512, "icon_256x256@2x.png")
+          save(512, "icon_512x512.png")
+          save(1024,"icon_512x512@2x.png")
 
-          echo "== try run directly after unblock =="
-          node_modules/app-builder-bin/mac/app-builder_arm64 --help || true
+          subprocess.check_call(["iconutil", "-c", "icns", str(iconset_dir), "-o", out_icns])
+          print("Generated:", out_icns)
+          PY
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: npx electron-builder --win nsis zip --publish never
 
-      # ===== macOS: electron-builder の詳細ログを出す =====
+      # ===== macOS: 生成した icns を明示してビルド =====
       - name: Build (macOS - zip only)
         if: runner.os == 'macOS'
         shell: bash
@@ -92,7 +104,7 @@ jobs:
           ELECTRON_BUILDER_LOG_LEVEL: "debug"
         run: |
           set -euxo pipefail
-          npx electron-builder --mac zip --publish never
+          npx electron-builder --mac zip --publish never -c.mac.icon=build/icons/wavcue_macos.icns
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
