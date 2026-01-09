@@ -92,10 +92,12 @@
     color: rgba(230,232,238,.92);
   }
   .brandMark img{
-    width: 26px;
-    height: 26px;
     display:block;
-    object-fit: contain;
+  }
+  .brandLogo{
+    height: 18px;
+    width: auto;
+    display:block;
   }
   .btnRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .btn{
@@ -2152,9 +2154,8 @@ header.wc-titlebar,
   <div class="hdrLeft">
     <div class="brand">
       <span aria-hidden="true" class="brandMark">
-        <img alt="" src="../build/icons/wavcue-logo-set.svg"/>
+        <img alt="" class="brandLogo" src="./wavcue-logo-set.svg"/>
       </span>
-      <div class="brandTitle">WavCue</div>
     </div>
     <div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div>
   </div>
