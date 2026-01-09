@@ -52,32 +52,32 @@ const injectWindowsDragStyles = () => {
     }
 
     .appHeader .brandLogo {
-      height: 38px !important;
+      height: 41px !important;
       width: auto !important;
-      max-height: 40px !important;
+      max-height: 42px !important;
       display: block !important;
-      margin: 2px 0 !important;
+      margin: 1px 0 !important;
       padding: 0 !important;
-      margin-left: 8px !important;
+      margin-left: 16px !important;
     }
 
     .appHeader .brand img,
     .appHeader .brand svg,
     .appHeader .hdrLeft > img:first-child,
     .appHeader .hdrLeft > svg:first-child {
-      height: 38px !important;
+      height: 41px !important;
       width: auto !important;
-      max-height: 40px !important;
+      max-height: 42px !important;
       display: block !important;
-      margin: 2px 0 !important;
+      margin: 1px 0 !important;
       padding: 0 !important;
-      margin-left: 8px !important;
+      margin-left: 16px !important;
     }
 
     .appHeader .hdrLeft {
       display: flex !important;
       align-items: center !important;
-      gap: 8px !important;
+      gap: 4px !important;
     }
 
     .appHeader .brand {
