@@ -36,17 +36,18 @@
     --r:16px;
     --app-pad: 10px;
     --app-gap: 10px;
-    --titlebar-height: 40px;
+    --titlebar-h: 56px;
+    --titlebar-px: 14px;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
   .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
-  .titlebar{
-    height:var(--titlebar-height);
+  .wc-titlebar{
+    height:var(--titlebar-h);
     display:flex;
     align-items:center;
     justify-content:space-between;
-    padding:0 12px;
+    padding:0 var(--titlebar-px);
     border:1px solid var(--line);
     border-radius:var(--r);
     background:linear-gradient(180deg, rgba(20,21,26,.96), rgba(15,16,20,.85));
@@ -514,7 +515,7 @@
   }
   .settingsDialog .settingsCard{
     border:1px solid var(--line);
-    border-radius:14px;
+    border-radius:16px;
     background:rgba(255,255,255,.03);
     padding:12px;
     display:flex;
@@ -1312,7 +1313,7 @@
   /* Topbar: tighter, more “app-like” */
   .topbar{
     position: sticky;
-    top: calc(var(--app-pad) + var(--titlebar-height) + var(--app-gap));
+    top: calc(var(--app-pad) + var(--titlebar-h) + var(--app-gap));
     z-index: 60;
     padding: 14px 14px 10px;
     margin-bottom: 10px;
@@ -2174,7 +2175,7 @@
   </div>
 </div>
 <div aria-atomic="true" aria-live="polite" id="toastHost"></div>
-<div class="titlebar">
+<div class="wc-titlebar">
   <div class="titlebarTitle">WavCue</div>
   <div class="titlebarControls">
     <button class="winBtn" id="winMinBtn" type="button" aria-label="最小化">—</button>
@@ -2499,9 +2500,47 @@
       </section>
       <section class="settingsCard">
         <h3>Cleanup</h3>
-        <button class="btn good" id="settingsCleanupNow" type="button">今すぐクリーンアップを実行</button>
-        <div class="muted" id="settingsCleanupResult">Last cleanup: not run yet.</div>
-        <div class="muted" id="settingsCleanupProgress">Idle.</div>
+        <button class="btn good" id="settingsCleanupNow" type="button">今すぐクリーンアップ</button>
+      </section>
+      <section class="settingsCard">
+        <h3>自動クリーンアップ</h3>
+        <div class="switchWrap">
+          <label class="switch">
+            <input id="settingsAutoCleanup" type="checkbox"/>
+            <span class="slider"></span>
+          </label>
+          <div class="switchText">
+            <span class="switchLabel">自動クリーンアップを有効にする</span>
+          </div>
+        </div>
+        <div class="switchWrap">
+          <label class="switch">
+            <input id="settingsCleanupOnExport" type="checkbox"/>
+            <span class="slider"></span>
+          </label>
+          <div class="switchText">
+            <span class="switchLabel">書き出し完了後に自動でクリーンアップ</span>
+          </div>
+        </div>
+        <div class="switchWrap">
+          <label class="switch">
+            <input id="settingsCleanupOnQuit" type="checkbox"/>
+            <span class="slider"></span>
+          </label>
+          <div class="switchText">
+            <span class="switchLabel">アプリ終了時に自動でクリーンアップ</span>
+          </div>
+        </div>
+        <div class="switchWrap">
+          <label class="switch">
+            <input id="settingsCleanupOnStartup" type="checkbox"/>
+            <span class="slider"></span>
+          </label>
+          <div class="switchText">
+            <span class="switchLabel">起動時に前回の一時ファイルを整理する</span>
+          </div>
+        </div>
+        <div class="muted">不要な一時ファイルだけを整理します</div>
       </section>
       <section class="settingsCard">
         <h3>Retention / Quota</h3>
@@ -6608,6 +6647,10 @@ const settingsRetentionDays = $("settingsRetentionDays");
 const settingsBackupQuotaGB = $("settingsBackupQuotaGB");
 const settingsMinKeepCount = $("settingsMinKeepCount");
 const settingsDeleteMethod = $("settingsDeleteMethod");
+const settingsAutoCleanup = $("settingsAutoCleanup");
+const settingsCleanupOnExport = $("settingsCleanupOnExport");
+const settingsCleanupOnQuit = $("settingsCleanupOnQuit");
+const settingsCleanupOnStartup = $("settingsCleanupOnStartup");
 
 const settingsLogAdd = (message)=>{
   if(!settingsLog) return;
@@ -6660,6 +6703,10 @@ const refreshSettingsData = async ()=>{
   if(settingsBackupQuotaGB) settingsBackupQuotaGB.value = String(settings.backupQuotaGB ?? 25);
   if(settingsMinKeepCount) settingsMinKeepCount.value = String(settings.minKeepCount ?? 20);
   if(settingsDeleteMethod) settingsDeleteMethod.value = settings.deleteMethod || "trash";
+  if(settingsAutoCleanup) settingsAutoCleanup.checked = !!settings.autoCleanup;
+  if(settingsCleanupOnExport) settingsCleanupOnExport.checked = !!settings.autoCleanupOnExport;
+  if(settingsCleanupOnQuit) settingsCleanupOnQuit.checked = !!settings.autoCleanupOnQuit;
+  if(settingsCleanupOnStartup) settingsCleanupOnStartup.checked = !!settings.autoCleanupOnStartup;
   updateCleanupResult(settings.cleanupLastResult);
 };
 
@@ -6716,6 +6763,10 @@ $("settingsSave")?.addEventListener("click", async ()=>{
     backupQuotaGB: Number(settingsBackupQuotaGB?.value || 25),
     minKeepCount: Number(settingsMinKeepCount?.value || 20),
     deleteMethod: settingsDeleteMethod?.value || "trash",
+    autoCleanup: !!settingsAutoCleanup?.checked,
+    autoCleanupOnExport: !!settingsCleanupOnExport?.checked,
+    autoCleanupOnQuit: !!settingsCleanupOnQuit?.checked,
+    autoCleanupOnStartup: !!settingsCleanupOnStartup?.checked,
   };
   await window.wavcue.setSettings(patch);
   settingsLogAdd("Settings saved.");

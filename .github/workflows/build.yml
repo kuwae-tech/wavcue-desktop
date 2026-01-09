@@ -28,9 +28,9 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: |
+          if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
-      # 保険（macだけ実行権限を付与）
       - name: Fix permissions for app-builder (macOS)
         if: runner.os == 'macOS'
         run: chmod +x node_modules/app-builder-bin/mac/app-builder_*
