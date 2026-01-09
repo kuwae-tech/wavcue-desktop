@@ -89,6 +89,26 @@
     align-items:center;
     gap:8px;
   }
+  .headerActions .btnIcon{
+    margin-right: 0;
+  }
+  .brand{
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .brandMark{
+    display:inline-flex;
+    align-items:center;
+    justify-content:center;
+    color: rgba(230,232,238,.92);
+  }
+  .brandMark svg{
+    width: 26px;
+    height: 26px;
+    display:block;
+    shape-rendering: geometricPrecision;
+  }
   .btnRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .btn{
     appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.04);
@@ -2084,7 +2104,8 @@ header.wc-titlebar,
   padding-top: 0 !important;
   margin-top: 0 !important;
 }
-.is-mac .hdrLeft{
+.is-mac .appHeader{
+  padding-top: 12px;
   padding-left: 72px;
 }
 
@@ -2119,6 +2140,10 @@ header.wc-titlebar,
 <symbol id="ico-paperclip" viewbox="0 0 24 24">
 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
 </symbol>
+<symbol id="ico-gear" viewbox="0 0 24 24">
+<path d="M12 8.5a3.5 3.5 0 1 1 0 7 3.5 3.5 0 0 1 0-7z" fill="none" stroke="currentColor" stroke-width="2"></path>
+<path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
+</symbol>
 </svg>
 <div aria-hidden="true" id="dropOverlay"><div class="box"><div class="big">WAVをドロップして読み込み</div></div></div><div class="small"></div><div class="app">
 <div aria-hidden="true" id="progressOverlay">
@@ -2134,7 +2159,15 @@ header.wc-titlebar,
 <div aria-atomic="true" aria-live="polite" id="toastHost"></div>
 <header class="appHeader">
   <div class="hdrLeft">
-    <div class="brandTitle">WavCue</div>
+    <div class="brand">
+      <span aria-hidden="true" class="brandMark">
+        <svg aria-hidden="true" focusable="false" viewBox="0 0 28 28">
+          <rect fill="rgba(255,255,255,0.04)" height="24" rx="6" ry="6" stroke="currentColor" stroke-width="1.5" width="24" x="2" y="2"></rect>
+          <path d="M6 16c1.8 0 2.4-6 4.3-6s2.4 8 4.2 8 2.5-6 4.2-6 2.4 4 3.3 4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path>
+        </svg>
+      </span>
+      <div class="brandTitle">WavCue</div>
+    </div>
   </div>
   <div class="hdrCenter">
     <div class="hdrCenterInner">
@@ -2143,7 +2176,7 @@ header.wc-titlebar,
     </div>
   </div>
   <div class="hdrRight">
-    <div class="headerActions"><button aria-label="Settings" class="btn" id="btnSettings" title="Settings" type="button">⚙</button></div>
+    <div class="headerActions"><button aria-label="Settings" class="btn" id="btnSettings" title="Settings" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
 <div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
