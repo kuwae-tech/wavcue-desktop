@@ -2112,9 +2112,15 @@ header.wc-titlebar,
   pointer-events: auto;
 }
 
+.is-mac body{
+  padding-top: 0 !important;
+}
+.is-mac .app{
+  padding-top: 0 !important;
+}
+
 .no-drag{ -webkit-app-region: no-drag; }
 </style></head><body>
-<div class="drag-ghost"></div>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
 <symbol id="ico-folder" viewbox="0 0 24 24">
@@ -2585,6 +2591,11 @@ window.safeToast = window.safeToast || function(msg, type="ok", timeout=2600){
 
 document.documentElement.classList.toggle("is-mac", !!window.platform?.isMac);
 document.documentElement.classList.toggle("is-win", !!window.platform?.isWindows);
+if(window.platform?.isWindows){
+  const dragGhost = document.createElement("div");
+  dragGhost.className = "drag-ghost";
+  document.body.prepend(dragGhost);
+}
 /* =============================================================================
   WavCue — Sectioned (HTML single-file)
   - Code cleanup pass: 2026-01-07 (no behavior change intended)
