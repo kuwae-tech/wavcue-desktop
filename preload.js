@@ -55,6 +55,35 @@ const injectWindowsDragStyles = () => {
       height: 38px !important;
       width: auto !important;
       max-height: 40px !important;
+      display: block !important;
+      margin: 2px 0 !important;
+      padding: 0 !important;
+      margin-left: 8px !important;
+    }
+
+    .appHeader .brand img,
+    .appHeader .brand svg,
+    .appHeader .hdrLeft > img:first-child,
+    .appHeader .hdrLeft > svg:first-child {
+      height: 38px !important;
+      width: auto !important;
+      max-height: 40px !important;
+      display: block !important;
+      margin: 2px 0 !important;
+      padding: 0 !important;
+      margin-left: 8px !important;
+    }
+
+    .appHeader .hdrLeft {
+      display: flex !important;
+      align-items: center !important;
+      gap: 8px !important;
+    }
+
+    .appHeader .brand {
+      display: flex !important;
+      align-items: center !important;
+      padding-right: 0 !important;
     }
 
     html,
