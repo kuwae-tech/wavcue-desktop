@@ -27,32 +27,40 @@ jobs:
           node-version: 20
           cache: npm
 
-      # WindowsはPowerShell、Macはbashで安全に分岐
+      # 依存インストール（OSごとにシェルを分けて安定させる）
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: |
-          if (Test-Path package-lock.json) { npm ci } else { npm install }
+        run: npm ci
 
       - name: Install dependencies (macOS)
         if: runner.os == 'macOS'
         shell: bash
-        run: |
-          if [ -f package-lock.json ]; then npm ci; else npm install; fi
+        run: npm ci
 
+      # app-builder の実行権限（macOSのみ）
       - name: Fix permissions for app-builder (macOS)
         if: runner.os == 'macOS'
+        shell: bash
         run: chmod +x node_modules/app-builder-bin/mac/app-builder_*
 
-      - name: Build
-        run: npx electron-builder --publish never
+      # Windows: nsis + zip
+      - name: Build (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: npx electron-builder --win nsis zip --publish never
+
+      # macOS: zip のみ（app-builder系でdmg生成が落ちやすいため）
+      - name: Build (macOS - zip only)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: npx electron-builder --mac zip --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: wavcue-${{ matrix.os }}
           path: |
-            dist/*.dmg
             dist/*.exe
             dist/*.zip
             dist/*.blockmap
