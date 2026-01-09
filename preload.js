@@ -17,3 +17,8 @@ contextBridge.exposeInMainWorld('wavcue', {
     return () => ipcRenderer.removeListener('settings:cleanup-progress', listener);
   },
 });
+
+contextBridge.exposeInMainWorld('platform', {
+  isMac: process.platform === 'darwin',
+  isWindows: process.platform === 'win32',
+});

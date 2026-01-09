@@ -99,13 +99,27 @@ const ensureDefaultFolders = async () => {
   return setSettings({ paths: fallbackPaths });
 };
 
+const isMac = process.platform === 'darwin';
+
 const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
     autoHideMenuBar: true,
     backgroundColor: '#0b0c0f',
-    frame: false,
+    ...(isMac
+      ? {
+          frame: true,
+          titleBarStyle: 'hiddenInset',
+        }
+      : {
+          frame: false,
+          titleBarOverlay: {
+            color: '#0b0f16',
+            symbolColor: '#ffffff',
+            height: 36,
+          },
+        }),
     resizable: true,
     minimizable: true,
     maximizable: true,
@@ -118,9 +132,13 @@ const createWindow = () => {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'prototype.html'));
-  mainWindow.setMenuBarVisibility(false);
-  mainWindow.removeMenu();
-  Menu.setApplicationMenu(null);
+
+  if (!isMac) {
+    mainWindow.setMenuBarVisibility(false);
+    mainWindow.removeMenu();
+    Menu.setApplicationMenu(null);
+  }
+
   mainWindow.webContents.openDevTools({ mode: 'detach' });
 };
 
