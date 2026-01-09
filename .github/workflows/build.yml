@@ -27,20 +27,46 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
+      - name: Install dependencies
         run: npm ci
 
-      - name: Install dependencies (macOS)
+      # ===== macOS: app-builder 実行不能の根本原因をログに出す =====
+      - name: Diagnose app-builder (macOS)
         if: runner.os == 'macOS'
         shell: bash
-        run: npm ci
+        run: |
+          set -euxo pipefail
+          echo "== OS info =="
+          sw_vers || true
+          uname -a || true
+          uname -m || true
 
-      - name: Fix permissions for app-builder (macOS)
+          echo "== app-builder files =="
+          ls -la node_modules/app-builder-bin/mac || true
+          file node_modules/app-builder-bin/mac/app-builder_* || true
+
+          echo "== xattr (quarantine etc.) =="
+          xattr -l node_modules/app-builder-bin/mac/app-builder_* || true
+
+          echo "== spctl assess (Gatekeeper) =="
+          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_* || true
+
+          echo "== codesign info =="
+          codesign -dv --verbose=4 node_modules/app-builder-bin/mac/app-builder_* || true
+
+      # ===== macOS: 典型的なブロック解除（権限 + quarantine解除 + ad-hoc署名）=====
+      - name: Unblock app-builder (macOS)
         if: runner.os == 'macOS'
         shell: bash
-        run: chmod +x node_modules/app-builder-bin/mac/app-builder_*
+        run: |
+          set -euxo pipefail
+          chmod +x node_modules/app-builder-bin/mac/app-builder_* || true
+          xattr -dr com.apple.quarantine node_modules/app-builder-bin/mac || true
+          codesign --force --sign - node_modules/app-builder-bin/mac/app-builder_* || true
+
+          echo "== try run directly after unblock =="
+          node_modules/app-builder-bin/mac/app-builder_arm64 --help || true
+          node_modules/app-builder-bin/mac/app-builder_amd64 --help || true
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
