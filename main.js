@@ -12,7 +12,7 @@ const store = new Store({
       autoCleanupOnExport: false,
       autoCleanupOnQuit: false,
       autoCleanupOnStartup: false,
-      autoReport: false,
+      autoBackupEnabled: true,
       retentionDays: 30,
       backupQuotaGB: 25,
       minKeepCount: 20,
@@ -247,6 +247,25 @@ const ensureUniquePath = async (basePath) => {
   }
   const suffix = new Date().toISOString().replace(/[:.]/g, '-');
   return `${basePath}-${suffix}`;
+};
+
+const sanitizeFileSegment = (value) =>
+  String(value || 'output')
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, '_')
+    .replace(/\s+/g, ' ')
+    .trim() || 'output';
+
+const ensureUniqueJobId = async (baseJobId, paths) => {
+  let jobId = baseJobId;
+  let index = 1;
+  while (
+    (await safeStat(path.join(paths.backups, jobId))) ||
+    (await safeStat(path.join(paths.reports, jobId)))
+  ) {
+    jobId = `${baseJobId}-${index}`;
+    index += 1;
+  }
+  return jobId;
 };
 
 const movePath = async (source, destination) => {
@@ -537,6 +556,21 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
   };
 });
 
+ipcMain.handle('settings:get-backup-status', async () => {
+  const settings = await ensureDefaultFolders();
+  const { backups, reports } = settings.paths;
+  const jobs = await listJobs({ backups, reports });
+  const totalBytes = jobs.reduce((sum, job) => sum + job.backupSize + job.reportSize, 0);
+  const oldest = jobs[0]?.createdAt || null;
+  const latest = jobs[jobs.length - 1]?.createdAt || null;
+  return {
+    jobCount: jobs.length,
+    totalBytes,
+    oldest: oldest ? oldest.toISOString() : null,
+    latest: latest ? latest.toISOString() : null,
+  };
+});
+
 ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) => {
   try {
     const { canceled, filePath } = await dialog.showSaveDialog({
@@ -553,6 +587,53 @@ ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) =>
     const buf = Buffer.from(dataBase64, 'base64');
     fsSync.writeFileSync(resolvedPath, buf);
     return { ok: true, filePath: resolvedPath };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle('export:save-backup-report', async (_event, payload) => {
+  try {
+    if (!payload?.backupDataBase64) {
+      return { ok: false, error: 'Missing backup data.' };
+    }
+    const settings = await ensureDefaultFolders();
+    const { backups, reports } = settings.paths;
+    const baseName = sanitizeFileSegment(payload.baseName || 'output');
+    const stamp = sanitizeFileSegment(payload.stamp || new Date().toISOString());
+    const baseJobId = `${baseName}__${stamp}`;
+    const jobId = await ensureUniqueJobId(baseJobId, { backups, reports });
+    const backupsPath = path.join(backups, jobId);
+    const reportsPath = path.join(reports, jobId);
+    await fs.mkdir(backupsPath, { recursive: true });
+    await fs.mkdir(reportsPath, { recursive: true });
+
+    const backupFileName = `${baseName}__${stamp}__backup.wav`;
+    const reportFileName = `${baseName}__${stamp}__report.txt`;
+    const backupTarget = path.join(backupsPath, backupFileName);
+    const reportTarget = path.join(reportsPath, reportFileName);
+
+    const backupBuf = Buffer.from(payload.backupDataBase64, 'base64');
+    await fs.writeFile(backupTarget, backupBuf);
+    await fs.writeFile(reportTarget, String(payload.reportText || ''), 'utf8');
+
+    const jobJson = {
+      createdAt: new Date().toISOString(),
+      sourceFileName: payload.sourceFileName || '',
+      exportFileName: payload.exportFileName || '',
+      backupFileName,
+      reportFileName,
+    };
+    await fs.writeFile(path.join(reportsPath, 'Job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
+
+    return {
+      ok: true,
+      jobId,
+      backupFileName,
+      reportFileName,
+      backupPath: backupTarget,
+      reportPath: reportTarget,
+    };
   } catch (error) {
     return { ok: false, error: String(error?.message || error) };
   }
