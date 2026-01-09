@@ -1,5 +1,64 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const shouldApplyWindowsDragFix = () =>
+  typeof navigator !== 'undefined' && navigator.userAgent.includes('Windows NT');
+
+const injectWindowsDragStyles = () => {
+  if (!shouldApplyWindowsDragFix()) {
+    return;
+  }
+
+  const style = document.createElement('style');
+  style.setAttribute('data-wavcue', 'windows-drag-fix');
+  style.textContent = `
+    html,
+    body {
+      margin: 0 !important;
+      padding: 0 !important;
+    }
+
+    .headerDragLayer {
+      background: transparent !important;
+      -webkit-app-region: drag !important;
+      backdrop-filter: none !important;
+      filter: none !important;
+      text-shadow: none !important;
+      box-shadow: none !important;
+      transition: none !important;
+      animation: none !important;
+      transform: translateZ(0) !important;
+      will-change: transform !important;
+    }
+
+    .appHeader {
+      padding-right: 160px !important;
+      height: 44px !important;
+    }
+
+    .appHeaderUi,
+    .appHeaderUi *,
+    .appHeader button,
+    .appHeader input,
+    .appHeader select,
+    .appHeader textarea,
+    .appHeader a {
+      -webkit-app-region: no-drag !important;
+    }
+
+    .appHeader,
+    .appHeader * {
+      transition: none !important;
+      animation: none !important;
+    }
+  `;
+
+  document.head.appendChild(style);
+};
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('DOMContentLoaded', injectWindowsDragStyles, { once: true });
+}
+
 contextBridge.exposeInMainWorld('wavcue', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
@@ -20,5 +79,5 @@ contextBridge.exposeInMainWorld('wavcue', {
 
 contextBridge.exposeInMainWorld('platform', {
   isMac: process.platform === 'darwin',
-  isWindows: process.platform === 'win32',
+  isWindows: shouldApplyWindowsDragFix(),
 });
