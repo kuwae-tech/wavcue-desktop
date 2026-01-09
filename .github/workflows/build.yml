@@ -37,65 +37,86 @@ jobs:
         shell: bash
         run: npm ci
 
-      # ===== macOS: ICO から ICNS を生成（app-builderのアイコン変換を避ける）=====
+      # ===== macOS: app-builder診断（原因確認用）=====
+      - name: Diagnose app-builder (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          echo "== OS info =="
+          sw_vers || true
+          uname -a || true
+          uname -m || true
+
+          echo "== app-builder files =="
+          ls -la node_modules/app-builder-bin/mac || true
+          file node_modules/app-builder-bin/mac/app-builder_* || true
+
+          echo "== xattr (quarantine etc.) =="
+          xattr -l node_modules/app-builder-bin/mac/app-builder_arm64 || true
+
+          echo "== spctl assess (Gatekeeper) =="
+          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_arm64 || true
+
+          echo "== codesign info =="
+          codesign -dv --verbose=4 node_modules/app-builder-bin/mac/app-builder_arm64 || true
+
+      # ===== macOS: ブロック解除（arm64のみ）=====
+      - name: Unblock app-builder (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euxo pipefail
+          chmod +x node_modules/app-builder-bin/mac/app-builder_arm64
+          xattr -dr com.apple.quarantine node_modules/app-builder-bin/mac/app-builder_arm64 || true
+          codesign --force --sign - node_modules/app-builder-bin/mac/app-builder_arm64 || true
+
+          echo "== reassess after unblock =="
+          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_arm64 || true
+          xattr -l node_modules/app-builder-bin/mac/app-builder_arm64 || true
+
+          echo "== try run directly after unblock =="
+          node_modules/app-builder-bin/mac/app-builder_arm64 --help || true
+
+      # ===== macOS: PNGからICNS生成（pip不使用。sips+iconutilのみ）=====
       - name: Prepare macOS icon (ICNS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euxo pipefail
-          python3 -m pip install --user pillow
-          python3 - <<'PY'
-          from PIL import Image
-          import os, pathlib, subprocess
 
-          ico_path = "build/icons/wavcue_app.ico"
-          out_icns = "build/icons/wavcue_macos.icns"
-          iconset_dir = pathlib.Path("build/icons/wavcue.iconset")
-          iconset_dir.mkdir(parents=True, exist_ok=True)
+          SRC_PNG="build/icons/wavcue_app.png"
+          OUT_ICNS="build/icons/wavcue_macos.icns"
+          ICONSET_DIR="build/icons/wavcue.iconset"
 
-          img = Image.open(ico_path)
+          if [ ! -f "$SRC_PNG" ]; then
+            echo "ERROR: $SRC_PNG not found."
+            echo "Please add a PNG icon at: build/icons/wavcue_app.png"
+            exit 1
+          fi
 
-          # いちばん大きいフレームを選ぶ
-          best_i = 0
-          best_size = 0
-          try:
-            for i in range(getattr(img, "n_frames", 1)):
-              img.seek(i)
-              s = img.size[0]
-              if s > best_size:
-                best_size = s
-                best_i = i
-          except Exception:
-            pass
+          rm -rf "$ICONSET_DIR"
+          mkdir -p "$ICONSET_DIR"
 
-          img.seek(best_i)
-          base = img.convert("RGBA")
+          sips -z 16 16     "$SRC_PNG" --out "$ICONSET_DIR/icon_16x16.png"
+          sips -z 32 32     "$SRC_PNG" --out "$ICONSET_DIR/icon_16x16@2x.png"
+          sips -z 32 32     "$SRC_PNG" --out "$ICONSET_DIR/icon_32x32.png"
+          sips -z 64 64     "$SRC_PNG" --out "$ICONSET_DIR/icon_32x32@2x.png"
+          sips -z 128 128   "$SRC_PNG" --out "$ICONSET_DIR/icon_128x128.png"
+          sips -z 256 256   "$SRC_PNG" --out "$ICONSET_DIR/icon_128x128@2x.png"
+          sips -z 256 256   "$SRC_PNG" --out "$ICONSET_DIR/icon_256x256.png"
+          sips -z 512 512   "$SRC_PNG" --out "$ICONSET_DIR/icon_256x256@2x.png"
+          sips -z 512 512   "$SRC_PNG" --out "$ICONSET_DIR/icon_512x512.png"
+          sips -z 1024 1024 "$SRC_PNG" --out "$ICONSET_DIR/icon_512x512@2x.png"
 
-          def save(sz, name):
-            base.resize((sz, sz), Image.LANCZOS).save(iconset_dir / name, format="PNG")
-
-          # Apple標準のiconset構成
-          save(16,  "icon_16x16.png")
-          save(32,  "icon_16x16@2x.png")
-          save(32,  "icon_32x32.png")
-          save(64,  "icon_32x32@2x.png")
-          save(128, "icon_128x128.png")
-          save(256, "icon_128x128@2x.png")
-          save(256, "icon_256x256.png")
-          save(512, "icon_256x256@2x.png")
-          save(512, "icon_512x512.png")
-          save(1024,"icon_512x512@2x.png")
-
-          subprocess.check_call(["iconutil", "-c", "icns", str(iconset_dir), "-o", out_icns])
-          print("Generated:", out_icns)
-          PY
+          iconutil -c icns "$ICONSET_DIR" -o "$OUT_ICNS"
+          ls -la "$OUT_ICNS"
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: npx electron-builder --win nsis zip --publish never
 
-      # ===== macOS: 生成した icns を明示してビルド =====
       - name: Build (macOS - zip only)
         if: runner.os == 'macOS'
         shell: bash
