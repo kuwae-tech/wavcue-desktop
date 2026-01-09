@@ -40,16 +40,16 @@
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
   .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
-  .topbar{
-    display:flex;align-items:center;justify-content:space-between;gap:10px;
-    padding:10px 12px;background:rgba(15,26,46,.80);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
-    -webkit-app-region: no-drag;
+  .headerActions{
+    margin-left:auto;
+    display:flex;
+    align-items:center;
+    gap:8px;
   }
-  .topbar .noDrag{ -webkit-app-region: no-drag; }
-  .topbarActions{ display:flex;align-items:center;gap:8px; }
-  .brand{display:flex;flex-direction:column;gap:2px;min-width:240px}
-  .brand b{font-size:13px}
-  .brand .small{font-size:11px;color:var(--muted)}
+  .btnRowSpacer{
+    flex:1 1 auto;
+    min-width:16px;
+  }
   .btnRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .btn{
     appearance:none;border:1px solid var(--line);background:rgba(255,255,255,.04);
@@ -62,29 +62,6 @@
   .btn.primary:hover{background:rgba(56,189,248,.18)}
   .btn.good{border-color:rgba(126,231,162,.45);background:rgba(126,231,162,.12)}
   .btn.good:hover{background:rgba(126,231,162,.16)}
-
-  .verPill{
-    display:inline-flex;align-items:center;gap:6px;
-    margin-left:8px;
-    font-size:11px;
-    padding:4px 8px;
-    border-radius:999px;
-    border:1px solid var(--line);
-    color:rgba(229,231,235,.9);
-    background:rgba(255,255,255,.04);
-  }
-  .linkBtn{
-    margin-left:8px;
-    padding:0;
-    border:none;
-    background:transparent;
-    color:rgba(229,231,235,.82);
-    font-size:11px;
-    cursor:pointer;
-    text-decoration: underline;
-    text-underline-offset: 3px;
-  }
-  .linkBtn:hover{ color: rgba(255,255,255,.95); }
 
   .pill{
     font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:6px 10px;
@@ -1155,7 +1132,7 @@
   }
 
   /* Tool-like top bars and sticky action clusters (non-invasive) */
-  .toolbar, .topbar, .headerBar{
+  .toolbar, .headerBar{
     backdrop-filter: blur(8px);
   }
 
@@ -1259,20 +1236,6 @@
 
   /* ===== ProTools+ v2: product polish (visual only) ===== */
 
-  /* Topbar: tighter, more “app-like” */
-  .topbar{
-    position: sticky;
-    top: var(--app-pad);
-    z-index: 60;
-    padding: 14px 14px 10px;
-    margin-bottom: 10px;
-    background: linear-gradient(180deg, rgba(20,21,26,.92), rgba(20,21,26,.72));
-    border-bottom: 1px solid rgba(59,65,82,.35);
-    backdrop-filter: blur(10px);
-  }
-  .brand .small{
-    opacity: .85;
-  }
   .btnRow{
     gap: 8px;
     align-items: center;
@@ -1765,36 +1728,6 @@
 
 
 
-  /* --- WavCue branding --- */
-  /* Use the existing topbar frame, and let the logo consume (almost) the full height */
-  .topbar{
-    height: 66px;                 /* fixed frame height for stable “product” look */
-    padding: 8px 14px;            /* keeps buttons comfortable while giving the logo height */
-    align-items: stretch;         /* allow children to fill the bar vertically */
-  }
-  .brand{
-    height: 100%;
-    display:flex;
-    flex-direction:row;
-    align-items:center;
-    justify-content:flex-start;
-    gap:10px;
-    min-width:240px;
-  }
-  .brandLogo{
-    height: 100%;
-    width: auto;
-    max-height: 100%;
-    display: block;
-    margin: 0;
-    filter: drop-shadow(0 10px 20px rgba(0,0,0,.45));
-  }
-  .brand .small{ display:none !important; }
-
-  /* Keep layout sane on narrow screens */
-  @media (max-width: 980px){
-    .brand{ min-width: unset; }
-  }
   /* Accent tune to match the WavCue underline (warm yellow) */
   .btn.primary{
     background: linear-gradient(180deg, rgba(255,210,74,.20), rgba(255,210,74,.10));
@@ -2115,8 +2048,11 @@ header.wc-titlebar,
 .is-mac body{
   padding-top: 0 !important;
 }
-.is-mac .app{
+.is-mac .app,
+.is-mac #app,
+.is-mac .appRoot{
   padding-top: 0 !important;
+  margin-top: 0 !important;
 }
 
 .no-drag{ -webkit-app-region: no-drag; }
@@ -2163,7 +2099,7 @@ header.wc-titlebar,
   </div>
 </div>
 <div aria-atomic="true" aria-live="polite" id="toastHost"></div>
-<div class="topbar"><div class="brand"><img alt="WavCue" class="brandLogo" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA4NjAgMjU2IiBhcmlhLWxhYmVsPSJXYXZDdWUiIHJvbGU9ImltZyI+CjxzdHlsZT4KICA6cm9vdHsKICAgIC0td2MtdGlsZTojMTQxNTFhOwogICAgLS13Yy1pbms6I2U2ZThlZTsKICAgIC0td2Mtd2F2ZTojZTZlOGVlOwogICAgLS13Yy1hY2NlbnQ6I2ZmZDI0YTsKICB9CiAgLndjLXNoYWRvd3sgZmlsdGVyOiBkcm9wLXNoYWRvdygwIDEwcHggMThweCByZ2JhKDAsMCwwLC40NSkpIGRyb3Atc2hhZG93KDAgNHB4IDlweCByZ2JhKDAsMCwwLC4zNSkpOyB9CiAgLndjLWdsb3d7IGZpbHRlcjogZHJvcC1zaGFkb3coMCAwIDEwcHggcmdiYSgyNTUsMjEwLDc0LC4yNSkpOyB9Cjwvc3R5bGU+CiAgPGcgY2xhc3M9IndjLXNoYWRvdyI+CiAgICA8cmVjdCB4PSIyNCIgeT0iMjQiIHdpZHRoPSIyMDgiIGhlaWdodD0iMjA4IiByeD0iNDgiIGZpbGw9InZhcigtLXdjLXRpbGUpIi8+CiAgICA8cGF0aCBkPSJNNTYgMTQ4IEM3MiAxNDggNzIgMTEyIDg4IDExMiBTMTA0IDE4NCAxMjAgMTg0IFMxMzYgNzYgMTUyIDc2IFMxNjggMTg0IDE4NCAxODQgUzE5MiAxNDggMjAwIDE0OCIKICAgICAgICAgIHN0cm9rZT0idmFyKC0td2Mtd2F2ZSkiIHN0cm9rZS13aWR0aD0iMTQiIHN0cm9rZS1saW5lY2FwPSJyb3VuZCIgc3Ryb2tlLWxpbmVqb2luPSJyb3VuZCIgZmlsbD0ibm9uZSIvPgogICAgPGcgY2xhc3M9IndjLWdsb3ciPgogICAgICA8Y2lyY2xlIGN4PSI1NiIgY3k9IjE0OCIgcj0iMTAiIGZpbGw9InZhcigtLXdjLWFjY2VudCkiLz4KICAgICAgPGNpcmNsZSBjeD0iMjAwIiBjeT0iMTQ4IiByPSIxMCIgZmlsbD0idmFyKC0td2MtYWNjZW50KSIvPgogICAgPC9nPgoKICAgIDxnIGZpbGw9InZhcigtLXdjLWluaykiIHRyYW5zZm9ybT0idHJhbnNsYXRlKDI3MC4wMDAsMTMyLjAwMCkiPgogICAgICA8cGF0aCBkPSJNMjAuOTEwIC0wLjAwMCBMMzUuMTYwIC0wLjAwMCBMNDguNDIwIC00NS4zNzUgTDQ4LjYxNSAtNDUuMzc1IEw2MS45MjAgLTAuMDAwIEw3Ni4xNzAgLTAuMDAwIEw5NS45MTAgLTY5LjAwMCBMNzkuOTY1IC02OS4wMDAgTDY4LjI5NSAtMjEuMDQ1IEw2OC4yMDUgLTIxLjA0NSBMNTUuMzY1IC02OS4wMDAgTDQxLjcxNSAtNjkuMDAwIEwyOC44MzAgLTIxLjA0NSBMMjguNzQwIC0yMS4wNDUgTDE3LjA3MCAtNjkuMDAwIEwxLjEyNSAtNjkuMDAwIEwyMC45MTAgLTAuMDAwIFogTTExNi4zOTYgMC43NTAgQzEyMy43NDYgMC43NTAgMTI4LjU3NiAtMi4wMTAgMTMxLjI5MSAtNi45OTAgTDEzMS40ODYgLTYuOTkwIEwxMzEuNDg2IC0wLjAwMCBMMTQ1LjEyMSAtMC4wMDAgTDE0NS4xMjEgLTMzLjk0NSBDMTQ1LjEyMSAtNDMuMzY1IDEzNi44MjYgLTUwLjI1MCAxMjMuMzI2IC01MC4yNTAgQzEwOS4zNjEgLTUwLjI1MCAxMDEuNTc2IC00Mi44ODUgMTAxLjAyMSAtMzMuNjYwIEwxMTQuNjU2IC0zMy42NjAgQzExNS4wMzEgLTM3LjQ1NSAxMTguMzYxIC0zOS43OTUgMTIzLjE0NiAtMzkuNzk1IEMxMjcuODcxIC0zOS43OTUgMTMwLjg3MSAtMzcuNTQ1IDEzMC44NzEgLTMzLjk5MCBMMTMwLjg3MSAtMzMuNzUwIEMxMzAuODcxIC0zMC42MTUgMTI3LjY5MSAtMzAuMTM1IDExOC42OTEgLTI5LjI5NSBDMTA4LjI4MSAtMjguNDEwIDk5LjM3MSAtMjUuMDgwIDk5LjM3MSAtMTMuOTIwIEM5OS4zNzEgLTQuMDM1IDEwNi40OTYgMC43NTAgMTE2LjM5NiAwLjc1MCBaIE0xMjAuNTIxIC05LjA0NSBDMTE2LjA2NiAtOS4wNDUgMTEzLjE1NiAtMTEuMDEwIDExMy4xNTYgLTE0LjM4NSBDMTEzLjE1NiAtMTguMTM1IDExNi43MjYgLTIwLjAxMCAxMjEuMzE2IC0yMC42NzAgQzEyNS42NjYgLTIxLjI4NSAxMjkuMzcxIC0yMi4wMzUgMTMwLjk3NiAtMjIuODc1IEwxMzAuOTc2IC0xOC4wMDAgQzEzMC45NzYgLTEyLjc5NSAxMjYuODUxIC05LjA0NSAxMjAuNTIxIC05LjA0NSBaIE0yMDIuMDM5IC00OS41MDAgTDE4Ni45MzQgLTQ5LjUwMCBMMTc2LjA1OSAtMTQuNzE1IEwxNzUuODc5IC0xNC43MTUgTDE2NC45MTQgLTQ5LjUwMCBMMTQ5Ljc2NCAtNDkuNTAwIEwxNjcuODA5IC0wLjAwMCBMMTgzLjk3OSAtMC4wMDAgTDIwMi4wMzkgLTQ5LjUwMCBaIE0yMzguMTIzIDEuMTI1IEMyNTUuMzI4IDEuMTI1IDI2Ny43OTMgLTEwLjI2MCAyNjguNjQ4IC0yNi4xMTUgTDI1My43MzggLTI2LjExNSBDMjUyLjk0MyAtMTcuMzQwIDI0Ni44OTggLTExLjgyMCAyMzguNDk4IC0xMS44MjAgQzIyNi45MTggLTExLjgyMCAyMjAuNTQzIC0yMC4yNTAgMjIwLjU0MyAtMzQuNTAwIEMyMjAuNTQzIC00OC43OTUgMjI3LjAyMyAtNTcuMTk1IDIzOC40NTMgLTU3LjE5NSBDMjQ2LjcwMyAtNTcuMTk1IDI1Mi41NjggLTUxLjg0MCAyNTMuNzM4IC00Mi44ODUgTDI2OC42NDggLTQyLjg4NS BD..."></div><div class="small"><span>WAVキュー / 添付 / 規格チェック</span><span class="verPill" id="verPill">v5_10_31</span><button class="linkBtn" id="btnChangelog" type="button">変更点</button></div><div class="topbarActions"><button class="btn noDrag" id="btnSettings" type="button">⚙ Settings</button></div></div><div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div><div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div></div><div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
+<div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div><div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button><span class="btnRowSpacer" aria-hidden="true"></span><div class="headerActions"><button class="btn" id="btnSettings" type="button">⚙ Settings</button></div></div></div><div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
@@ -9721,38 +9657,6 @@ window.addEventListener("keydown", (e)=>{
 });
 /* Resize */
 window.addEventListener("resize", ()=>{ resizeAll(); drawAll(); });
-
-/* Init */
-function fitBrandLogoToTopbar(){
-  const topbar = document.querySelector(".topbar");
-  const brand  = document.querySelector(".topbar .brand");
-  const logo   = document.querySelector(".topbar .brandLogo");
-  const small  = document.querySelector(".topbar .brand .small");
-  if(!topbar || !brand || !logo || !small) return;
-
-  // Measure competing topbar items (so we don't accidentally increase the topbar height)
-  const siblings = Array.from(topbar.children).filter(el => el !== brand);
-  const sibMaxH = siblings.reduce((m, el) => Math.max(m, el.getBoundingClientRect().height), 0);
-
-  const brandRect = brand.getBoundingClientRect();
-  const targetChildH = Math.max(sibMaxH, brandRect.height); // never shrink the prototype bar
-
-  const smallH = small.getBoundingClientRect().height;
-  const cs = getComputedStyle(brand);
-  const gap = parseFloat(cs.gap || "0") || 0;
-  const gaps = Math.max(0, brand.children.length - 1) * gap;
-
-  // Max logo height that fits within the existing topbar child height
-  const avail = Math.max(0, targetChildH - smallH - gaps);
-
-  // Set a hard layout height (keeps topbar sizing stable)
-  logo.style.height = `${Math.floor(avail)}px`;
-  logo.style.width  = "auto";
-
-  // Visual-only boost (does NOT affect layout height)
-  logo.style.transformOrigin = "left center";
-  logo.style.transform = "scale(1.08)";
-}
 
 function init(){
   setupDragAndDrop();
