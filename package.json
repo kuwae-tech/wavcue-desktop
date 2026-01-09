@@ -25,15 +25,11 @@
       "package.json"
     ],
     "mac": {
-      "target": [
-        "zip"
-      ]
+      "target": ["zip"],
+      "icon": "build/icons/wavcue_app.png"
     },
     "win": {
-      "target": [
-        "nsis",
-        "zip"
-      ],
+      "target": ["nsis", "zip"],
       "icon": "build/icons/wavcue_app.ico"
     },
     "nsis": {
