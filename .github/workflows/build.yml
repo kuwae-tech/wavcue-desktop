@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         os:
-          - macos-13
+          - macos-15-intel
           - windows-latest
 
     steps:
@@ -27,7 +27,16 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
+      # WindowsはPowerShell、Macはbashで安全に分岐
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          if (Test-Path package-lock.json) { npm ci } else { npm install }
+
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
         run: |
           if [ -f package-lock.json ]; then npm ci; else npm install; fi
 
