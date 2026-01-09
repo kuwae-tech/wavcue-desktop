@@ -47,30 +47,18 @@
     -webkit-app-region: drag;
   }
   .hdrLeft{
-    flex:0 0 auto;
+    flex:1 1 auto;
     display:flex;
     align-items:center;
-  }
-  .hdrCenter{
-    flex:1 1 auto;
+    gap:12px;
     min-width:0;
-    display:flex;
-    justify-content:center;
-    overflow-x:auto;
-  }
-  .hdrCenterInner{
-    display:flex;
-    flex-wrap:nowrap;
-    gap:10px;
-    min-width:0;
-  }
-  .hdrCenter .btnRow{
-    flex-wrap:nowrap;
+    flex-wrap:wrap;
   }
   .hdrRight{
     flex:0 0 auto;
     display:flex;
     align-items:center;
+    gap:10px;
     margin-left:auto;
   }
   .appHeader button,
@@ -103,11 +91,11 @@
     justify-content:center;
     color: rgba(230,232,238,.92);
   }
-  .brandMark svg{
+  .brandMark img{
     width: 26px;
     height: 26px;
     display:block;
-    shape-rendering: geometricPrecision;
+    object-fit: contain;
   }
   .btnRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
   .btn{
@@ -2083,6 +2071,8 @@ header.wc-titlebar,
 
 :root{
   --win-title-safe: 36px;
+  --mac-titlebar-safe: 28px;
+  --mac-logo-gap: 10px;
 }
 .is-win body{
   padding-top: max(env(titlebar-area-height, 0px), var(--win-title-safe));
@@ -2105,8 +2095,9 @@ header.wc-titlebar,
   margin-top: 0 !important;
 }
 .is-mac .appHeader{
-  padding-top: 12px;
-  padding-left: 72px;
+  margin-top: calc(var(--mac-titlebar-safe) + var(--mac-logo-gap));
+  padding-top: 0;
+  padding-left: 0;
 }
 
 .no-drag{ -webkit-app-region: no-drag; }
@@ -2161,21 +2152,14 @@ header.wc-titlebar,
   <div class="hdrLeft">
     <div class="brand">
       <span aria-hidden="true" class="brandMark">
-        <svg aria-hidden="true" focusable="false" viewBox="0 0 28 28">
-          <rect fill="rgba(255,255,255,0.04)" height="24" rx="6" ry="6" stroke="currentColor" stroke-width="1.5" width="24" x="2" y="2"></rect>
-          <path d="M6 16c1.8 0 2.4-6 4.3-6s2.4 8 4.2 8 2.5-6 4.2-6 2.4 4 3.3 4" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="2"></path>
-        </svg>
+        <img alt="" src="../build/icons/wavcue-logo-set.svg"/>
       </span>
       <div class="brandTitle">WavCue</div>
     </div>
-  </div>
-  <div class="hdrCenter">
-    <div class="hdrCenterInner">
-      <div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div>
-      <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
-    </div>
+    <div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div>
   </div>
   <div class="hdrRight">
+    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
     <div class="headerActions"><button aria-label="Settings" class="btn" id="btnSettings" title="Settings" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
