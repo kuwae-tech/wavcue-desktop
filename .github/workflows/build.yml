@@ -1,10 +1,8 @@
-name: Build Desktop Apps
+name: Build Desktop Apps (zip)
 
 on:
   push:
     branches: ["main"]
-    tags:
-      - "v*"
   workflow_dispatch:
 
 jobs:
@@ -27,111 +25,37 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
+      - name: Install dependencies
         run: npm ci
 
-      - name: Install dependencies (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: npm ci
-
-      # ===== macOS: app-builder診断（原因確認用）=====
-      - name: Diagnose app-builder (macOS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euxo pipefail
-          echo "== OS info =="
-          sw_vers || true
-          uname -a || true
-          uname -m || true
-
-          echo "== app-builder files =="
-          ls -la node_modules/app-builder-bin/mac || true
-          file node_modules/app-builder-bin/mac/app-builder_* || true
-
-          echo "== xattr (quarantine etc.) =="
-          xattr -l node_modules/app-builder-bin/mac/app-builder_arm64 || true
-
-          echo "== spctl assess (Gatekeeper) =="
-          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_arm64 || true
-
-          echo "== codesign info =="
-          codesign -dv --verbose=4 node_modules/app-builder-bin/mac/app-builder_arm64 || true
-
-      # ===== macOS: ブロック解除（arm64のみ）=====
+      # app-builder が Gatekeeper / quarantine / 署名で実行不能になる事故対策（macOSのみ）
       - name: Unblock app-builder (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euxo pipefail
-          chmod +x node_modules/app-builder-bin/mac/app-builder_arm64
-          xattr -dr com.apple.quarantine node_modules/app-builder-bin/mac/app-builder_arm64 || true
-          codesign --force --sign - node_modules/app-builder-bin/mac/app-builder_arm64 || true
-
-          echo "== reassess after unblock =="
-          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_arm64 || true
-          xattr -l node_modules/app-builder-bin/mac/app-builder_arm64 || true
-
-          echo "== try run directly after unblock =="
+          chmod +x node_modules/app-builder-bin/mac/app-builder_* || true
+          xattr -dr com.apple.quarantine node_modules/app-builder-bin/mac || true
+          codesign --force --sign - node_modules/app-builder-bin/mac/app-builder_* || true
           node_modules/app-builder-bin/mac/app-builder_arm64 --help || true
+          node_modules/app-builder-bin/mac/app-builder_amd64 --help || true
 
-      # ===== macOS: PNGからICNS生成（pip不使用。sips+iconutilのみ）=====
-      - name: Prepare macOS icon (ICNS)
-        if: runner.os == 'macOS'
-        shell: bash
-        run: |
-          set -euxo pipefail
-
-          SRC_PNG="build/icons/wavcue_app.png"
-          OUT_ICNS="build/icons/wavcue_macos.icns"
-          ICONSET_DIR="build/icons/wavcue.iconset"
-
-          if [ ! -f "$SRC_PNG" ]; then
-            echo "ERROR: $SRC_PNG not found."
-            echo "Please add a PNG icon at: build/icons/wavcue_app.png"
-            exit 1
-          fi
-
-          rm -rf "$ICONSET_DIR"
-          mkdir -p "$ICONSET_DIR"
-
-          sips -z 16 16     "$SRC_PNG" --out "$ICONSET_DIR/icon_16x16.png"
-          sips -z 32 32     "$SRC_PNG" --out "$ICONSET_DIR/icon_16x16@2x.png"
-          sips -z 32 32     "$SRC_PNG" --out "$ICONSET_DIR/icon_32x32.png"
-          sips -z 64 64     "$SRC_PNG" --out "$ICONSET_DIR/icon_32x32@2x.png"
-          sips -z 128 128   "$SRC_PNG" --out "$ICONSET_DIR/icon_128x128.png"
-          sips -z 256 256   "$SRC_PNG" --out "$ICONSET_DIR/icon_128x128@2x.png"
-          sips -z 256 256   "$SRC_PNG" --out "$ICONSET_DIR/icon_256x256.png"
-          sips -z 512 512   "$SRC_PNG" --out "$ICONSET_DIR/icon_256x256@2x.png"
-          sips -z 512 512   "$SRC_PNG" --out "$ICONSET_DIR/icon_512x512.png"
-          sips -z 1024 1024 "$SRC_PNG" --out "$ICONSET_DIR/icon_512x512@2x.png"
-
-          iconutil -c icns "$ICONSET_DIR" -o "$OUT_ICNS"
-          ls -la "$OUT_ICNS"
-
-      - name: Build (Windows)
+      # Windows: zip だけ
+      - name: Build (Windows - zip only)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: npx electron-builder --win nsis zip --publish never
+        run: npx electron-builder --win zip --publish never
 
+      # macOS: zip だけ（dmgは作らない）
       - name: Build (macOS - zip only)
         if: runner.os == 'macOS'
         shell: bash
-        env:
-          DEBUG: "electron-builder*"
-          ELECTRON_BUILDER_LOG_LEVEL: "debug"
-        run: |
-          set -euxo pipefail
-          npx electron-builder --mac zip --publish never -c.mac.icon=build/icons/wavcue_macos.icns
+        run: npx electron-builder --mac zip --publish never
 
-      - name: Upload artifacts
+      # ここが重要：zip しかアップしない（blockmap / exe / dmg を切る）
+      - name: Upload artifacts (zip only)
         uses: actions/upload-artifact@v4
         with:
           name: wavcue-${{ matrix.os }}
-          path: |
-            dist/*.exe
-            dist/*.zip
-            dist/*.blockmap
+          path: dist/*.zip
+          if-no-files-found: error
