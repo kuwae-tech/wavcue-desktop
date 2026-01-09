@@ -27,7 +27,6 @@ jobs:
           node-version: 20
           cache: npm
 
-      # 依存インストール（OSごとにシェルを分けて安定させる）
       - name: Install dependencies (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
@@ -38,19 +37,16 @@ jobs:
         shell: bash
         run: npm ci
 
-      # app-builder の実行権限（macOSのみ）
       - name: Fix permissions for app-builder (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: chmod +x node_modules/app-builder-bin/mac/app-builder_*
 
-      # Windows: nsis + zip
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: npx electron-builder --win nsis zip --publish never
 
-      # macOS: zip のみ（app-builder系でdmg生成が落ちやすいため）
       - name: Build (macOS - zip only)
         if: runner.os == 'macOS'
         shell: bash
