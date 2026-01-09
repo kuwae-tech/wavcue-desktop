@@ -27,10 +27,17 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Install dependencies
+      - name: Install dependencies (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
         run: npm ci
 
-      # ===== macOS: app-builder 実行不能の根本原因をログに出す =====
+      - name: Install dependencies (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: npm ci
+
+      # ===== macOS: app-builder の状態を確認 =====
       - name: Diagnose app-builder (macOS)
         if: runner.os == 'macOS'
         shell: bash
@@ -49,34 +56,43 @@ jobs:
           xattr -l node_modules/app-builder-bin/mac/app-builder_* || true
 
           echo "== spctl assess (Gatekeeper) =="
-          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_* || true
+          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_arm64 || true
 
           echo "== codesign info =="
-          codesign -dv --verbose=4 node_modules/app-builder-bin/mac/app-builder_* || true
+          codesign -dv --verbose=4 node_modules/app-builder-bin/mac/app-builder_arm64 || true
 
-      # ===== macOS: 典型的なブロック解除（権限 + quarantine解除 + ad-hoc署名）=====
+      # ===== macOS: ブロック解除（arm64だけ対象にする）=====
       - name: Unblock app-builder (macOS)
         if: runner.os == 'macOS'
         shell: bash
         run: |
           set -euxo pipefail
-          chmod +x node_modules/app-builder-bin/mac/app-builder_* || true
-          xattr -dr com.apple.quarantine node_modules/app-builder-bin/mac || true
-          codesign --force --sign - node_modules/app-builder-bin/mac/app-builder_* || true
+          chmod +x node_modules/app-builder-bin/mac/app-builder_arm64
+          xattr -dr com.apple.quarantine node_modules/app-builder-bin/mac/app-builder_arm64 || true
+          codesign --force --sign - node_modules/app-builder-bin/mac/app-builder_arm64 || true
+
+          echo "== reassess after unblock =="
+          spctl --assess -vv node_modules/app-builder-bin/mac/app-builder_arm64 || true
+          xattr -l node_modules/app-builder-bin/mac/app-builder_arm64 || true
 
           echo "== try run directly after unblock =="
           node_modules/app-builder-bin/mac/app-builder_arm64 --help || true
-          node_modules/app-builder-bin/mac/app-builder_amd64 --help || true
 
       - name: Build (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: npx electron-builder --win nsis zip --publish never
 
+      # ===== macOS: electron-builder の詳細ログを出す =====
       - name: Build (macOS - zip only)
         if: runner.os == 'macOS'
         shell: bash
-        run: npx electron-builder --mac zip --publish never
+        env:
+          DEBUG: "electron-builder*"
+          ELECTRON_BUILDER_LOG_LEVEL: "debug"
+        run: |
+          set -euxo pipefail
+          npx electron-builder --mac zip --publish never
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
