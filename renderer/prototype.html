@@ -2289,7 +2289,6 @@ header.wc-titlebar,
 </div>
 <div class="row" style="gap:10px;align-items:center;justify-content:flex-end">
   <button class="btn good" id="exportCheckRun" style="padding:8px 12px;border-radius:999px" type="button">書き出し</button>
-  <label class="chk"><input type="checkbox" id="ec_autoReport"> レポート自動ダウンロード</label>
 </div>
 </div>
 <div class="modalBody">
@@ -2459,7 +2458,7 @@ header.wc-titlebar,
   <div class="modalHead">
     <div class="title">
       <b>Settings</b>
-      <span class="muted">Storage / Cleanup</span>
+      <span class="muted">バックアップ管理</span>
     </div>
     <div class="row" style="gap:8px">
       <button class="btn" id="settingsClose" type="button">閉じる</button>
@@ -2467,24 +2466,24 @@ header.wc-titlebar,
   </div>
   <div class="modalBody">
     <div class="settingsGrid">
-      <section class="settingsCard">
-        <h3>Storage</h3>
+      <section class="settingsCard" style="grid-column:1/-1">
+        <h3>バックアップ管理</h3>
         <div class="row" style="gap:8px;flex-wrap:wrap">
-          <button class="btn" data-settings-folder="exports" type="button">Exportsを開く</button>
-          <button class="btn" data-settings-folder="backups" type="button">Backupsを開く</button>
-          <button class="btn" data-settings-folder="reports" type="button">Reportsを開く</button>
+          <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
+          <button class="btn" data-settings-folder="reports" type="button">レポートを開く</button>
+          <button class="btn good" id="settingsCleanupNow" type="button">今すぐクリーンアップ</button>
         </div>
-      </section>
-      <section class="settingsCard">
-        <h3>Paths</h3>
         <div class="settingsPaths" id="settingsPaths"></div>
-      </section>
-      <section class="settingsCard">
-        <h3>Cleanup</h3>
-        <button class="btn good" id="settingsCleanupNow" type="button">今すぐクリーンアップ</button>
-      </section>
-      <section class="settingsCard">
-        <h3>自動クリーンアップ</h3>
+        <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
+        <div class="switchWrap">
+          <label class="switch">
+            <input id="settingsAutoBackup" type="checkbox"/>
+            <span class="slider"></span>
+          </label>
+          <div class="switchText">
+            <span class="switchLabel">自動バックアップを有効にする</span>
+          </div>
+        </div>
         <div class="switchWrap">
           <label class="switch">
             <input id="settingsAutoCleanup" type="checkbox"/>
@@ -2522,9 +2521,6 @@ header.wc-titlebar,
           </div>
         </div>
         <div class="muted">不要な一時ファイルだけを整理します</div>
-      </section>
-      <section class="settingsCard">
-        <h3>Retention / Quota</h3>
         <label class="settingsField">
           <span class="muted">Retention days</span>
           <input id="settingsRetentionDays" min="1" type="number"/>
@@ -2545,6 +2541,8 @@ header.wc-titlebar,
           </select>
         </label>
         <button class="btn" id="settingsSave" type="button">設定を保存</button>
+        <div class="muted" id="settingsCleanupProgress"></div>
+        <div class="muted" id="settingsCleanupResult"></div>
       </section>
       <section class="settingsCard" style="grid-column:1/-1">
         <h3>Logs</h3>
@@ -6271,14 +6269,22 @@ async function exportWav(){
       __exportBarShown = true;
     };
 
-    // オプション（書き出し前チェック画面の設定を使用）
-    const autoReport = !!($("ec_autoReport")?.checked);
-    const makeBackup = true;
+    let autoBackupEnabled = false;
+    let autoCleanupEnabled = false;
+    let autoCleanupOnExport = false;
+    try{
+      const settings = await window.wavcue?.getSettings?.();
+      autoBackupEnabled = !!settings?.autoBackupEnabled;
+      autoCleanupEnabled = !!settings?.autoCleanup;
+      autoCleanupOnExport = !!settings?.autoCleanupOnExport;
+    }catch(_){}
     try{ scheduleDiffUpdate(true); }catch(_){ }
 
     // 既定のファイル名は「元ファイル名」を提示（現場の命名ルールを尊重）
     const base = _baseNameNoExt((state.fileName && String(state.fileName).trim()) ? state.fileName : "output.wav");
     const suggested = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
+    const backupBase = _sanitizeFileSegment(base);
+    const backupStamp = _backupStamp();
 // --- build replacements (editable chunks only) ---
     _prog.set(0.18, "書き出し中…", "チャンク生成中");
     const bextBuf = buildBextChunk();                        // bext (version preserved)
@@ -6380,41 +6386,6 @@ async function exportWav(){
       return;
     }
 
-    // Backup: 原本のWAVをそのまま別保存（事故防止）
-    let _backupRes = null;
-    let backupName = null;
-    if(makeBackup){
-      try{
-        backupName = `${base}_ORIGINAL_BACKUP_${_tsStamp()}.wav`;
-        const backupBlob = new Blob([state.srcAb], {type:"audio/wav"});
-        _backupRes = await _saveBlobWithFallback(backupBlob, backupName, (phase)=>{
-          try{
-            if(phase==="picker_open"){
-              if(__exportBarShown){ _prog.hide(); __exportBarShown = false; }
-            }else if(phase==="picked"){
-              __ensureExportBar("バックアップ書き込み準備…");
-              _prog.set(0.70, "書き出し中…", "バックアップ保存先確定…");
-            }else if(phase==="writing"){
-              __ensureExportBar("バックアップ書き込み中…");
-              _prog.set(0.78, "書き出し中…", "バックアップ書き込み中…");
-            }else if(phase==="download_start"){
-              __ensureExportBar("バックアップDL開始…");
-              _prog.set(0.76, "書き出し中…", "バックアップDL開始…");
-            }else if(phase==="done"){
-              if(__exportBarShown) _prog.set(0.82, "書き出し中…", "バックアップ保存完了…");
-            }else if(phase==="cancel"){
-              if(__exportBarShown){ _prog.hide(); __exportBarShown = false; }
-            }
-          }catch(_){}
-        });
-        if(_backupRes && _backupRes.mode === "cancel"){
-          log("WARN: バックアップ保存はキャンセルされました。");
-        }
-      }catch(e){
-        log(`WARN: バックアップ保存に失敗: ${e?.name||"Error"} ${e?.message||""}`);
-      }
-    }
-
     // Self-verify: 透過チャンク（未知/編集対象外）とiXMLの保持を簡易検証
     let verifyOk = true;
     const verifyNotes = [];
@@ -6480,16 +6451,13 @@ async function exportWav(){
       verifyNotes.push("自己検証で例外が発生しました。");
     }
 
-    // Export Report (.txt)
-    if(autoReport){
+    // Auto backup + report (app-managed folders)
+    if(autoBackupEnabled){
+      const backupName = `${backupBase}__${backupStamp}__backup.wav`;
+      const reportName = `${backupBase}__${backupStamp}__report.txt`;
       try{
         const diffs = (state._diff && state._diff.diffs) ? state._diff.diffs : diffSnapshots(state.originalSnapshot, takeSnapshot());
-        const stamp = _tsStamp();
-        // レポートのファイル名は、可能なら「書き出し時に確定した出力ファイル名」を優先（保存ダイアログで名称変更した場合に追従）
-        const _outNameForReport = _saveRes?.filePath ? _baseNameFromPath(_saveRes.filePath) : (_saveRes?.suggested || suggested);
-        const _reportBase = _baseNameNoExt(String(_outNameForReport || state.fileName || "output"));
-        const reportName = `${_reportBase}_WavCue_Report_${stamp}.txt`;
-const lines = [];
+        const lines = [];
         lines.push("WavCue Export Report");
         lines.push(`Date: ${new Date().toString()}`);
         lines.push(`Source: ${String(state.fileName||"")}`);
@@ -6506,7 +6474,7 @@ const lines = [];
         }else{
           lines.push(`Output: — (${_outMode})`);
         }
-        lines.push(`Backup: ${String(backupName || "—")} (${String(_backupRes?.mode||"")})`);
+        lines.push(`Backup: ${backupName} (auto)`);
         try{
           const norm=(s)=> String(s||"").trim().replace(/\s+/g,"").toUpperCase();
           const bcCount = (Array.isArray(state.cues)?state.cues:[]).filter(c=>{
@@ -6522,23 +6490,46 @@ const lines = [];
         lines.push("");
         lines.push(`Self-Verify: ${verifyOk ? "PASS" : "FAIL"}`);
         verifyNotes.forEach(n=> lines.push(`- ${n}`));
-                if(verifyDiffLines.length){
+        if(verifyDiffLines.length){
           lines.push("");
           verifyDiffLines.forEach(l=> lines.push(l));
         }
-lines.push("");
+        lines.push("");
         lines.push("Log (tail)");
         const logTxt = getLogText();
         const logLines = String(logTxt||"").split("\n");
         lines.push(logLines.slice(Math.max(0, logLines.length-200)).join("\n"));
 
-        const reportRes = await downloadTextFile(reportName, lines.join("\n"));
-        if(reportRes?.mode !== "cancel"){
+        const reportText = lines.join("\n");
+        const backupBase64 = _base64FromArrayBuffer(state.srcAb);
+        const backupRes = await window.wavcue?.saveBackupReport?.({
+          baseName: backupBase,
+          stamp: backupStamp,
+          backupDataBase64: backupBase64,
+          reportText,
+          sourceFileName: String(state.fileName || ""),
+          exportFileName: _outName,
+        });
+        if(backupRes?.ok){
+          log(`OK: バックアップを保存しました: ${backupName}`);
           log(`OK: レポートを書き出しました: ${reportName}`);
+        }else{
+          log(`WARN: バックアップ保存に失敗: ${backupRes?.error || "unknown error"}`);
         }
       }catch(e){
-        log(`WARN: レポート生成に失敗: ${e?.name||"Error"} ${e?.message||""}`);
+        log(`WARN: バックアップ/レポート生成に失敗: ${e?.name||"Error"} ${e?.message||""}`);
       }
+    }
+
+    if(autoCleanupEnabled && autoCleanupOnExport){
+      try{
+        const cleanupResult = await window.wavcue?.runCleanupNow?.();
+        if(cleanupResult?.ok){
+          settingsLogAdd(`Cleanup after export: deleted ${cleanupResult.summary.deletedCount} jobs, freed ${formatBytes(cleanupResult.summary.deletedBytes)}.`);
+        }else if(cleanupResult){
+          settingsLogAdd(`Cleanup after export finished with errors (${cleanupResult.summary?.errorCount ?? "unknown"}).`);
+        }
+      }catch(_){}
     }
 
     __exportOK = true;
@@ -6625,12 +6616,14 @@ const settingsDialog = $("settingsDialog");
 const settingsClose = $("settingsClose");
 const settingsLog = $("settingsLog");
 const settingsPaths = $("settingsPaths");
+const settingsBackupStatus = $("settingsBackupStatus");
 const settingsCleanupResult = $("settingsCleanupResult");
 const settingsCleanupProgress = $("settingsCleanupProgress");
 const settingsRetentionDays = $("settingsRetentionDays");
 const settingsBackupQuotaGB = $("settingsBackupQuotaGB");
 const settingsMinKeepCount = $("settingsMinKeepCount");
 const settingsDeleteMethod = $("settingsDeleteMethod");
+const settingsAutoBackup = $("settingsAutoBackup");
 const settingsAutoCleanup = $("settingsAutoCleanup");
 const settingsCleanupOnExport = $("settingsCleanupOnExport");
 const settingsCleanupOnQuit = $("settingsCleanupOnQuit");
@@ -6680,9 +6673,7 @@ const refreshSettingsData = async ()=>{
   if(settingsLog && settingsLog.textContent.trim() === "Ready." && paths.reports){
     settingsLog.textContent = `Cleanup log: ${paths.reports}/CleanupLog.txt`;
   }
-  if(typeof settings.autoReport === "boolean" && $("ec_autoReport")){
-    $("ec_autoReport").checked = settings.autoReport;
-  }
+  if(settingsAutoBackup) settingsAutoBackup.checked = !!settings.autoBackupEnabled;
   if(settingsRetentionDays) settingsRetentionDays.value = String(settings.retentionDays ?? 30);
   if(settingsBackupQuotaGB) settingsBackupQuotaGB.value = String(settings.backupQuotaGB ?? 25);
   if(settingsMinKeepCount) settingsMinKeepCount.value = String(settings.minKeepCount ?? 20);
@@ -6692,6 +6683,17 @@ const refreshSettingsData = async ()=>{
   if(settingsCleanupOnQuit) settingsCleanupOnQuit.checked = !!settings.autoCleanupOnQuit;
   if(settingsCleanupOnStartup) settingsCleanupOnStartup.checked = !!settings.autoCleanupOnStartup;
   updateCleanupResult(settings.cleanupLastResult);
+
+  if(settingsBackupStatus && window.wavcue?.getBackupStatus){
+    try{
+      const status = await window.wavcue.getBackupStatus();
+      const oldest = status?.oldest ? new Date(status.oldest).toLocaleString() : "—";
+      const latest = status?.latest ? new Date(status.latest).toLocaleString() : "—";
+      settingsBackupStatus.textContent = `バックアップ状況: ${status?.jobCount ?? 0}件 / ${formatBytes(status?.totalBytes || 0)} / 最古 ${oldest} / 最新 ${latest}`;
+    }catch(_){
+      settingsBackupStatus.textContent = "バックアップ状況: 取得できませんでした。";
+    }
+  }
 };
 
 const openSettingsDialog = async ()=>{
@@ -6743,6 +6745,7 @@ window.wavcue?.onCleanupProgress?.((payload)=>{
 $("settingsSave")?.addEventListener("click", async ()=>{
   if(!window.wavcue?.setSettings) return;
   const patch = {
+    autoBackupEnabled: !!settingsAutoBackup?.checked,
     retentionDays: Number(settingsRetentionDays?.value || 30),
     backupQuotaGB: Number(settingsBackupQuotaGB?.value || 25),
     minKeepCount: Number(settingsMinKeepCount?.value || 20),
@@ -7028,6 +7031,17 @@ function _tsStamp(){
   const d = new Date();
   const pad = (n)=> String(n).padStart(2,"0");
   return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}_${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+function _backupStamp(){
+  const d = new Date();
+  const pad = (n)=> String(n).padStart(2,"0");
+  return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}`;
+}
+function _sanitizeFileSegment(value){
+  return String(value || "output")
+    .replace(/[<>:"/\\|?*\u0000-\u001F]/g, "_")
+    .replace(/\s+/g, " ")
+    .trim() || "output";
 }
 function _baseNameNoExt(name){
   const n = String(name||"output.wav");
@@ -9754,17 +9768,6 @@ function _settingsSave(){
 }
 _settingsLoad();
 refreshSettingsData();
-try{
-  const autoReportEl = $("ec_autoReport");
-  if(autoReportEl){
-    autoReportEl.addEventListener("change", async ()=>{
-      try{
-        await window.wavcue?.setSettings?.({ autoReport: !!autoReportEl.checked });
-        settingsLogAdd(`Auto report ${autoReportEl.checked ? "enabled" : "disabled"}.`);
-      }catch(_){}
-    });
-  }
-}catch(_){}
 try{
   ["pairSeconds","chkLinkPair"].forEach(id=>{
     const el = document.getElementById(id);
