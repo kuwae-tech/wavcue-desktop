@@ -1399,13 +1399,14 @@
   /* Toasts */
   #toastRoot{
     position: fixed;
-    top: 16px;
-    right: 16px;
+    left: 50%;
+    bottom: 16px;
+    transform: translateX(-50%);
     z-index: 2147483647;
     display: flex;
     flex-direction: column;
-    align-items: flex-end;
-    justify-content: flex-start;
+    align-items: center;
+    justify-content: flex-end;
     gap: 10px;
     pointer-events: none; /* clicks pass through */
   }
@@ -6905,37 +6906,42 @@ settingsCleanupConfirmRun?.addEventListener("click", async ()=>{
   await refreshSettingsData();
 });
 
-$("settingsSave")?.addEventListener("click", async ()=>{
-  const patch = {
-    autoBackupEnabled: !!cachedAutoBackupEnabled,
-    retentionDays: Number(settingsRetentionDays?.value || 30),
-    backupQuotaGB: Number(settingsBackupQuotaGB?.value || 5),
-    minKeepCount: Number(settingsMinKeepCount?.value || 20),
-    deleteMethod: settingsDeleteMethod?.value || "trash",
-    autoCleanup: !!settingsAutoCleanup?.checked,
-    autoCleanupOnExport: !!settingsAutoCleanup?.checked,
-    autoCleanupOnQuit: false,
-    autoCleanupOnStartup: false,
-  };
-  let saveOk = false;
+async function onSaveSettingsClicked(){
   try{
+    const patch = {
+      autoBackupEnabled: !!cachedAutoBackupEnabled,
+      retentionDays: Number(settingsRetentionDays?.value || 30),
+      backupQuotaGB: Number(settingsBackupQuotaGB?.value || 5),
+      minKeepCount: Number(settingsMinKeepCount?.value || 20),
+      deleteMethod: settingsDeleteMethod?.value || "trash",
+      autoCleanup: !!settingsAutoCleanup?.checked,
+      autoCleanupOnExport: !!settingsAutoCleanup?.checked,
+      autoCleanupOnQuit: false,
+      autoCleanupOnStartup: false,
+    };
     if(typeof window.wavcue?.setSettings !== "function"){
       throw new Error("settings:set unavailable");
     }
     await window.wavcue.setSettings(patch);
-    saveOk = true;
     updateRulesBadge();
     settingsLogAdd("設定を保存しました。");
-  }catch(error){
-    settingsLogAdd("設定の保存に失敗しました。");
-  }finally{
-    if(saveOk){
-      window.safeToast && window.safeToast("設定を保存しました", "ok", 2400);
-    }else{
-      window.safeToast && window.safeToast("設定の保存に失敗しました", "err", 3200);
+    if(typeof toast === "function"){
+      toast("設定を保存しました", "ok", 2400);
+    }else if(window.safeToast){
+      window.safeToast("設定を保存しました", "ok", 2400);
     }
+  }catch(error){
+    if(typeof toast === "function"){
+      toast("設定の保存に失敗しました", "err", 3200);
+    }else if(window.safeToast){
+      window.safeToast("設定の保存に失敗しました", "err", 3200);
+    }
+    settingsLogAdd("設定の保存に失敗しました。");
+    console.error(error);
   }
-});
+}
+
+$("settingsSave")?.addEventListener("click", onSaveSettingsClicked);
 
 $("btnZoomIn").addEventListener("click", ()=>{
   if(!state.buffer) return;
