@@ -59,3 +59,4 @@ jobs:
           name: wavcue-${{ matrix.os }}
           path: dist/*.zip
           if-no-files-found: error
+          retention-days: 1
