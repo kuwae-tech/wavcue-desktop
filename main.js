@@ -556,6 +556,84 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
   };
 });
 
+ipcMain.handle('settings:run-complete-cleanup', async (event) => {
+  const startedAt = new Date();
+  const progress = (message) => {
+    event.sender.send('settings:cleanup-progress', { message });
+  };
+
+  progress('スキャン中...');
+
+  const settings = await ensureDefaultFolders();
+  const { retentionDays, backupQuotaGB, minKeepCount, deleteMethod } = settings;
+  const { backups, reports, root } = settings.paths;
+
+  const jobs = await listJobs({ backups, reports });
+  const orphanJobs = jobs.filter((job) => job.orphanReason);
+  const deletions = jobs.map((job) => ({ ...job, reason: 'manual complete cleanup' }));
+
+  if (deletions.length === 0) {
+    progress('削除対象はありません。');
+  }
+
+  const trashRoot = path.join(root, 'Trash');
+  await fs.mkdir(trashRoot, { recursive: true });
+
+  let deletedBytes = 0;
+  let errorCount = 0;
+  const deletionResults = [];
+  for (let index = 0; index < deletions.length; index += 1) {
+    const job = deletions[index];
+    progress(`削除中 ${index + 1}/${deletions.length}...`);
+    const result = await deleteJob(job, { deleteMethod, trashRoot });
+    if (result.errors.length > 0) {
+      errorCount += 1;
+    } else {
+      deletedBytes += result.deletedBytes;
+    }
+    deletionResults.push({ ...job, errors: result.errors, reason: job.reason });
+  }
+
+  const finishedAt = new Date();
+  const cleanupLastResult = {
+    timestamp: finishedAt.toISOString(),
+    deletedCount: deletions.length - errorCount,
+    deletedBytes,
+    errorCount,
+  };
+  setSettings({ cleanupLastResult });
+
+  const logPayload = {
+    startedAt,
+    finishedAt,
+    retentionDays,
+    backupQuotaGB,
+    minKeepCount,
+    deleteMethod,
+    jobCount: jobs.length,
+    protectedCount: 0,
+    orphanJobs,
+    deletions: deletionResults,
+    deletedCount: cleanupLastResult.deletedCount,
+    deletedBytes,
+    errorCount,
+  };
+  const logPath = path.join(reports, 'CleanupLog.txt');
+  await fs.appendFile(logPath, buildCleanupLog(logPayload), 'utf8');
+
+  progress('Cleanup finished.');
+
+  return {
+    ok: errorCount === 0,
+    summary: cleanupLastResult,
+    deletions: deletionResults.map((job) => ({
+      jobId: job.jobId,
+      reason: job.reason,
+      errors: job.errors,
+    })),
+  };
+});
+
 ipcMain.handle('settings:get-backup-status', async () => {
   const settings = await ensureDefaultFolders();
   const { backups, reports } = settings.paths;

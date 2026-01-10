@@ -111,6 +111,8 @@
   .btn.primary:hover{background:rgba(56,189,248,.18)}
   .btn.good{border-color:rgba(126,231,162,.45);background:rgba(126,231,162,.12)}
   .btn.good:hover{background:rgba(126,231,162,.16)}
+  .btn.danger{border-color:rgba(255,91,110,.5);background:rgba(255,91,110,.14)}
+  .btn.danger:hover{background:rgba(255,91,110,.2)}
 
   .pill{
     font-size:11px;color:var(--muted);border:1px solid var(--line);border-radius:999px;padding:6px 10px;
@@ -559,6 +561,7 @@
   }
   .settingsDialog select,
   .settingsDialog input[type="number"]{
+    color-scheme: dark;
     width:100%;
     padding:8px 10px;
     border-radius:12px;
@@ -573,6 +576,7 @@
     box-shadow:0 0 0 2px rgba(255,210,74,.2);
   }
   .settingsDialog select option{
+    color-scheme: dark;
     background:#10141b;
     color:var(--text);
   }
@@ -589,6 +593,7 @@
   .settingsDialog .rulesGrid{
     display:grid;
     grid-template-columns: repeat(2, minmax(180px, 1fr));
+    align-items:start;
     gap:8px 12px;
   }
   .settingsDialog .rulesNote{
@@ -596,8 +601,33 @@
     color:rgba(229,231,235,.65);
   }
   .settingsDialog .fieldNote{
-    font-size:11px;
-    color:rgba(248,198,108,.9);
+    font-size:10px;
+    color:rgba(229,231,235,.6);
+    min-height:1em;
+  }
+  .settingsDialog .fieldNote.is-empty{
+    visibility:hidden;
+  }
+  .confirmDialog{
+    width:min(520px, calc(100% - 24px));
+  }
+  .confirmDialog .confirmBody{
+    display:grid;
+    gap:10px;
+    font-size:12px;
+    color:rgba(229,231,235,.85);
+  }
+  .confirmDialog .confirmList{
+    margin:0;
+    padding-left:18px;
+    display:grid;
+    gap:4px;
+  }
+  .confirmDialog .confirmActions{
+    display:flex;
+    justify-content:flex-end;
+    gap:8px;
+    margin-top:8px;
   }
   @media (max-width: 640px){
     .settingsDialog .rulesGrid{
@@ -2533,9 +2563,9 @@ header.wc-titlebar,
           <div class="row" style="gap:8px;flex-wrap:wrap">
             <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
             <button class="btn" data-settings-folder="reports" type="button">レポートを開く</button>
-            <button class="btn good" id="settingsCleanupNow" type="button">今すぐクリーンアップ</button>
+            <button class="btn danger" id="settingsCleanupNow" type="button">今すぐ完全クリーンアップ</button>
           </div>
-          <div class="settingsHint">古いバックアップが削除されます（最低保持数は残ります）</div>
+          <div class="settingsHint">保存ルールを無視してバックアップ／レポートを可能な限り削除します</div>
           <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
           <div class="muted" id="settingsCleanupResult"></div>
           <div class="muted" id="settingsCleanupProgress"></div>
@@ -2580,6 +2610,7 @@ header.wc-titlebar,
                   <option value="50">50GB</option>
                   <option value="9999">制限なし（注意）</option>
                 </select>
+                <span class="fieldNote is-empty">　</span>
               </label>
               <label class="settingsField">
                 <span class="muted">最低保持数</span>
@@ -2589,6 +2620,7 @@ header.wc-titlebar,
                   <option value="20">20件（推奨）</option>
                   <option value="50">50件</option>
                 </select>
+                <span class="fieldNote is-empty">　</span>
               </label>
               <label class="settingsField">
                 <span class="muted">削除方法</span>
@@ -2608,6 +2640,26 @@ header.wc-titlebar,
         <h3>ログ</h3>
         <div class="settingsLog" id="settingsLog">準備完了</div>
       </section>
+    </div>
+  </div>
+</dialog>
+<dialog class="confirmDialog" id="settingsCleanupConfirm">
+  <div class="modalHead">
+    <div class="title">
+      <b>完全クリーンアップを実行しますか？</b>
+    </div>
+  </div>
+  <div class="modalBody">
+    <div class="confirmBody">
+      <ul class="confirmList">
+        <li>保存ルールを無視してバックアップを削除します</li>
+        <li>最低保持数は適用されません</li>
+        <li>この操作は元に戻せません</li>
+      </ul>
+      <div class="confirmActions">
+        <button class="btn" id="settingsCleanupConfirmCancel" type="button">キャンセル</button>
+        <button class="btn danger" id="settingsCleanupConfirmRun" type="button">完全クリーンアップを実行</button>
+      </div>
     </div>
   </div>
 </dialog>
@@ -6586,8 +6638,10 @@ async function exportWav(){
         const cleanupResult = await window.wavcue?.runCleanupNow?.();
         if(cleanupResult?.ok){
           settingsLogAdd(`書き出し後のクリーンアップ: ${cleanupResult.summary.deletedCount}件削除 / ${formatBytes(cleanupResult.summary.deletedBytes)} 解放。`);
+          window.safeToast && window.safeToast(`自動クリーンアップを実行しました（${cleanupResult.summary.deletedCount}件削除 / ${formatBytes(cleanupResult.summary.deletedBytes)} 解放）`, "ok", 3200);
         }else if(cleanupResult){
           settingsLogAdd(`書き出し後のクリーンアップがエラーで終了しました（エラー ${cleanupResult.summary?.errorCount ?? "不明"}件）。`);
+          window.safeToast && window.safeToast("自動クリーンアップがエラーで終了しました", "warn", 3600);
         }
       }catch(_){}
     }
@@ -6678,6 +6732,9 @@ const settingsLog = $("settingsLog");
 const settingsBackupStatus = $("settingsBackupStatus");
 const settingsCleanupResult = $("settingsCleanupResult");
 const settingsCleanupProgress = $("settingsCleanupProgress");
+const settingsCleanupConfirm = $("settingsCleanupConfirm");
+const settingsCleanupConfirmCancel = $("settingsCleanupConfirmCancel");
+const settingsCleanupConfirmRun = $("settingsCleanupConfirmRun");
 const settingsRetentionDays = $("settingsRetentionDays");
 const settingsBackupQuotaGB = $("settingsBackupQuotaGB");
 const settingsMinKeepCount = $("settingsMinKeepCount");
@@ -6768,6 +6825,16 @@ const openSettingsDialog = async ()=>{
   try{ settingsDialog.showModal(); }catch(_){ settingsDialog.open = true; }
 };
 
+const openCleanupConfirm = ()=>{
+  if(!settingsCleanupConfirm) return;
+  try{ settingsCleanupConfirm.showModal(); }catch(_){ settingsCleanupConfirm.open = true; }
+};
+
+const closeCleanupConfirm = ()=>{
+  if(!settingsCleanupConfirm) return;
+  try{ settingsCleanupConfirm.close(); }catch(_){ settingsCleanupConfirm.open = false; }
+};
+
 if(settingsButton){
   settingsButton.addEventListener("click", openSettingsDialog);
 }
@@ -6775,6 +6842,10 @@ if(settingsClose && settingsDialog){
   settingsClose.addEventListener("click", ()=>{ try{ settingsDialog.close(); }catch(_){ settingsDialog.open = false; } });
 }
 settingsDialog?.addEventListener("click", (e)=>{ if(e.target === settingsDialog){ try{ settingsDialog.close(); }catch(_){ settingsDialog.open = false; } } });
+if(settingsCleanupConfirmCancel){
+  settingsCleanupConfirmCancel.addEventListener("click", closeCleanupConfirm);
+}
+settingsCleanupConfirm?.addEventListener("click", (e)=>{ if(e.target === settingsCleanupConfirm){ closeCleanupConfirm(); } });
 
 [settingsRetentionDays, settingsBackupQuotaGB, settingsMinKeepCount, settingsDeleteMethod].forEach((select)=>{
   if(!select) return;
@@ -6797,22 +6868,31 @@ document.querySelectorAll("[data-settings-folder]").forEach((button)=>{
 });
 
 $("settingsCleanupNow")?.addEventListener("click", async ()=>{
-  if(!window.wavcue?.runCleanupNow) return;
-  if(settingsCleanupProgress) settingsCleanupProgress.textContent = "クリーンアップを開始しています...";
-  settingsLogAdd("クリーンアップを開始しました。");
-  const result = await window.wavcue.runCleanupNow();
-  if(result.ok){
-    settingsLogAdd(`クリーンアップが完了しました。${result.summary.deletedCount}件削除 / ${formatBytes(result.summary.deletedBytes)} 解放 / エラー ${result.summary.errorCount}件。`);
-  }else{
-    settingsLogAdd(`クリーンアップがエラーで終了しました。エラー ${result.summary?.errorCount ?? "不明"}件。`);
-  }
-  updateCleanupResult(result.summary);
+  if(!window.wavcue?.runCompleteCleanup) return;
+  openCleanupConfirm();
 });
 
 window.wavcue?.onCleanupProgress?.((payload)=>{
   if(payload?.message && settingsCleanupProgress){
     settingsCleanupProgress.textContent = payload.message;
   }
+});
+
+settingsCleanupConfirmRun?.addEventListener("click", async ()=>{
+  if(!window.wavcue?.runCompleteCleanup) return;
+  closeCleanupConfirm();
+  if(settingsCleanupProgress) settingsCleanupProgress.textContent = "完全クリーンアップを開始しています...";
+  settingsLogAdd("完全クリーンアップを開始しました。");
+  const result = await window.wavcue.runCompleteCleanup();
+  if(result.ok){
+    settingsLogAdd(`完全クリーンアップが完了しました。${result.summary.deletedCount}件削除 / ${formatBytes(result.summary.deletedBytes)} 解放 / エラー ${result.summary.errorCount}件。`);
+    window.safeToast && window.safeToast(`完全クリーンアップを実行しました（${result.summary.deletedCount}件削除 / ${formatBytes(result.summary.deletedBytes)} 解放）`, "ok", 3200);
+  }else{
+    settingsLogAdd(`完全クリーンアップがエラーで終了しました。エラー ${result.summary?.errorCount ?? "不明"}件。`);
+    window.safeToast && window.safeToast("完全クリーンアップがエラーで終了しました", "warn", 3600);
+  }
+  updateCleanupResult(result.summary);
+  await refreshSettingsData();
 });
 
 $("settingsSave")?.addEventListener("click", async ()=>{
@@ -6831,6 +6911,7 @@ $("settingsSave")?.addEventListener("click", async ()=>{
   await window.wavcue.setSettings(patch);
   updateRulesBadge();
   settingsLogAdd("設定を保存しました。");
+  window.safeToast && window.safeToast("設定を保存しました", "ok", 2400);
 });
 
 $("btnZoomIn").addEventListener("click", ()=>{
