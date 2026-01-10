@@ -1397,10 +1397,10 @@
   }
 
   /* Toasts */
-  #toastRoot{
+  .toastHost{
     position: fixed;
     left: 50%;
-    bottom: 16px;
+    top: 80px;
     transform: translateX(-50%);
     z-index: 2147483647;
     display: flex;
@@ -2226,7 +2226,7 @@ header.wc-titlebar,
 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
 </symbol>
 </svg>
-<div aria-atomic="true" aria-live="polite" id="toastRoot"></div>
+<div aria-atomic="true" aria-live="polite" class="toastHost" id="toastRoot"></div>
 <div aria-hidden="true" id="dropOverlay"><div class="box"><div class="big">WAVをドロップして読み込み</div></div></div><div class="small"></div><div class="app">
 <div aria-hidden="true" id="progressOverlay">
   <div class="box" role="status" aria-live="polite" aria-atomic="true">
@@ -2543,6 +2543,7 @@ header.wc-titlebar,
 </dialog>
 <!-- ===== /Standard Check ===== -->
 <dialog class="settingsDialog" id="settingsDialog">
+  <div aria-atomic="true" aria-live="polite" class="toastHost" data-toast-host="settings"></div>
   <div class="modalHead">
     <div class="title">
       <b>設定</b>
@@ -2632,6 +2633,7 @@ header.wc-titlebar,
           <div class="rulesNote">保存期間と容量上限のどちらかに到達すると、古いものから削除されます（最低保持数は残します）</div>
         </div>
         <button class="btn" id="settingsSave" type="button">設定を保存</button>
+        <div class="settingsHint" id="settingsToastDebug">debug line: —</div>
       </section>
       <section class="settingsCard" style="grid-column:1/-1">
         <h3>ログ</h3>
@@ -3242,8 +3244,20 @@ function log(msg){
 ================================ */
 
 function toast(msg, type="ok", timeout=2600){
-  const host = document.getElementById("toastRoot");
-  if(!host) return;
+  const openDialogs = Array.from(document.querySelectorAll("dialog[open]"));
+  const activeDialog = openDialogs.length ? openDialogs[openDialogs.length - 1] : null;
+  let targetContainer = document.getElementById("toastRoot");
+  if(activeDialog){
+    let dialogHost = activeDialog.querySelector(".toastHost");
+    if(!dialogHost){
+      dialogHost = document.createElement("div");
+      dialogHost.className = "toastHost";
+      activeDialog.appendChild(dialogHost);
+    }
+    targetContainer = dialogHost;
+  }
+  if(!targetContainer) return;
+  console.log("[Toast] show:", msg, "target:", targetContainer, "inDialog:", !!activeDialog);
   const t = document.createElement("div");
   t.className = `toast ${type}`;
   const ic = document.createElement("div");
@@ -3254,7 +3268,12 @@ function toast(msg, type="ok", timeout=2600){
   m.textContent = msg;
   t.appendChild(ic);
   t.appendChild(m);
-  host.appendChild(t);
+  targetContainer.appendChild(t);
+
+  const settingsToastDebug = document.getElementById("settingsToastDebug");
+  if(settingsToastDebug){
+    settingsToastDebug.textContent = `debug line: ${msg}`;
+  }
 
   window.setTimeout(()=>{
     t.classList.add("out");
@@ -6806,6 +6825,7 @@ const refreshSettingsData = async ()=>{
   if(!window.wavcue?.getSettings) return;
   try{ await window.wavcue.ensureDefaultFolders?.(); }catch(_){}
   const settings = await window.wavcue.getSettings();
+  console.log("[Settings] loaded settings:", settings);
   if(settingsLog && settingsLog.textContent.trim() === "準備完了"){
     settingsLog.textContent = "クリーンアップログはバックアップ内のreport.txtに保存されます。";
   }
@@ -6919,10 +6939,12 @@ async function onSaveSettingsClicked(){
       autoCleanupOnQuit: false,
       autoCleanupOnStartup: false,
     };
+    console.log("[Settings] save clicked, patch:", patch);
     if(typeof window.wavcue?.setSettings !== "function"){
       throw new Error("settings:set unavailable");
     }
-    await window.wavcue.setSettings(patch);
+    const result = await window.wavcue.setSettings(patch);
+    console.log("[Settings] setSettings resolved:", result);
     updateRulesBadge();
     settingsLogAdd("設定を保存しました。");
     if(typeof toast === "function"){
