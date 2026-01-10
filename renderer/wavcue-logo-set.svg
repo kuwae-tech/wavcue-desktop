@@ -14,8 +14,8 @@
     <path d="M56 148 C72 148 72 112 88 112 S104 184 120 184 S136 76 152 76 S168 184 184 184 S192 148 200 148"
           stroke="var(--wc-wave)" stroke-width="14" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
     <g class="wc-glow">
-      <circle cx="56" cy="148" r="10" fill="var(--wc-accent)"/>
-      <circle cx="200" cy="148" r="10" fill="var(--wc-accent)"/>
+      <circle cx="56" cy="148" r="10" style="fill:#ffd24a !important"/>
+      <circle cx="200" cy="148" r="10" style="fill:#ffd24a !important"/>
     </g>
 
     <g fill="var(--wc-ink)" transform="translate(270.000,132.000)">

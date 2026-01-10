@@ -448,7 +448,7 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
     event.sender.send('settings:cleanup-progress', { message });
   };
 
-  progress('Scanning...');
+  progress('スキャン中...');
 
   const settings = await ensureDefaultFolders();
   const { retentionDays, backupQuotaGB, minKeepCount, deleteMethod } = settings;
@@ -495,7 +495,7 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
   }
 
   if (deletions.length === 0) {
-    progress('No cleanup needed.');
+    progress('削除対象はありません。');
   }
 
   const trashRoot = path.join(root, 'Trash');
@@ -506,7 +506,7 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
   const deletionResults = [];
   for (let index = 0; index < deletions.length; index += 1) {
     const job = deletions[index];
-    progress(`Deleting ${index + 1}/${deletions.length} ...`);
+    progress(`削除中 ${index + 1}/${deletions.length}...`);
     const result = await deleteJob(job, { deleteMethod, trashRoot });
     if (result.errors.length > 0) {
       errorCount += 1;

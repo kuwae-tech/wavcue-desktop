@@ -482,40 +482,62 @@
   .modalGrid{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
   .settingsDialog{
     width:min(1040px, calc(100% - 24px));
+    color-scheme: dark;
   }
   .settingsDialog .settingsGrid{
     display:grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap:12px;
+    gap:10px;
   }
   .settingsDialog .settingsCard{
     border:1px solid var(--line);
     border-radius:16px;
     background:rgba(255,255,255,.03);
-    padding:12px;
+    padding:10px;
     display:flex;
     flex-direction:column;
-    gap:10px;
+    gap:8px;
   }
   .settingsDialog .settingsCard h3{
     margin:0;
-    font-size:13px;
+    font-size:12px;
     letter-spacing:.2px;
   }
   .settingsDialog .settingsBlock{
     display:flex;
     flex-direction:column;
-    gap:10px;
-    padding-top:10px;
+    gap:8px;
+    padding-top:8px;
   }
   .settingsDialog .settingsBlock + .settingsBlock{
     border-top:1px solid var(--line);
-    margin-top:4px;
+    margin-top:2px;
   }
   .settingsDialog .settingsBlockTitle{
     font-size:12px;
     color:rgba(229,231,235,.85);
     letter-spacing:.2px;
+  }
+  .settingsDialog .settingsBlockTitleRow{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:8px;
+  }
+  .settingsDialog .settingsBadge{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:2px 8px;
+    border-radius:999px;
+    border:1px solid rgba(255,210,74,.45);
+    background:rgba(255,210,74,.12);
+    color:var(--accent);
+    font-size:10px;
+    letter-spacing:.3px;
+  }
+  .settingsDialog .settingsBadge.is-hidden{
+    display:none;
   }
   .settingsDialog .settingsLog{
     border:1px solid var(--line);
@@ -524,26 +546,63 @@
     padding:10px;
     font-size:12px;
     white-space:pre-wrap;
-    min-height:160px;
-    max-height:240px;
+    min-height:120px;
+    max-height:200px;
     overflow:auto;
     font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     color:rgba(229,231,235,.9);
   }
   .settingsDialog .settingsField{
     display:grid;
-    gap:6px;
+    gap:4px;
     font-size:12px;
   }
   .settingsDialog select,
   .settingsDialog input[type="number"]{
     width:100%;
-    padding:10px;
+    padding:8px 10px;
     border-radius:12px;
     border:1px solid var(--line);
-    background:rgba(0,0,0,.15);
+    background:rgba(13,16,22,.92);
     color:var(--text);
     font-size:12px;
+  }
+  .settingsDialog select:focus{
+    outline:none;
+    border-color:rgba(255,210,74,.7);
+    box-shadow:0 0 0 2px rgba(255,210,74,.2);
+  }
+  .settingsDialog select option{
+    background:#10141b;
+    color:var(--text);
+  }
+  .settingsDialog .settingsHint{
+    font-size:11px;
+    color:rgba(229,231,235,.65);
+  }
+  .settingsDialog .rulesCard{
+    border:1px solid rgba(148,163,184,.25);
+    border-radius:14px;
+    background:rgba(9,12,17,.45);
+    padding:10px;
+  }
+  .settingsDialog .rulesGrid{
+    display:grid;
+    grid-template-columns: repeat(2, minmax(180px, 1fr));
+    gap:8px 12px;
+  }
+  .settingsDialog .rulesNote{
+    font-size:11px;
+    color:rgba(229,231,235,.65);
+  }
+  .settingsDialog .fieldNote{
+    font-size:11px;
+    color:rgba(248,198,108,.9);
+  }
+  @media (max-width: 640px){
+    .settingsDialog .rulesGrid{
+      grid-template-columns: 1fr;
+    }
   }
   textarea{
     width:100%;height:220px;border-radius:14px;border:1px solid var(--line);
@@ -2162,7 +2221,7 @@ header.wc-titlebar,
   </div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
-    <div class="headerActions"><button aria-label="Settings" class="btn" id="btnSettings" title="Settings" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
+        <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
 <div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
@@ -2458,7 +2517,7 @@ header.wc-titlebar,
 <dialog class="settingsDialog" id="settingsDialog">
   <div class="modalHead">
     <div class="title">
-      <b>Settings</b>
+      <b>設定</b>
       <span class="muted">バックアップ管理</span>
     </div>
     <div class="row" style="gap:8px">
@@ -2476,72 +2535,78 @@ header.wc-titlebar,
             <button class="btn" data-settings-folder="reports" type="button">レポートを開く</button>
             <button class="btn good" id="settingsCleanupNow" type="button">今すぐクリーンアップ</button>
           </div>
+          <div class="settingsHint">古いバックアップが削除されます（最低保持数は残ります）</div>
           <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
           <div class="muted" id="settingsCleanupResult"></div>
           <div class="muted" id="settingsCleanupProgress"></div>
         </div>
         <div class="settingsBlock">
-          <div class="settingsBlockTitle">自動処理</div>
+          <div class="settingsBlockTitle">自動クリーンアップ</div>
           <div class="switchWrap">
             <label class="switch">
               <input id="settingsAutoCleanup" type="checkbox"/>
               <span class="slider"></span>
             </label>
             <div class="switchText">
-              <span class="switchLabel">自動整理を有効にする</span>
-              <span class="muted">書き出し完了後にバックアップを整理します</span>
+              <span class="switchLabel"><strong>自動クリーンアップ（古いバックアップを削除）</strong></span>
+              <span class="muted">書き出し完了後に実行します</span>
             </div>
           </div>
         </div>
         <div class="settingsBlock">
-          <div class="settingsBlockTitle">保存ルール</div>
-          <label class="settingsField">
-            <span class="muted">保存期間（日）</span>
-            <select id="settingsRetentionDays">
-              <option value="7">7日</option>
-              <option value="14">14日</option>
-              <option value="30">30日</option>
-              <option value="60">60日</option>
-              <option value="90">90日</option>
-              <option value="180">180日</option>
-              <option value="365">365日</option>
-            </select>
-          </label>
-          <label class="settingsField">
-            <span class="muted">最大使用容量（GB）</span>
-            <select id="settingsBackupQuotaGB">
-              <option value="5">5GB</option>
-              <option value="10">10GB</option>
-              <option value="25">25GB</option>
-              <option value="50">50GB</option>
-              <option value="100">100GB</option>
-              <option value="200">200GB</option>
-            </select>
-          </label>
-          <label class="settingsField">
-            <span class="muted">最低保持数（件）</span>
-            <select id="settingsMinKeepCount">
-              <option value="0">0件</option>
-              <option value="10">10件</option>
-              <option value="20">20件</option>
-              <option value="30">30件</option>
-              <option value="50">50件</option>
-              <option value="100">100件</option>
-            </select>
-          </label>
-          <label class="settingsField">
-            <span class="muted">削除方法</span>
-            <select id="settingsDeleteMethod">
-              <option value="trash">ゴミ箱に移動</option>
-              <option value="delete">完全削除</option>
-            </select>
-          </label>
+          <div class="settingsBlockTitleRow">
+            <div class="settingsBlockTitle">保存ルール</div>
+            <span class="settingsBadge" id="settingsRulesBadge">推奨</span>
+          </div>
+          <div class="rulesCard">
+            <div class="rulesGrid">
+              <label class="settingsField">
+                <span class="muted">保存期間</span>
+                <select id="settingsRetentionDays">
+                  <option value="7">7日</option>
+                  <option value="14">14日</option>
+                  <option value="30">30日（推奨）</option>
+                  <option value="90">90日</option>
+                  <option value="36500">無制限（注意）</option>
+                </select>
+                <span class="fieldNote">無制限は容量が増え続けます</span>
+              </label>
+              <label class="settingsField">
+                <span class="muted">使用容量上限</span>
+                <select id="settingsBackupQuotaGB">
+                  <option value="5">5GB</option>
+                  <option value="10">10GB</option>
+                  <option value="25">25GB（推奨）</option>
+                  <option value="50">50GB</option>
+                  <option value="9999">制限なし（注意）</option>
+                </select>
+              </label>
+              <label class="settingsField">
+                <span class="muted">最低保持数</span>
+                <select id="settingsMinKeepCount">
+                  <option value="5">5件</option>
+                  <option value="10">10件</option>
+                  <option value="20">20件（推奨）</option>
+                  <option value="50">50件</option>
+                </select>
+              </label>
+              <label class="settingsField">
+                <span class="muted">削除方法</span>
+                <select id="settingsDeleteMethod">
+                  <option value="trash">ゴミ箱へ移動（推奨）</option>
+                  <option value="delete">完全に削除（注意）</option>
+                </select>
+                <span class="fieldNote">完全削除は元に戻せません</span>
+              </label>
+            </div>
+          </div>
+          <div class="rulesNote">保存期間と容量上限のどちらかに到達すると、古いものから削除されます（最低保持数は残します）</div>
         </div>
         <button class="btn" id="settingsSave" type="button">設定を保存</button>
       </section>
       <section class="settingsCard" style="grid-column:1/-1">
-        <h3>Logs</h3>
-        <div class="settingsLog" id="settingsLog">Ready.</div>
+        <h3>ログ</h3>
+        <div class="settingsLog" id="settingsLog">準備完了</div>
       </section>
     </div>
   </div>
@@ -6520,9 +6585,9 @@ async function exportWav(){
       try{
         const cleanupResult = await window.wavcue?.runCleanupNow?.();
         if(cleanupResult?.ok){
-          settingsLogAdd(`Cleanup after export: deleted ${cleanupResult.summary.deletedCount} jobs, freed ${formatBytes(cleanupResult.summary.deletedBytes)}.`);
+          settingsLogAdd(`書き出し後のクリーンアップ: ${cleanupResult.summary.deletedCount}件削除 / ${formatBytes(cleanupResult.summary.deletedBytes)} 解放。`);
         }else if(cleanupResult){
-          settingsLogAdd(`Cleanup after export finished with errors (${cleanupResult.summary?.errorCount ?? "unknown"}).`);
+          settingsLogAdd(`書き出し後のクリーンアップがエラーで終了しました（エラー ${cleanupResult.summary?.errorCount ?? "不明"}件）。`);
         }
       }catch(_){}
     }
@@ -6618,7 +6683,21 @@ const settingsBackupQuotaGB = $("settingsBackupQuotaGB");
 const settingsMinKeepCount = $("settingsMinKeepCount");
 const settingsDeleteMethod = $("settingsDeleteMethod");
 const settingsAutoCleanup = $("settingsAutoCleanup");
+const settingsRulesBadge = $("settingsRulesBadge");
 let cachedAutoBackupEnabled = true;
+
+const updateRulesBadge = ()=>{
+  if(!settingsRulesBadge) return;
+  const retentionValue = Number(settingsRetentionDays?.value ?? 30);
+  const quotaValue = Number(settingsBackupQuotaGB?.value ?? 25);
+  const minKeepValue = Number(settingsMinKeepCount?.value ?? 20);
+  const deleteValue = settingsDeleteMethod?.value ?? "trash";
+  const isRecommended = retentionValue === 30
+    && quotaValue === 25
+    && minKeepValue === 20
+    && deleteValue === "trash";
+  settingsRulesBadge.classList.toggle("is-hidden", !isRecommended);
+};
 
 const settingsLogAdd = (message)=>{
   if(!settingsLog) return;
@@ -6659,9 +6738,8 @@ const refreshSettingsData = async ()=>{
   if(!window.wavcue?.getSettings) return;
   try{ await window.wavcue.ensureDefaultFolders?.(); }catch(_){}
   const settings = await window.wavcue.getSettings();
-  const paths = settings.paths || {};
-  if(settingsLog && settingsLog.textContent.trim() === "Ready." && paths.reports){
-    settingsLog.textContent = `Cleanup log: ${paths.reports}/CleanupLog.txt`;
+  if(settingsLog && settingsLog.textContent.trim() === "準備完了"){
+    settingsLog.textContent = "クリーンアップログはレポートに保存されます。";
   }
   cachedAutoBackupEnabled = settings.autoBackupEnabled ?? cachedAutoBackupEnabled;
   setSelectValue(settingsRetentionDays, settings.retentionDays ?? 30, 30);
@@ -6669,6 +6747,7 @@ const refreshSettingsData = async ()=>{
   setSelectValue(settingsMinKeepCount, settings.minKeepCount ?? 20, 20);
   if(settingsDeleteMethod) settingsDeleteMethod.value = settings.deleteMethod || "trash";
   if(settingsAutoCleanup) settingsAutoCleanup.checked = !!settings.autoCleanup;
+  updateRulesBadge();
   updateCleanupResult(settings.cleanupLastResult);
 
   if(settingsBackupStatus && window.wavcue?.getBackupStatus){
@@ -6697,28 +6776,35 @@ if(settingsClose && settingsDialog){
 }
 settingsDialog?.addEventListener("click", (e)=>{ if(e.target === settingsDialog){ try{ settingsDialog.close(); }catch(_){ settingsDialog.open = false; } } });
 
+[settingsRetentionDays, settingsBackupQuotaGB, settingsMinKeepCount, settingsDeleteMethod].forEach((select)=>{
+  if(!select) return;
+  select.addEventListener("change", updateRulesBadge);
+});
+
 document.querySelectorAll("[data-settings-folder]").forEach((button)=>{
   button.addEventListener("click", async ()=>{
     const kind = button.dataset.settingsFolder;
     if(!kind || !window.wavcue?.openFolder) return;
     const result = await window.wavcue.openFolder(kind);
+    const labelMap = { backups: "バックアップ", reports: "レポート" };
+    const label = labelMap[kind] || kind;
     if(result.ok){
-      settingsLogAdd(`Opened ${kind} folder.`);
+      settingsLogAdd(`${label}フォルダを開きました。`);
     }else{
-      settingsLogAdd(`Failed to open ${kind} folder: ${result.message || "unknown error"}`);
+      settingsLogAdd(`${label}フォルダを開けませんでした。${result.message || "不明なエラー"}`);
     }
   });
 });
 
 $("settingsCleanupNow")?.addEventListener("click", async ()=>{
   if(!window.wavcue?.runCleanupNow) return;
-  if(settingsCleanupProgress) settingsCleanupProgress.textContent = "Starting cleanup...";
-  settingsLogAdd("Cleanup started.");
+  if(settingsCleanupProgress) settingsCleanupProgress.textContent = "クリーンアップを開始しています...";
+  settingsLogAdd("クリーンアップを開始しました。");
   const result = await window.wavcue.runCleanupNow();
   if(result.ok){
-    settingsLogAdd(`Cleanup finished. Deleted ${result.summary.deletedCount} jobs, freed ${formatBytes(result.summary.deletedBytes)}. Errors: ${result.summary.errorCount}.`);
+    settingsLogAdd(`クリーンアップが完了しました。${result.summary.deletedCount}件削除 / ${formatBytes(result.summary.deletedBytes)} 解放 / エラー ${result.summary.errorCount}件。`);
   }else{
-    settingsLogAdd(`Cleanup finished with errors. Errors: ${result.summary?.errorCount ?? "unknown"}.`);
+    settingsLogAdd(`クリーンアップがエラーで終了しました。エラー ${result.summary?.errorCount ?? "不明"}件。`);
   }
   updateCleanupResult(result.summary);
 });
@@ -6743,7 +6829,8 @@ $("settingsSave")?.addEventListener("click", async ()=>{
     autoCleanupOnStartup: false,
   };
   await window.wavcue.setSettings(patch);
-  settingsLogAdd("Settings saved.");
+  updateRulesBadge();
+  settingsLogAdd("設定を保存しました。");
 });
 
 $("btnZoomIn").addEventListener("click", ()=>{
