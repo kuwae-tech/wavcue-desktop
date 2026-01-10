@@ -1410,6 +1410,12 @@
     gap: 10px;
     pointer-events: none; /* clicks pass through */
   }
+  #toastRoot.toastHost,
+  #toastLayerHost.toastHost{
+    position: fixed;
+    z-index: 2147483647;
+    pointer-events: none;
+  }
   .toast{
     pointer-events: auto;
     min-width: 280px;
@@ -1464,6 +1470,7 @@
   }
 
   /* Override position for the top-layer toast host */
+  #toastRoot.toastHost,
   #toastLayerHost.toastHost{
     top: 16px;         /* 画面中央上部 */
     left: 50%;
@@ -2248,10 +2255,6 @@ header.wc-titlebar,
 <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" fill="none" stroke="currentColor" stroke-linejoin="round" stroke-width="2"></path>
 </symbol>
 </svg>
-<div aria-atomic="true" aria-live="polite" class="toastHost" id="toastRoot"></div>
-<dialog id="toastLayer" class="toastLayer" aria-live="polite" aria-atomic="true">
-  <div class="toastHost" id="toastLayerHost"></div>
-</dialog>
 <div aria-hidden="true" id="dropOverlay"><div class="box"><div class="big">WAVをドロップして読み込み</div></div></div><div class="small"></div><div class="app">
 <div aria-hidden="true" id="progressOverlay">
   <div class="box" role="status" aria-live="polite" aria-atomic="true">
@@ -11298,5 +11301,10 @@ try{
   </div>
 </dialog>
 <!-- ===== /CHANGELOG ===== -->
+
+<div aria-atomic="true" aria-live="polite" class="toastHost" id="toastRoot"></div>
+<dialog id="toastLayer" class="toastLayer" aria-live="polite" aria-atomic="true">
+  <div class="toastHost" id="toastLayerHost"></div>
+</dialog>
 
 </body></html>
