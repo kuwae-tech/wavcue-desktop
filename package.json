@@ -30,11 +30,9 @@
     },
     "win": {
       "target": ["nsis", "zip"],
-      "icon": "build/icons/wavcue_app.ico"
+      "icon": "build/icons/wavcue_app.png"
     },
     "nsis": {
-      "installerIcon": "build/icons/wavcue_installer.ico",
-      "uninstallerIcon": "build/icons/wavcue_installer.ico",
       "shortcutName": "WavCue"
     },
     "artifactName": "WavCue-${os}-${arch}-${version}.${ext}"

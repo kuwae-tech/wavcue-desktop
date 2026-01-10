@@ -1403,7 +1403,7 @@
     left: 0;
     right: 0;
     bottom: auto;
-    z-index: 9999;
+    z-index: 99999;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -6381,14 +6381,14 @@ async function exportWav(){
       __exportBarShown = true;
     };
 
-    let autoBackupEnabled = false;
-    let autoCleanupEnabled = false;
-    let autoCleanupOnExport = false;
+    let autoBackupEnabled = true;
+    let autoCleanupEnabled = true;
+    let autoCleanupOnExport = true;
     try{
       const settings = await window.wavcue?.getSettings?.();
-      autoBackupEnabled = !!settings?.autoBackupEnabled;
-      autoCleanupEnabled = !!settings?.autoCleanup;
-      autoCleanupOnExport = !!settings?.autoCleanup;
+      autoBackupEnabled = settings?.autoBackupEnabled ?? true;
+      autoCleanupEnabled = settings?.autoCleanup ?? true;
+      autoCleanupOnExport = settings?.autoCleanup ?? true;
     }catch(_){}
     try{ scheduleDiffUpdate(true); }catch(_){ }
 
@@ -6746,11 +6746,11 @@ let cachedAutoBackupEnabled = true;
 const updateRulesBadge = ()=>{
   if(!settingsRulesBadge) return;
   const retentionValue = Number(settingsRetentionDays?.value ?? 30);
-  const quotaValue = Number(settingsBackupQuotaGB?.value ?? 25);
+  const quotaValue = Number(settingsBackupQuotaGB?.value ?? 5);
   const minKeepValue = Number(settingsMinKeepCount?.value ?? 20);
   const deleteValue = settingsDeleteMethod?.value ?? "trash";
   const isRecommended = retentionValue === 30
-    && quotaValue === 25
+    && quotaValue === 5
     && minKeepValue === 20
     && deleteValue === "trash";
   settingsRulesBadge.classList.toggle("is-hidden", !isRecommended);
@@ -6800,7 +6800,7 @@ const refreshSettingsData = async ()=>{
   }
   cachedAutoBackupEnabled = settings.autoBackupEnabled ?? cachedAutoBackupEnabled;
   setSelectValue(settingsRetentionDays, settings.retentionDays ?? 30, 30);
-  setSelectValue(settingsBackupQuotaGB, settings.backupQuotaGB ?? 25, 25);
+  setSelectValue(settingsBackupQuotaGB, settings.backupQuotaGB ?? 5, 5);
   setSelectValue(settingsMinKeepCount, settings.minKeepCount ?? 20, 20);
   if(settingsDeleteMethod) settingsDeleteMethod.value = settings.deleteMethod || "trash";
   if(settingsAutoCleanup) settingsAutoCleanup.checked = !!settings.autoCleanup;
@@ -6900,7 +6900,7 @@ $("settingsSave")?.addEventListener("click", async ()=>{
   const patch = {
     autoBackupEnabled: !!cachedAutoBackupEnabled,
     retentionDays: Number(settingsRetentionDays?.value || 30),
-    backupQuotaGB: Number(settingsBackupQuotaGB?.value || 25),
+    backupQuotaGB: Number(settingsBackupQuotaGB?.value || 5),
     minKeepCount: Number(settingsMinKeepCount?.value || 20),
     deleteMethod: settingsDeleteMethod?.value || "trash",
     autoCleanup: !!settingsAutoCleanup?.checked,
@@ -6908,10 +6908,15 @@ $("settingsSave")?.addEventListener("click", async ()=>{
     autoCleanupOnQuit: false,
     autoCleanupOnStartup: false,
   };
-  await window.wavcue.setSettings(patch);
-  updateRulesBadge();
-  settingsLogAdd("設定を保存しました。");
-  window.safeToast && window.safeToast("設定を保存しました", "ok", 2400);
+  try{
+    await window.wavcue.setSettings(patch);
+    updateRulesBadge();
+    settingsLogAdd("設定を保存しました。");
+    window.safeToast && window.safeToast("設定を保存しました", "ok", 2400);
+  }catch(error){
+    settingsLogAdd("設定の保存に失敗しました。");
+    window.safeToast && window.safeToast("設定の保存に失敗しました", "err", 3200);
+  }
 });
 
 $("btnZoomIn").addEventListener("click", ()=>{
