@@ -1463,6 +1463,7 @@
     width: auto;
     height: 0;
     box-shadow: none;
+    pointer-events: none;
   }
   dialog.toastLayer::backdrop{
     background: transparent;
@@ -3274,8 +3275,12 @@ function toast(msg, type="ok", timeout=2600){
     const toastLayer = document.getElementById("toastLayer");
     const toastLayerHost = document.getElementById("toastLayerHost");
     if(toastLayer && toastLayerHost){
+      // Re-open to bring to the front of the top-layer stack
       try{
-        if(!toastLayer.open) toastLayer.show(); // non-modal => doesn’t block UI, but goes to top-layer
+        if(toastLayer.open) toastLayer.close();
+      }catch(_){}
+      try{
+        toastLayer.show(); // non-modal, but in top-layer
       }catch(_){}
       targetContainer = toastLayerHost;
     }
