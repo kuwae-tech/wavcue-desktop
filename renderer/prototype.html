@@ -502,19 +502,20 @@
     font-size:13px;
     letter-spacing:.2px;
   }
-  .settingsDialog .settingsPaths{
-    display:grid;
-    gap:8px;
-    font-size:12px;
+  .settingsDialog .settingsBlock{
+    display:flex;
+    flex-direction:column;
+    gap:10px;
+    padding-top:10px;
   }
-  .settingsDialog .settingsPaths span{
-    display:block;
-    padding:8px 10px;
-    border-radius:12px;
-    border:1px solid var(--line);
-    background:rgba(0,0,0,.2);
-    font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-    color:rgba(229,231,235,.9);
+  .settingsDialog .settingsBlock + .settingsBlock{
+    border-top:1px solid var(--line);
+    margin-top:4px;
+  }
+  .settingsDialog .settingsBlockTitle{
+    font-size:12px;
+    color:rgba(229,231,235,.85);
+    letter-spacing:.2px;
   }
   .settingsDialog .settingsLog{
     border:1px solid var(--line);
@@ -2468,81 +2469,75 @@ header.wc-titlebar,
     <div class="settingsGrid">
       <section class="settingsCard" style="grid-column:1/-1">
         <h3>バックアップ管理</h3>
-        <div class="row" style="gap:8px;flex-wrap:wrap">
-          <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
-          <button class="btn" data-settings-folder="reports" type="button">レポートを開く</button>
-          <button class="btn good" id="settingsCleanupNow" type="button">今すぐクリーンアップ</button>
+        <div class="settingsBlock">
+          <div class="settingsBlockTitle">状態・操作</div>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
+            <button class="btn" data-settings-folder="reports" type="button">レポートを開く</button>
+            <button class="btn good" id="settingsCleanupNow" type="button">今すぐクリーンアップ</button>
+          </div>
+          <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
+          <div class="muted" id="settingsCleanupResult"></div>
+          <div class="muted" id="settingsCleanupProgress"></div>
         </div>
-        <div class="settingsPaths" id="settingsPaths"></div>
-        <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
-        <div class="switchWrap">
-          <label class="switch">
-            <input id="settingsAutoBackup" type="checkbox"/>
-            <span class="slider"></span>
-          </label>
-          <div class="switchText">
-            <span class="switchLabel">自動バックアップを有効にする</span>
+        <div class="settingsBlock">
+          <div class="settingsBlockTitle">自動処理</div>
+          <div class="switchWrap">
+            <label class="switch">
+              <input id="settingsAutoCleanup" type="checkbox"/>
+              <span class="slider"></span>
+            </label>
+            <div class="switchText">
+              <span class="switchLabel">自動整理を有効にする</span>
+              <span class="muted">書き出し完了後にバックアップを整理します</span>
+            </div>
           </div>
         </div>
-        <div class="switchWrap">
-          <label class="switch">
-            <input id="settingsAutoCleanup" type="checkbox"/>
-            <span class="slider"></span>
+        <div class="settingsBlock">
+          <div class="settingsBlockTitle">保存ルール</div>
+          <label class="settingsField">
+            <span class="muted">保存期間（日）</span>
+            <select id="settingsRetentionDays">
+              <option value="7">7日</option>
+              <option value="14">14日</option>
+              <option value="30">30日</option>
+              <option value="60">60日</option>
+              <option value="90">90日</option>
+              <option value="180">180日</option>
+              <option value="365">365日</option>
+            </select>
           </label>
-          <div class="switchText">
-            <span class="switchLabel">自動クリーンアップを有効にする</span>
-          </div>
-        </div>
-        <div class="switchWrap">
-          <label class="switch">
-            <input id="settingsCleanupOnExport" type="checkbox"/>
-            <span class="slider"></span>
+          <label class="settingsField">
+            <span class="muted">最大使用容量（GB）</span>
+            <select id="settingsBackupQuotaGB">
+              <option value="5">5GB</option>
+              <option value="10">10GB</option>
+              <option value="25">25GB</option>
+              <option value="50">50GB</option>
+              <option value="100">100GB</option>
+              <option value="200">200GB</option>
+            </select>
           </label>
-          <div class="switchText">
-            <span class="switchLabel">書き出し完了後に自動でクリーンアップ</span>
-          </div>
-        </div>
-        <div class="switchWrap">
-          <label class="switch">
-            <input id="settingsCleanupOnQuit" type="checkbox"/>
-            <span class="slider"></span>
+          <label class="settingsField">
+            <span class="muted">最低保持数（件）</span>
+            <select id="settingsMinKeepCount">
+              <option value="0">0件</option>
+              <option value="10">10件</option>
+              <option value="20">20件</option>
+              <option value="30">30件</option>
+              <option value="50">50件</option>
+              <option value="100">100件</option>
+            </select>
           </label>
-          <div class="switchText">
-            <span class="switchLabel">アプリ終了時に自動でクリーンアップ</span>
-          </div>
-        </div>
-        <div class="switchWrap">
-          <label class="switch">
-            <input id="settingsCleanupOnStartup" type="checkbox"/>
-            <span class="slider"></span>
+          <label class="settingsField">
+            <span class="muted">削除方法</span>
+            <select id="settingsDeleteMethod">
+              <option value="trash">ゴミ箱に移動</option>
+              <option value="delete">完全削除</option>
+            </select>
           </label>
-          <div class="switchText">
-            <span class="switchLabel">起動時に前回の一時ファイルを整理する</span>
-          </div>
         </div>
-        <div class="muted">不要な一時ファイルだけを整理します</div>
-        <label class="settingsField">
-          <span class="muted">Retention days</span>
-          <input id="settingsRetentionDays" min="1" type="number"/>
-        </label>
-        <label class="settingsField">
-          <span class="muted">Backup quota (GB)</span>
-          <input id="settingsBackupQuotaGB" min="1" type="number"/>
-        </label>
-        <label class="settingsField">
-          <span class="muted">Minimum keep count</span>
-          <input id="settingsMinKeepCount" min="0" type="number"/>
-        </label>
-        <label class="settingsField">
-          <span class="muted">Delete method</span>
-          <select id="settingsDeleteMethod">
-            <option value="trash">Move to trash</option>
-            <option value="delete">Delete permanently</option>
-          </select>
-        </label>
         <button class="btn" id="settingsSave" type="button">設定を保存</button>
-        <div class="muted" id="settingsCleanupProgress"></div>
-        <div class="muted" id="settingsCleanupResult"></div>
       </section>
       <section class="settingsCard" style="grid-column:1/-1">
         <h3>Logs</h3>
@@ -6276,7 +6271,7 @@ async function exportWav(){
       const settings = await window.wavcue?.getSettings?.();
       autoBackupEnabled = !!settings?.autoBackupEnabled;
       autoCleanupEnabled = !!settings?.autoCleanup;
-      autoCleanupOnExport = !!settings?.autoCleanupOnExport;
+      autoCleanupOnExport = !!settings?.autoCleanup;
     }catch(_){}
     try{ scheduleDiffUpdate(true); }catch(_){ }
 
@@ -6615,7 +6610,6 @@ const settingsButton = document.getElementById("btnSettings");
 const settingsDialog = $("settingsDialog");
 const settingsClose = $("settingsClose");
 const settingsLog = $("settingsLog");
-const settingsPaths = $("settingsPaths");
 const settingsBackupStatus = $("settingsBackupStatus");
 const settingsCleanupResult = $("settingsCleanupResult");
 const settingsCleanupProgress = $("settingsCleanupProgress");
@@ -6623,11 +6617,8 @@ const settingsRetentionDays = $("settingsRetentionDays");
 const settingsBackupQuotaGB = $("settingsBackupQuotaGB");
 const settingsMinKeepCount = $("settingsMinKeepCount");
 const settingsDeleteMethod = $("settingsDeleteMethod");
-const settingsAutoBackup = $("settingsAutoBackup");
 const settingsAutoCleanup = $("settingsAutoCleanup");
-const settingsCleanupOnExport = $("settingsCleanupOnExport");
-const settingsCleanupOnQuit = $("settingsCleanupOnQuit");
-const settingsCleanupOnStartup = $("settingsCleanupOnStartup");
+let cachedAutoBackupEnabled = true;
 
 const settingsLogAdd = (message)=>{
   if(!settingsLog) return;
@@ -6650,11 +6641,18 @@ const formatBytes = (bytes)=>{
 const updateCleanupResult = (result)=>{
   if(!settingsCleanupResult) return;
   if(!result || !result.timestamp){
-    settingsCleanupResult.textContent = "Last cleanup: not run yet.";
+    settingsCleanupResult.textContent = "クリーンアップ履歴: 未実行";
     return;
   }
   const when = new Date(result.timestamp).toLocaleString();
-  settingsCleanupResult.textContent = `Last cleanup (${when}): deleted ${result.deletedCount} jobs, freed ${formatBytes(result.deletedBytes)}, errors ${result.errorCount}.`;
+  settingsCleanupResult.textContent = `クリーンアップ履歴 (${when}): ${result.deletedCount}件削除 / ${formatBytes(result.deletedBytes)} 解放 / エラー ${result.errorCount}件`;
+};
+
+const setSelectValue = (selectEl, value, fallback)=>{
+  if(!selectEl) return;
+  const next = String(value);
+  const hasOption = Array.from(selectEl.options).some((option)=> option.value === next);
+  selectEl.value = hasOption ? next : String(fallback);
 };
 
 const refreshSettingsData = async ()=>{
@@ -6662,26 +6660,15 @@ const refreshSettingsData = async ()=>{
   try{ await window.wavcue.ensureDefaultFolders?.(); }catch(_){}
   const settings = await window.wavcue.getSettings();
   const paths = settings.paths || {};
-  if(settingsPaths){
-    settingsPaths.innerHTML = [
-      `Root: ${paths.root || "Not set"}`,
-      `Exports: ${paths.exports || "Not set"}`,
-      `Backups: ${paths.backups || "Not set"}`,
-      `Reports: ${paths.reports || "Not set"}`,
-    ].map((line)=>`<span>${line}</span>`).join("");
-  }
   if(settingsLog && settingsLog.textContent.trim() === "Ready." && paths.reports){
     settingsLog.textContent = `Cleanup log: ${paths.reports}/CleanupLog.txt`;
   }
-  if(settingsAutoBackup) settingsAutoBackup.checked = !!settings.autoBackupEnabled;
-  if(settingsRetentionDays) settingsRetentionDays.value = String(settings.retentionDays ?? 30);
-  if(settingsBackupQuotaGB) settingsBackupQuotaGB.value = String(settings.backupQuotaGB ?? 25);
-  if(settingsMinKeepCount) settingsMinKeepCount.value = String(settings.minKeepCount ?? 20);
+  cachedAutoBackupEnabled = settings.autoBackupEnabled ?? cachedAutoBackupEnabled;
+  setSelectValue(settingsRetentionDays, settings.retentionDays ?? 30, 30);
+  setSelectValue(settingsBackupQuotaGB, settings.backupQuotaGB ?? 25, 25);
+  setSelectValue(settingsMinKeepCount, settings.minKeepCount ?? 20, 20);
   if(settingsDeleteMethod) settingsDeleteMethod.value = settings.deleteMethod || "trash";
   if(settingsAutoCleanup) settingsAutoCleanup.checked = !!settings.autoCleanup;
-  if(settingsCleanupOnExport) settingsCleanupOnExport.checked = !!settings.autoCleanupOnExport;
-  if(settingsCleanupOnQuit) settingsCleanupOnQuit.checked = !!settings.autoCleanupOnQuit;
-  if(settingsCleanupOnStartup) settingsCleanupOnStartup.checked = !!settings.autoCleanupOnStartup;
   updateCleanupResult(settings.cleanupLastResult);
 
   if(settingsBackupStatus && window.wavcue?.getBackupStatus){
@@ -6745,15 +6732,15 @@ window.wavcue?.onCleanupProgress?.((payload)=>{
 $("settingsSave")?.addEventListener("click", async ()=>{
   if(!window.wavcue?.setSettings) return;
   const patch = {
-    autoBackupEnabled: !!settingsAutoBackup?.checked,
+    autoBackupEnabled: !!cachedAutoBackupEnabled,
     retentionDays: Number(settingsRetentionDays?.value || 30),
     backupQuotaGB: Number(settingsBackupQuotaGB?.value || 25),
     minKeepCount: Number(settingsMinKeepCount?.value || 20),
     deleteMethod: settingsDeleteMethod?.value || "trash",
     autoCleanup: !!settingsAutoCleanup?.checked,
-    autoCleanupOnExport: !!settingsCleanupOnExport?.checked,
-    autoCleanupOnQuit: !!settingsCleanupOnQuit?.checked,
-    autoCleanupOnStartup: !!settingsCleanupOnStartup?.checked,
+    autoCleanupOnExport: !!settingsAutoCleanup?.checked,
+    autoCleanupOnQuit: false,
+    autoCleanupOnStartup: false,
   };
   await window.wavcue.setSettings(patch);
   settingsLogAdd("Settings saved.");
