@@ -46,15 +46,13 @@ const setSettings = (patch) => {
 const ensureFolders = async (root) => {
   const exportsPath = path.join(root, 'Exports');
   const backupsPath = path.join(root, 'Backups');
-  const reportsPath = path.join(root, 'Reports');
   await fs.mkdir(exportsPath, { recursive: true });
   await fs.mkdir(backupsPath, { recursive: true });
-  await fs.mkdir(reportsPath, { recursive: true });
   return {
     root,
     exports: exportsPath,
     backups: backupsPath,
-    reports: reportsPath,
+    reports: path.join(root, 'Reports'),
   };
 };
 
@@ -145,8 +143,6 @@ const createWindow = () => {
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
-const formatIsoTimestamp = (date) => date.toISOString();
-
 const isValidDate = (value) => Number.isFinite(value?.getTime?.());
 
 const getFolderSize = async (targetPath) => {
@@ -198,43 +194,33 @@ const safeReadJson = async (targetPath) => {
 };
 
 const listJobs = async (paths) => {
-  const entries = await fs.readdir(paths.reports, { withFileTypes: true });
+  const entries = await fs.readdir(paths.backups, { withFileTypes: true });
   const jobs = [];
   for (const entry of entries) {
     if (!entry.isDirectory()) {
       continue;
     }
     const jobId = entry.name;
-    const reportsPath = path.join(paths.reports, jobId);
-    const backupsPath = path.join(paths.backups, jobId);
-    const jobJsonPath = path.join(reportsPath, 'Job.json');
-    const jobJsonResult = await safeReadJson(jobJsonPath);
-    const reportStat = await safeStat(reportsPath);
-    if (!reportStat) {
+    const jobPath = path.join(paths.backups, jobId);
+    const metaPath = path.join(jobPath, 'meta.json');
+    const metaResult = await safeReadJson(metaPath);
+    const jobStat = await safeStat(jobPath);
+    if (!jobStat) {
       continue;
     }
-    let createdAt = reportStat.mtime;
-    let orphanReason = null;
-    if (jobJsonResult.ok) {
-      const parsed = new Date(jobJsonResult.value.createdAt);
+    let createdAt = jobStat.mtime;
+    if (metaResult.ok) {
+      const parsed = new Date(metaResult.value.createdAt);
       if (isValidDate(parsed)) {
         createdAt = parsed;
-      } else {
-        orphanReason = 'invalid createdAt';
       }
-    } else {
-      orphanReason = jobJsonResult.error;
     }
-    const reportSize = await getFolderSize(reportsPath);
-    const backupSize = await getFolderSize(backupsPath);
+    const totalBytes = await getFolderSize(jobPath);
     jobs.push({
       jobId,
-      reportsPath,
-      backupsPath,
+      jobPath,
       createdAt,
-      reportSize,
-      backupSize,
-      orphanReason,
+      totalBytes,
     });
   }
   return jobs.sort((a, b) => a.createdAt - b.createdAt);
@@ -255,14 +241,30 @@ const sanitizeFileSegment = (value) =>
     .replace(/\s+/g, ' ')
     .trim() || 'output';
 
-const ensureUniqueJobId = async (baseJobId, paths) => {
+const formatJobStamp = (date) => {
+  const pad = (value) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}_${pad(
+    date.getHours(),
+  )}${pad(date.getMinutes())}${pad(date.getSeconds())}`;
+};
+
+const shortenSegment = (value, maxLength = 60) => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed) {
+    return 'output';
+  }
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+  return trimmed.slice(0, maxLength).trim();
+};
+
+const ensureUniqueJobFolderName = async (baseJobId, backupsPath) => {
   let jobId = baseJobId;
   let index = 1;
-  while (
-    (await safeStat(path.join(paths.backups, jobId))) ||
-    (await safeStat(path.join(paths.reports, jobId)))
-  ) {
-    jobId = `${baseJobId}-${index}`;
+  while (await safeStat(path.join(backupsPath, jobId))) {
+    const suffix = String(index).padStart(2, '0');
+    jobId = `${baseJobId}_${suffix}`;
     index += 1;
   }
   return jobId;
@@ -284,11 +286,8 @@ const movePath = async (source, destination) => {
 const deleteJob = async (job, options) => {
   const { deleteMethod, trashRoot } = options;
   const errors = [];
-  const totalBytes = job.reportSize + job.backupSize;
-  const pathsToDelete = [
-    { label: 'reports', path: job.reportsPath },
-    { label: 'backups', path: job.backupsPath },
-  ];
+  const totalBytes = job.totalBytes;
+  const pathsToDelete = [{ label: 'backups', path: job.jobPath }];
 
   if (deleteMethod === 'hard') {
     for (const item of pathsToDelete) {
@@ -332,37 +331,6 @@ const deleteJob = async (job, options) => {
   }
 
   return { deletedBytes: totalBytes, errors };
-};
-
-const buildCleanupLog = (payload) => {
-  const lines = [];
-  lines.push(`[${formatIsoTimestamp(payload.startedAt)}] Cleanup run started`);
-  lines.push(
-    `Settings: retentionDays=${payload.retentionDays}, backupQuotaGB=${payload.backupQuotaGB}, minKeepCount=${payload.minKeepCount}, deleteMethod=${payload.deleteMethod}`,
-  );
-  lines.push(`Jobs scanned: ${payload.jobCount}`);
-  lines.push(`Protected jobs: ${payload.protectedCount}`);
-  if (payload.orphanJobs.length > 0) {
-    for (const orphan of payload.orphanJobs) {
-      lines.push(`Orphan candidate: ${orphan.jobId} (${orphan.orphanReason || 'missing Job.json'})`);
-    }
-  }
-  if (payload.deletions.length === 0) {
-    lines.push('No jobs scheduled for deletion.');
-  }
-  for (const deletion of payload.deletions) {
-    const base = `Delete ${deletion.jobId} reason=${deletion.reason} backupSize=${deletion.backupSize} reportSize=${deletion.reportSize}`;
-    if (deletion.errors.length > 0) {
-      lines.push(`${base} failed=${deletion.errors.join('; ')}`);
-    } else {
-      lines.push(`${base} ok`);
-    }
-  }
-  lines.push(
-    `Summary: deletedJobs=${payload.deletedCount}, deletedBytes=${payload.deletedBytes}, errors=${payload.errorCount}`,
-  );
-  lines.push(`Cleanup run finished at ${formatIsoTimestamp(payload.finishedAt)}`);
-  return `${lines.join('\n')}\n`;
 };
 
 const ensureWavExtension = (targetPath) => {
@@ -429,6 +397,9 @@ ipcMain.handle('settings:get', () => getSettings());
 ipcMain.handle('settings:set', (_event, patch) => setSettings(patch || {}));
 ipcMain.handle('settings:ensure-default-folders', () => ensureDefaultFolders());
 ipcMain.handle('settings:open-folder', async (_event, kind) => {
+  if (kind === 'reports') {
+    return { ok: false, message: 'Reports folder is deprecated.' };
+  }
   const settings = getSettings();
   const paths = settings.paths || {};
   const target = paths[kind];
@@ -452,24 +423,18 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
 
   const settings = await ensureDefaultFolders();
   const { retentionDays, backupQuotaGB, minKeepCount, deleteMethod } = settings;
-  const { backups, reports, root } = settings.paths;
+  const { backups, root } = settings.paths;
 
-  const jobs = await listJobs({ backups, reports });
+  const jobs = await listJobs({ backups });
   const protectedJobs = new Set(jobs.slice(-minKeepCount).map((job) => job.jobId));
-  const orphanJobs = jobs.filter((job) => job.orphanReason);
   const retentionThreshold = retentionDays * DAY_MS;
   const quotaBytes = backupQuotaGB * 1024 * 1024 * 1024;
-  const totalBackupBytes = jobs.reduce((sum, job) => sum + job.backupSize, 0);
+  const totalBackupBytes = jobs.reduce((sum, job) => sum + job.totalBytes, 0);
 
   const deletions = [];
   const deletionLookup = new Set();
   for (const job of jobs) {
     if (protectedJobs.has(job.jobId)) {
-      continue;
-    }
-    if (job.orphanReason) {
-      deletions.push({ ...job, reason: 'orphan (missing Job.json)' });
-      deletionLookup.add(job.jobId);
       continue;
     }
     const age = Date.now() - job.createdAt.getTime();
@@ -479,7 +444,7 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
     }
   }
 
-  let projectedBytes = totalBackupBytes - deletions.reduce((sum, job) => sum + job.backupSize, 0);
+  let projectedBytes = totalBackupBytes - deletions.reduce((sum, job) => sum + job.totalBytes, 0);
   if (projectedBytes > quotaBytes) {
     for (const job of jobs) {
       if (protectedJobs.has(job.jobId) || deletionLookup.has(job.jobId)) {
@@ -487,7 +452,7 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
       }
       deletions.push({ ...job, reason: `backupQuota ${backupQuotaGB}GB exceeded` });
       deletionLookup.add(job.jobId);
-      projectedBytes -= job.backupSize;
+      projectedBytes -= job.totalBytes;
       if (projectedBytes <= quotaBytes) {
         break;
       }
@@ -525,24 +490,6 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
   };
   setSettings({ cleanupLastResult });
 
-  const logPayload = {
-    startedAt,
-    finishedAt,
-    retentionDays,
-    backupQuotaGB,
-    minKeepCount,
-    deleteMethod,
-    jobCount: jobs.length,
-    protectedCount: protectedJobs.size,
-    orphanJobs,
-    deletions: deletionResults,
-    deletedCount: cleanupLastResult.deletedCount,
-    deletedBytes,
-    errorCount,
-  };
-  const logPath = path.join(reports, 'CleanupLog.txt');
-  await fs.appendFile(logPath, buildCleanupLog(logPayload), 'utf8');
-
   progress('Cleanup finished.');
 
   return {
@@ -566,10 +513,9 @@ ipcMain.handle('settings:run-complete-cleanup', async (event) => {
 
   const settings = await ensureDefaultFolders();
   const { retentionDays, backupQuotaGB, minKeepCount, deleteMethod } = settings;
-  const { backups, reports, root } = settings.paths;
+  const { backups, root } = settings.paths;
 
-  const jobs = await listJobs({ backups, reports });
-  const orphanJobs = jobs.filter((job) => job.orphanReason);
+  const jobs = await listJobs({ backups });
   const deletions = jobs.map((job) => ({ ...job, reason: 'manual complete cleanup' }));
 
   if (deletions.length === 0) {
@@ -603,24 +549,6 @@ ipcMain.handle('settings:run-complete-cleanup', async (event) => {
   };
   setSettings({ cleanupLastResult });
 
-  const logPayload = {
-    startedAt,
-    finishedAt,
-    retentionDays,
-    backupQuotaGB,
-    minKeepCount,
-    deleteMethod,
-    jobCount: jobs.length,
-    protectedCount: 0,
-    orphanJobs,
-    deletions: deletionResults,
-    deletedCount: cleanupLastResult.deletedCount,
-    deletedBytes,
-    errorCount,
-  };
-  const logPath = path.join(reports, 'CleanupLog.txt');
-  await fs.appendFile(logPath, buildCleanupLog(logPayload), 'utf8');
-
   progress('Cleanup finished.');
 
   return {
@@ -636,9 +564,9 @@ ipcMain.handle('settings:run-complete-cleanup', async (event) => {
 
 ipcMain.handle('settings:get-backup-status', async () => {
   const settings = await ensureDefaultFolders();
-  const { backups, reports } = settings.paths;
-  const jobs = await listJobs({ backups, reports });
-  const totalBytes = jobs.reduce((sum, job) => sum + job.backupSize + job.reportSize, 0);
+  const { backups } = settings.paths;
+  const jobs = await listJobs({ backups });
+  const totalBytes = jobs.reduce((sum, job) => sum + job.totalBytes, 0);
   const oldest = jobs[0]?.createdAt || null;
   const latest = jobs[jobs.length - 1]?.createdAt || null;
   return {
@@ -672,45 +600,65 @@ ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) =>
 
 ipcMain.handle('export:save-backup-report', async (_event, payload) => {
   try {
-    if (!payload?.backupDataBase64) {
+    const exportDataBase64 = payload?.exportDataBase64 || payload?.backupDataBase64;
+    if (!exportDataBase64) {
       return { ok: false, error: 'Missing backup data.' };
     }
     const settings = await ensureDefaultFolders();
-    const { backups, reports } = settings.paths;
-    const baseName = sanitizeFileSegment(payload.baseName || 'output');
-    const stamp = sanitizeFileSegment(payload.stamp || new Date().toISOString());
-    const baseJobId = `${baseName}__${stamp}`;
-    const jobId = await ensureUniqueJobId(baseJobId, { backups, reports });
-    const backupsPath = path.join(backups, jobId);
-    const reportsPath = path.join(reports, jobId);
-    await fs.mkdir(backupsPath, { recursive: true });
-    await fs.mkdir(reportsPath, { recursive: true });
+    const { backups } = settings.paths;
+    const createdAt = new Date();
+    const sourceBaseName = sanitizeFileSegment(payload.sourceBaseName || payload.sourceFileName || 'output');
+    const safeBaseName = shortenSegment(sourceBaseName);
+    const stamp = formatJobStamp(createdAt);
+    const baseJobId = `${stamp}__${safeBaseName}__EXPORT`;
+    const jobFolderName = await ensureUniqueJobFolderName(baseJobId, backups);
+    const jobPath = path.join(backups, jobFolderName);
+    await fs.mkdir(jobPath, { recursive: true });
 
-    const backupFileName = `${baseName}__${stamp}__backup.wav`;
-    const reportFileName = `${baseName}__${stamp}__report.txt`;
-    const backupTarget = path.join(backupsPath, backupFileName);
-    const reportTarget = path.join(reportsPath, reportFileName);
+    const exportFileName = 'export.wav';
+    const reportFileName = 'report.txt';
+    const metaFileName = 'meta.json';
+    const exportTarget = path.join(jobPath, exportFileName);
+    const reportTarget = path.join(jobPath, reportFileName);
+    const metaTarget = path.join(jobPath, metaFileName);
 
-    const backupBuf = Buffer.from(payload.backupDataBase64, 'base64');
-    await fs.writeFile(backupTarget, backupBuf);
+    const exportBuf = Buffer.from(exportDataBase64, 'base64');
+    await fs.writeFile(exportTarget, exportBuf);
     await fs.writeFile(reportTarget, String(payload.reportText || ''), 'utf8');
 
-    const jobJson = {
-      createdAt: new Date().toISOString(),
-      sourceFileName: payload.sourceFileName || '',
-      exportFileName: payload.exportFileName || '',
-      backupFileName,
-      reportFileName,
+    const meta = {
+      createdAt: createdAt.toISOString(),
+      jobFolder: jobFolderName,
+      source: {
+        name: payload.sourceFileName || '',
+        sizeBytes: Number.isFinite(payload.sourceSizeBytes) ? payload.sourceSizeBytes : null,
+        mtime: payload.sourceMtime || null,
+        hash: payload.sourceHash || null,
+      },
+      export: {
+        name: payload.exportFileName || exportFileName,
+        sizeBytes: exportBuf.length,
+        sampleRate: Number.isFinite(payload.exportSampleRate) ? payload.exportSampleRate : null,
+        channels: Number.isFinite(payload.exportChannels) ? payload.exportChannels : null,
+      },
+      qc: {
+        result: payload.qcResult || 'UNKNOWN',
+        notes: payload.qcNotes || null,
+      },
+      app: {
+        version: payload.appVersion || null,
+      },
     };
-    await fs.writeFile(path.join(reportsPath, 'Job.json'), JSON.stringify(jobJson, null, 2), 'utf8');
+    await fs.writeFile(metaTarget, JSON.stringify(meta, null, 2), 'utf8');
 
     return {
       ok: true,
-      jobId,
-      backupFileName,
+      jobFolderName,
+      exportFileName,
       reportFileName,
-      backupPath: backupTarget,
+      exportPath: exportTarget,
       reportPath: reportTarget,
+      metaPath: metaTarget,
     };
   } catch (error) {
     return { ok: false, error: String(error?.message || error) };
