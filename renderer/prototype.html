@@ -1448,6 +1448,28 @@
   .toast.warn{ border-color: rgba(255,210,74,.45); }
   .toast.err{ border-color: rgba(255,91,110,.45); }
 
+  /* Toast top-layer (always above any dialog) */
+  dialog.toastLayer{
+    border: none;
+    background: transparent;
+    padding: 0;
+    margin: 0;
+    width: auto;
+    height: 0;
+    box-shadow: none;
+  }
+  dialog.toastLayer::backdrop{
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  /* Override position for the top-layer toast host */
+  #toastLayerHost.toastHost{
+    top: 16px;         /* 画面中央上部 */
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
   @media (prefers-reduced-motion: no-preference){
     .toast{
       animation: toastIn .14s ease-out;
@@ -2227,6 +2249,9 @@ header.wc-titlebar,
 </symbol>
 </svg>
 <div aria-atomic="true" aria-live="polite" class="toastHost" id="toastRoot"></div>
+<dialog id="toastLayer" class="toastLayer" aria-live="polite" aria-atomic="true">
+  <div class="toastHost" id="toastLayerHost"></div>
+</dialog>
 <div aria-hidden="true" id="dropOverlay"><div class="box"><div class="big">WAVをドロップして読み込み</div></div></div><div class="small"></div><div class="app">
 <div aria-hidden="true" id="progressOverlay">
   <div class="box" role="status" aria-live="polite" aria-atomic="true">
@@ -2690,15 +2715,6 @@ header.wc-titlebar,
 
 // Ensure preset import/export never fails due to missing toast helpers.
 // Use window.safeToast(...) everywhere (never ReferenceError).
-window.safeToast = window.safeToast || function(msg, type="ok", timeout=2600){
-  try{
-    if(typeof window.toast === "function") return window.toast(msg, type, timeout);
-  }catch(_){}
-  try{
-    if(typeof window.log === "function") window.log(String(msg));
-  }catch(_){}
-  try{ console.warn(msg); }catch(_){}
-};
 
 document.documentElement.classList.toggle("is-mac", !!window.platform?.isMac);
 document.documentElement.classList.toggle("is-win", !!window.platform?.isWindows);
@@ -3246,50 +3262,64 @@ function log(msg){
 
 function toast(msg, type="ok", timeout=2600){
   const openDialogs = Array.from(document.querySelectorAll("dialog[open]"));
-  const activeDialog = openDialogs.length ? openDialogs[openDialogs.length - 1] : null;
+  const anyDialogOpen = openDialogs.length > 0;
+
   let targetContainer = document.getElementById("toastRoot");
-  if(activeDialog){
-    let dialogHost = activeDialog.querySelector(".toastHost");
-    if(!dialogHost){
-      dialogHost = document.createElement("div");
-      dialogHost.className = "toastHost";
-      activeDialog.appendChild(dialogHost);
+
+  // Use a dedicated top-layer dialog for toast while any dialog is open
+  if(anyDialogOpen){
+    const toastLayer = document.getElementById("toastLayer");
+    const toastLayerHost = document.getElementById("toastLayerHost");
+    if(toastLayer && toastLayerHost){
+      try{
+        if(!toastLayer.open) toastLayer.show(); // non-modal => doesn’t block UI, but goes to top-layer
+      }catch(_){}
+      targetContainer = toastLayerHost;
     }
-    targetContainer = dialogHost;
   }
+
   if(!targetContainer) return;
-  console.log("[Toast] show:", msg, "target:", targetContainer, "inDialog:", !!activeDialog);
+
+  console.log("[Toast] show:", msg, "target:", targetContainer, "inDialog:", anyDialogOpen);
+
   const t = document.createElement("div");
   t.className = `toast ${type}`;
+
   const ic = document.createElement("div");
   ic.className = "ic";
   ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : "OK");
+
   const m = document.createElement("div");
   m.className = "msg";
-  m.textContent = msg;
+  m.textContent = String(msg ?? "");
+
   t.appendChild(ic);
   t.appendChild(m);
   targetContainer.appendChild(t);
 
   const settingsToastDebug = document.getElementById("settingsToastDebug");
-  if(settingsToastDebug){
-    settingsToastDebug.textContent = `debug line: ${msg}`;
-  }
+  if(settingsToastDebug) settingsToastDebug.textContent = `debug line: ${msg}`;
 
   window.setTimeout(()=>{
     t.classList.add("out");
-    window.setTimeout(()=> t.remove(), 200);
+    window.setTimeout(()=>{
+      t.remove();
+
+      // Close toastLayer when empty
+      if(anyDialogOpen){
+        const host = document.getElementById("toastLayerHost");
+        const dlg = document.getElementById("toastLayer");
+        if(dlg && host && host.children.length===0){
+          try{ dlg.close(); }catch(_){}
+        }
+      }
+    }, 200);
   }, timeout);
 }
 
-function safeToast(msg, type="ok", timeout=2600){
-  try{
-    if(typeof toast==="function") return toast(msg, type, timeout);
-  }catch(_){}
-  // Fallback: never break main flow
-  try{ if(typeof log==="function") log(`WARN: ${msg}`); }catch(_){}
-  try{ console.warn(msg); }catch(_){}
-}
+window.safeToast = function(message, type="ok", timeout=2600){
+  toast(message, type, timeout);
+};
 
 // Only toast for major ops & errors (avoid spam)
 function maybeToastFromLog(msg){
