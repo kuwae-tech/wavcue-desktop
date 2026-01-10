@@ -4,10 +4,20 @@ const fs = require('fs/promises');
 const fsSync = require('fs');
 const Store = require('electron-store');
 
+const SETTINGS_SCHEMA_VERSION = 2;
+const RECOMMENDED_SETTINGS = {
+  autoCleanup: true,
+  retentionDays: 30,
+  backupQuotaGB: 5,
+  minKeepCount: 20,
+  deleteMethod: 'trash',
+};
+
 const store = new Store({
   name: 'settings',
   defaults: {
     settings: {
+      schemaVersion: SETTINGS_SCHEMA_VERSION,
       autoCleanup: true,
       autoCleanupOnExport: false,
       autoCleanupOnQuit: false,
@@ -41,6 +51,19 @@ const setSettings = (patch) => {
   };
   store.set('settings', next);
   return next;
+};
+
+const migrateSettingsSchema = () => {
+  const current = getSettings();
+  const currentVersion = current?.schemaVersion;
+  if (currentVersion !== undefined && currentVersion >= SETTINGS_SCHEMA_VERSION) {
+    return;
+  }
+  const patch = {
+    ...RECOMMENDED_SETTINGS,
+    schemaVersion: SETTINGS_SCHEMA_VERSION,
+  };
+  setSettings(patch);
 };
 
 const ensureFolders = async (root) => {
@@ -349,6 +372,7 @@ const ensureWavExtension = (targetPath) => {
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  migrateSettingsSchema();
   await ensureDefaultFolders();
   createWindow();
 

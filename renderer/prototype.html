@@ -2562,6 +2562,7 @@ header.wc-titlebar,
           <div class="row" style="gap:8px;flex-wrap:wrap">
             <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
             <button class="btn danger" id="settingsCleanupNow" type="button">今すぐ完全クリーンアップ</button>
+            <button class="btn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
           </div>
           <div class="settingsHint">保存ルールを無視してバックアップを可能な限り削除します</div>
           <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
@@ -2602,9 +2603,9 @@ header.wc-titlebar,
               <label class="settingsField">
                 <span class="muted">使用容量上限</span>
                 <select id="settingsBackupQuotaGB">
-                  <option value="5">5GB</option>
+                  <option value="5">5GB（推奨）</option>
                   <option value="10">10GB</option>
-                  <option value="25">25GB（推奨）</option>
+                  <option value="25">25GB</option>
                   <option value="50">50GB</option>
                   <option value="9999">制限なし（注意）</option>
                 </select>
@@ -6770,8 +6771,18 @@ const settingsBackupQuotaGB = $("settingsBackupQuotaGB");
 const settingsMinKeepCount = $("settingsMinKeepCount");
 const settingsDeleteMethod = $("settingsDeleteMethod");
 const settingsAutoCleanup = $("settingsAutoCleanup");
+const settingsResetRecommended = $("settingsResetRecommended");
 const settingsRulesBadge = $("settingsRulesBadge");
 let cachedAutoBackupEnabled = true;
+
+const RECOMMENDED_SETTINGS = {
+  autoCleanup: true,
+  retentionDays: 30,
+  backupQuotaGB: 5,
+  minKeepCount: 20,
+  deleteMethod: "trash",
+  schemaVersion: 2,
+};
 
 const updateRulesBadge = ()=>{
   if(!settingsRulesBadge) return;
@@ -6924,6 +6935,28 @@ settingsCleanupConfirmRun?.addEventListener("click", async ()=>{
   }
   updateCleanupResult(result.summary);
   await refreshSettingsData();
+});
+
+settingsResetRecommended?.addEventListener("click", async ()=>{
+  if(typeof window.wavcue?.setSettings !== "function") return;
+  try{
+    await window.wavcue.setSettings(RECOMMENDED_SETTINGS);
+    await refreshSettingsData();
+    settingsLogAdd("設定を推奨値に戻しました。");
+    if(typeof toast === "function"){
+      toast("設定を推奨値に戻しました", "ok", 2600);
+    }else if(window.safeToast){
+      window.safeToast("設定を推奨値に戻しました", "ok", 2600);
+    }
+  }catch(error){
+    if(typeof toast === "function"){
+      toast("設定の初期化に失敗しました", "err", 3200);
+    }else if(window.safeToast){
+      window.safeToast("設定の初期化に失敗しました", "err", 3200);
+    }
+    settingsLogAdd("設定の初期化に失敗しました。");
+    console.error(error);
+  }
 });
 
 async function onSaveSettingsClicked(){
