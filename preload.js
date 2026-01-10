@@ -113,6 +113,7 @@ contextBridge.exposeInMainWorld('wavcue', {
   ensureDefaultFolders: () => ipcRenderer.invoke('settings:ensure-default-folders'),
   openFolder: (kind) => ipcRenderer.invoke('settings:open-folder', kind),
   runCleanupNow: () => ipcRenderer.invoke('settings:run-cleanup-now'),
+  runCompleteCleanup: () => ipcRenderer.invoke('settings:run-complete-cleanup'),
   getBackupStatus: () => ipcRenderer.invoke('settings:get-backup-status'),
   saveExportFile: (payload) => ipcRenderer.invoke('export:saveFile', payload),
   saveBackupReport: (payload) => ipcRenderer.invoke('export:save-backup-report', payload),
