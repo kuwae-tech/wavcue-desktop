@@ -8,13 +8,13 @@ const store = new Store({
   name: 'settings',
   defaults: {
     settings: {
-      autoCleanup: false,
+      autoCleanup: true,
       autoCleanupOnExport: false,
       autoCleanupOnQuit: false,
       autoCleanupOnStartup: false,
       autoBackupEnabled: true,
       retentionDays: 30,
-      backupQuotaGB: 25,
+      backupQuotaGB: 5,
       minKeepCount: 20,
       deleteMethod: 'trash',
       paths: {
