@@ -2318,6 +2318,25 @@ body,
   align-items: center !important;
   overflow: visible !important;
 }
+/* ===== Electron drag region hardening ===== */
+.appHeader,
+#appHeader,
+.headerBar,
+.topHeader{
+  -webkit-app-region: drag;
+}
+button, a, input, textarea, select, label,
+.btn, .iconBtn, .tabBtn, .pill, .chip,
+.dialog, dialog, .modal, .modalContent, .modalBody, .modalFooter{
+  -webkit-app-region: no-drag !important;
+}
+dialog,
+dialog *{
+  -webkit-app-region: no-drag !important;
+}
+body, #appRoot, .appRoot, .mainLayout{
+  -webkit-app-region: no-drag;
+}
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">

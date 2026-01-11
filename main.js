@@ -123,9 +123,13 @@ const ensureDefaultFolders = async () => {
 const isMac = process.platform === 'darwin';
 
 const createWindow = () => {
+  const initialWidth = 1400;
+  const initialHeight = 900;
   const mainWindow = new BrowserWindow({
-    width: 1400,
-    height: 900,
+    width: initialWidth,
+    height: initialHeight,
+    minWidth: initialWidth,
+    minHeight: initialHeight,
     autoHideMenuBar: true,
     backgroundColor: '#0b0c0f',
     ...(isMac
