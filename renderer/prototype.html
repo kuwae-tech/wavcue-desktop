@@ -3977,8 +3977,12 @@ function parseWavCues(arrayBuffer, srForSec){
     if(str4(8)!=="WAVE") return [];
 
     let off = 12;
-    const cuePoints = new Map(); // id -> sampleOffset
-    const labels = new Map();    // id -> text
+
+    // NOTE: Mapだと同一IDが上書きされるため、配列で保持（重複を失わない）
+    const cuePoints = [];         // [{ id, sampleOffset, _i }]
+    const labels = new Map();     // id -> text（重複IDは同一ラベルでOK）
+
+    let seq = 0;
 
     while(off + 8 <= dv.byteLength){
       const id = str4(off);
@@ -3992,9 +3996,9 @@ function parseWavCues(arrayBuffer, srForSec){
           let p = dataOff + 4;
           for(let i=0;i<n;i++){
             if(p + 24 > dv.byteLength) break;
-            const cueId = u32(p);
-            const sampleOffset = u32(p+20);
-            cuePoints.set(cueId, sampleOffset);
+            const cueId = u32(p) >>> 0;
+            const sampleOffset = u32(p+20) >>> 0;
+            cuePoints.push({ id: cueId, sampleOffset, _i: seq++ });
             p += 24;
           }
         }
@@ -4013,7 +4017,7 @@ function parseWavCues(arrayBuffer, srForSec){
 
               if(sid === "labl"){
                 if(sdata + 4 <= dv.byteLength){
-                  const cueId = u32(sdata);
+                  const cueId = u32(sdata) >>> 0;
                   const maxLen = Math.max(0, Math.min(ssize - 4, dv.byteLength - (sdata+4)));
                   const bytes = new Uint8Array(arrayBuffer, sdata + 4, maxLen);
                   let end = bytes.length;
@@ -4031,15 +4035,20 @@ function parseWavCues(arrayBuffer, srForSec){
       off = next;
     }
 
-    if(cuePoints.size === 0) return [];
+    if(cuePoints.length === 0) return [];
     const sr = srForSec || 48000;
-    const out = [];
-    for(const [cueId, sampleOffset] of cuePoints.entries()){
-      const label = labels.get(cueId) || "CUE";
-      out.push({id: cueId, label, sec: sampleOffset / sr});
-    }
-    out.sort((a,b)=>a.sec-b.sec);
+
+    const out = cuePoints.map(cp=>({
+      id: cp.id,
+      label: labels.get(cp.id) || "CUE",
+      sec: (cp.sampleOffset / sr),
+      _i: cp._i
+    }));
+
+    out.sort((a,b)=> (a.sec-b.sec) || (a._i-b._i));
+    for(const c of out) delete c._i;
     return out;
+
   }catch(err){
     // parsing failures are non-fatal
     try{ log(`INFO: 既存CUE解析に失敗（無視）: ${err?.message || err}`); }catch(_){}
