@@ -6790,8 +6790,17 @@ async function exportWav(){
         const qcResult = !state.qcHasRun
           ? "UNKNOWN"
           : (overallText.includes("NG") ? "NG" : (overallText.includes("OK") ? "OK" : "UNKNOWN"));
+        const exportBaseName = (() => {
+          try{
+            const p = String(_saveRes?.filePath || "");
+            if(!p) return "";
+            const name = p.split(/[\\/]/).pop() || "";
+            return name.replace(/\.[^.]+$/, "");
+          }catch(_){ return ""; }
+        })();
         const backupRes = await window.wavcue?.saveBackupReport?.({
           sourceBaseName: backupBase,
+          backupNameHint: exportBaseName,
           exportDataBase64: exportBase64,
           reportText,
           sourceFileName: String(state.fileName || ""),

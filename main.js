@@ -631,8 +631,11 @@ ipcMain.handle('export:save-backup-report', async (_event, payload) => {
     const settings = await ensureDefaultFolders();
     const { backups } = settings.paths;
     const createdAt = new Date();
-    const sourceBaseName = sanitizeFileSegment(payload.sourceBaseName || payload.sourceFileName || 'output');
-    const safeBaseName = shortenSegment(sourceBaseName);
+    const hint = typeof payload?.backupNameHint === 'string' ? payload.backupNameHint.trim() : '';
+    const fallbackBaseName = payload?.sourceBaseName || payload?.sourceFileName || 'output';
+    const baseNameForJob = hint || fallbackBaseName || 'export';
+    const sourceBaseName = sanitizeFileSegment(baseNameForJob);
+    const safeBaseName = shortenSegment(sourceBaseName || 'export');
     const stamp = formatJobStamp(createdAt);
     const baseJobId = `${stamp}__${safeBaseName}__EXPORT`;
     const jobFolderName = await ensureUniqueJobFolderName(baseJobId, backups);
