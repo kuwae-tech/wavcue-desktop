@@ -306,6 +306,20 @@ const movePath = async (source, destination) => {
   }
 };
 
+async function moveToOsTrash(targetPath) {
+  // Electron shell.trashItem moves a file/folder to the OS trash (Recycle Bin / Trash)
+  // https://www.electronjs.org/docs/latest/api/shell#shelltrashitempath
+  try {
+    if (!targetPath) {
+      throw new Error('Empty path');
+    }
+    await shell.trashItem(targetPath);
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+}
+
 const deleteJob = async (job, options) => {
   const { deleteMethod, trashRoot } = options;
   const errors = [];
@@ -327,8 +341,11 @@ const deleteJob = async (job, options) => {
     return { deletedBytes: totalBytes, errors };
   }
 
-  const targetTrashBase = await ensureUniquePath(path.join(trashRoot, job.jobId));
-  await fs.mkdir(targetTrashBase, { recursive: true });
+  let targetTrashBase = null;
+  if (deleteMethod !== 'trash') {
+    targetTrashBase = await ensureUniquePath(path.join(trashRoot, job.jobId));
+    await fs.mkdir(targetTrashBase, { recursive: true });
+  }
 
   for (const item of pathsToDelete) {
     const stat = await safeStat(item.path);
@@ -337,12 +354,11 @@ const deleteJob = async (job, options) => {
     }
 
     if (deleteMethod === 'trash') {
-      try {
-        await shell.trashItem(item.path);
-        continue;
-      } catch (error) {
-        errors.push(`${item.label}: trash failed (${error.message}), falling back to appTrash`);
+      const result = await moveToOsTrash(item.path);
+      if (!result.ok) {
+        errors.push(`${item.label}: trash failed (${result.error})`);
       }
+      continue;
     }
 
     const destination = path.join(targetTrashBase, item.label);
@@ -487,8 +503,11 @@ ipcMain.handle('settings:run-cleanup-now', async (event) => {
     progress('削除対象はありません。');
   }
 
-  const trashRoot = path.join(root, 'Trash');
-  await fs.mkdir(trashRoot, { recursive: true });
+  let trashRoot = null;
+  if (deleteMethod !== 'hard' && deleteMethod !== 'trash') {
+    trashRoot = path.join(root, 'Trash');
+    await fs.mkdir(trashRoot, { recursive: true });
+  }
 
   let deletedBytes = 0;
   let errorCount = 0;
@@ -546,8 +565,11 @@ ipcMain.handle('settings:run-complete-cleanup', async (event) => {
     progress('削除対象はありません。');
   }
 
-  const trashRoot = path.join(root, 'Trash');
-  await fs.mkdir(trashRoot, { recursive: true });
+  let trashRoot = null;
+  if (deleteMethod !== 'hard' && deleteMethod !== 'trash') {
+    trashRoot = path.join(root, 'Trash');
+    await fs.mkdir(trashRoot, { recursive: true });
+  }
 
   let deletedBytes = 0;
   let errorCount = 0;
