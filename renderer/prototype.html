@@ -2269,6 +2269,55 @@ header.wc-titlebar,
 }
 
 .no-drag{ -webkit-app-region: no-drag; }
+
+:root{
+  --wavcue-header-h: 64px; /* 現状の見た目に近い値。必要なら 60/64/68 で微調整 */
+}
+
+/* Header container: never shrink, never clip */
+.appHeader,
+#appHeader,
+.headerBar,
+.topHeader{
+  height: var(--wavcue-header-h) !important;
+  min-height: var(--wavcue-header-h) !important;
+  max-height: var(--wavcue-header-h) !important;
+
+  flex: 0 0 auto !important;
+  align-items: center !important;
+
+  overflow: visible !important;
+  padding-bottom: 2px !important; /* 1px丸め対策の“逃げ” */
+}
+
+/* If header parent clips, neutralize */
+body,
+.appRoot,
+#appRoot,
+.mainLayout,
+#mainLayout{
+  overflow: visible;
+}
+
+/* Buttons in header: keep vertical metrics stable */
+.appHeader button,
+#appHeader button,
+.headerBar button,
+.topHeader button{
+  line-height: 1 !important;
+}
+
+/* If there is an inner row that gets clipped */
+.appHeader .row,
+#appHeader .row,
+.headerBar .row,
+.topHeader .row,
+.appHeader .headerInner,
+#appHeader .headerInner{
+  height: 100% !important;
+  align-items: center !important;
+  overflow: visible !important;
+}
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
