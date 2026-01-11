@@ -1482,6 +1482,17 @@
     left: 50%;
     transform: translateX(-50%);
   }
+  /* Stabilize toast position (prevent post-render drift) */
+  #toastLayerHost.toastHost,
+  #toastRoot.toastHost{
+    right: auto !important;         /* cancel legacy right-based positioning */
+    bottom: auto !important;
+    margin: 0 !important;
+    transform: translate3d(-50%, 0, 0) !important;
+    transition: none !important;    /* no host movement */
+    will-change: transform;
+    contain: layout paint;          /* isolate layout to avoid subtle reflow drift */
+  }
 
   @media (prefers-reduced-motion: no-preference){
     .toast{
@@ -2436,6 +2447,14 @@ header.wc-titlebar,
 </label>
 <div class="ecCueList" id="ec_cues">—</div>
 </div>
+<div class="card" style="margin-top:12px">
+  <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <div style="font-weight:700">規格チェック結果</div>
+    <button type="button" class="btn" id="exportQcRefreshBtn" style="border-radius:999px;padding:8px 12px">再チェック</button>
+  </div>
+  <div id="exportQcSummary" style="margin-top:10px;font-size:13px;opacity:.9">未チェック</div>
+  <div id="exportQcList" style="margin-top:10px;display:grid;grid-template-columns:1fr;gap:6px"></div>
+</div>
 
 <details class="advBox" style="margin-top:14px">
 <summary>変更サマリ（変更前 / 変更後）</summary>
@@ -2444,6 +2463,17 @@ header.wc-titlebar,
 </details>
 
 </div>
+</dialog>
+<dialog id="exportQcNgDialog" class="modal">
+  <h3 style="margin:0 0 8px 0">規格チェックでNGがあります</h3>
+  <div style="opacity:.9;font-size:13px;line-height:1.5">
+    NG項目があります。このまま書き出しを続行しますか？
+  </div>
+  <div id="exportQcNgList" style="margin-top:10px;display:grid;gap:6px"></div>
+  <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
+    <button type="button" class="btn" id="exportQcNgCancelBtn">キャンセル</button>
+    <button type="button" class="btn primary" id="exportQcNgProceedBtn">このまま書き出す</button>
+  </div>
 </dialog>
 <!-- ===== Standard Check (separate modal) ===== -->
 <dialog class="exportCheckDialog stdCheckDialog" id="stdCheckDialog">
@@ -7564,6 +7594,92 @@ function initDiffSummary(){
   }catch(_){}
 }
 
+function getLastQcForCurrentFile(){
+  const last = window.__wavcueLastQc;
+  if(!last || !last.result) return null;
+  const cur = String(state.fileName || "");
+  if(cur && last.fileKey && cur !== last.fileKey) return null;
+  return last.result;
+}
+
+function extractQcNgItems(qcResult){
+  const items = qcResult?.items || qcResult?.rows || qcResult?.results || [];
+  const normalized = Array.isArray(items) ? items : [];
+  const ng = normalized.filter(it => it && (it.ok === false || it.status === "ng" || it.pass === false));
+  return { items: normalized, ng };
+}
+
+function renderExportQc(qcResult){
+  const summaryEl = document.getElementById("exportQcSummary");
+  const listEl = document.getElementById("exportQcList");
+  if(!summaryEl || !listEl) return;
+
+  if(!qcResult){
+    summaryEl.textContent = "未チェック";
+    listEl.innerHTML = "";
+    return;
+  }
+
+  const { items, ng } = extractQcNgItems(qcResult);
+  const okCount = Math.max(0, items.length - ng.length);
+
+  summaryEl.textContent = (ng.length === 0)
+    ? `OK（${okCount}/${items.length}）`
+    : `NG（${ng.length}件） / OK（${okCount}/${items.length}）`;
+
+  listEl.innerHTML = "";
+  items.forEach(it=>{
+    const label = it.label || it.name || it.key || "項目";
+    const ok = !(it.ok === false || it.status === "ng" || it.pass === false);
+    const row = document.createElement("div");
+    row.style.display = "flex";
+    row.style.alignItems = "center";
+    row.style.justifyContent = "space-between";
+    row.style.gap = "10px";
+    row.style.padding = "8px 10px";
+    row.style.borderRadius = "10px";
+    row.style.background = "rgba(255,255,255,0.04)";
+    row.innerHTML = `
+      <div style="font-weight:600">${label}</div>
+      <div style="font-size:12px;opacity:.9">${ok ? "OK" : "NG"}</div>
+    `;
+    if(!ok){
+      row.style.outline = "1px solid rgba(255,80,80,0.35)";
+    }
+    listEl.appendChild(row);
+  });
+}
+
+function openExportQcNgDialog(qcResult){
+  const dlg = document.getElementById("exportQcNgDialog");
+  const list = document.getElementById("exportQcNgList");
+  if(!dlg || !list) return false;
+
+  const { ng } = extractQcNgItems(qcResult);
+  list.innerHTML = "";
+  ng.forEach(it=>{
+    const label = it.label || it.name || it.key || "項目";
+    const reason = it.reason || it.message || it.detail || "";
+    const row = document.createElement("div");
+    row.style.padding = "8px 10px";
+    row.style.borderRadius = "10px";
+    row.style.background = "rgba(255,80,80,0.10)";
+    row.style.outline = "1px solid rgba(255,80,80,0.30)";
+    row.innerHTML = `<div style="font-weight:700">${label}</div>${reason ? `<div style="opacity:.9;font-size:12px;margin-top:2px">${reason}</div>` : ""}`;
+    list.appendChild(row);
+  });
+
+  try{
+    if(dlg.open) dlg.close();
+  }catch(_){}
+  try{
+    dlg.showModal();
+  }catch(_){
+    try{ dlg.show(); }catch(__){}
+  }
+  return true;
+}
+
 
 /* ===============================
    QC_EXPORTCHECK: pre-export analyzer
@@ -7787,7 +7903,18 @@ async function _ecRunAndShow(){
 
   try{ scheduleDiffUpdate(true); }catch(_){ }
 
+  try{ renderExportQc(getLastQcForCurrentFile()); }catch(_){ }
   dlg.showModal();
+}
+
+async function doFinalExport(){
+  try{
+    log("INFO: 書き出し（チェック後）");
+    await exportWav();
+  }catch(e){
+    log("ERR: 書き出し失敗: "+(e&&e.stack?e.stack:e));
+    try{ toast("書き出しに失敗しました。画面下のログをご確認ください。","err"); }catch(_){}
+  }
 }
 
 function _ecWire(){
@@ -7806,15 +7933,29 @@ function _ecWire(){
 
   // Run export after confirmation
   $("exportCheckRun")?.addEventListener("click", async ()=>{
-    close();
-    try{
-      log("INFO: 書き出し（チェック後）");
-      await exportWav();
-    }catch(e){
-      log("ERR: 書き出し失敗: "+(e&&e.stack?e.stack:e));
-      try{ toast("書き出しに失敗しました。画面下のログをご確認ください。","err"); }catch(_){}
+    const qcResult = getLastQcForCurrentFile();
+    if(qcResult){
+      const { ng } = extractQcNgItems(qcResult);
+      if(ng.length > 0){
+        close();
+        openExportQcNgDialog(qcResult);
+        return;
+      }
     }
+    close();
+    await doFinalExport();
   });
+
+  const refreshBtn = $("exportQcRefreshBtn");
+  if(refreshBtn && !refreshBtn.dataset.bound){
+    refreshBtn.dataset.bound = "1";
+    refreshBtn.addEventListener("click", ()=>{
+      const summaryEl = $("exportQcSummary");
+      if(summaryEl) summaryEl.textContent = "チェック中…";
+      try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
+      try{ renderExportQc(getLastQcForCurrentFile()); }catch(_){}
+    });
+  }
 }
 
 
@@ -7828,6 +7969,17 @@ $("btnExport").addEventListener("click", async ()=>{
   }
 });
 _ecWire();
+if($("exportQcNgCancelBtn")){
+  $("exportQcNgCancelBtn").addEventListener("click", ()=>{
+    try{ $("exportQcNgDialog")?.close(); }catch(_){}
+  });
+}
+if($("exportQcNgProceedBtn")){
+  $("exportQcNgProceedBtn").addEventListener("click", async ()=>{
+    try{ $("exportQcNgDialog")?.close(); }catch(_){}
+    await doFinalExport();
+  });
+}
 // ===== /Export pre-check modal =====
 
 // ===== Standard Check modal (separate) =====
@@ -9439,6 +9591,24 @@ if(!sil.hasSound){
   if(silKind==="ng") ngList.push("無音（前/後）");
   const overallReason = (ngList.length>0) ? `NG: ${ngList.join(", ")}` : (summary.warnCount>0 ? "注意あり" : "OK");
   _scSetHtml("sc_overall", _scOverallTag(summary), overallReason);
+  const qcResult = {
+    items: [
+      { key: "lufs", label: "Integrated LUFS", ok: lufsKind !== "ng", reason: lufsReason },
+      { key: "tp", label: "TruePeak", ok: tpKind !== "ng", reason: tpReason },
+      { key: "sr", label: "サンプルレート", ok: srKind !== "ng", reason: srReason },
+      { key: "bd", label: "bit深度", ok: bdKind !== "ng", reason: bdReason },
+      { key: "ch", label: "チャンネル", ok: chKind !== "ng", reason: chReason },
+      { key: "clip", label: "クリッピング", ok: !clipDetected, reason: clipReason },
+      { key: "silence", label: "無音", ok: silKind !== "ng", reason: silReason },
+    ],
+    summary: { ngCount: ngList.length, warnCount: summary.warnCount },
+    presetId: state.qcPresetId || null,
+  };
+  window.__wavcueLastQc = {
+    at: Date.now(),
+    fileKey: String(state.fileName || ""),
+    result: qcResult || {}
+  };
   state.scLast = {presetId: state.qcPresetId, fileKey: _scCurrentFileKey(), lufs, tpDb, sr, bd, chN, clipDetected, headSilenceSec: sil.headSec, tailSilenceSec: sil.tailSec, silenceMinSec: silMin, silenceMaxSec: silMax, silenceAllowSec: silMax, effectiveMonoWarn: !!effMonoWarn, effectiveMonoCorr: effMono?.corr ?? null, effectiveMonoDiffRatio: effMono?.diffRatio ?? null};
 }
 
