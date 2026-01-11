@@ -45,6 +45,9 @@
     align-items:center;
     gap:12px;
     -webkit-app-region: drag;
+    flex: 0 0 auto;
+    overflow: visible;
+    padding-bottom: 2px;
   }
   .hdrLeft{
     flex:1 1 auto;
@@ -1456,12 +1459,14 @@
 
   /* Toast top-layer (always above any dialog) */
   dialog.toastLayer{
+    position: fixed;
+    inset: 0;
+    width: 100vw;
+    height: 100vh;
     border: none;
     background: transparent;
     padding: 0;
     margin: 0;
-    width: auto;
-    height: 0;
     box-shadow: none;
     pointer-events: none;
   }
@@ -2311,7 +2316,6 @@ header.wc-titlebar,
 <option value="BC$NOTE9">BC$NOTE9</option>
 </optgroup>
 </select>
-              <button class="btn" id="cmcd_pm_sort" style="border-radius:999px;padding:8px 12px" type="button">並び替え</button>
 <button class="btn" disabled="" id="btnAddBcLabel" style="padding:6px 10px;font-size:12px" type="button">＋ 追加</button>
 </div><div style="margin-top:10px"><label>任意Label</label><div class="row" style="margin-top:6px"><input id="customLabel" placeholder="例) CLIENT / CM / NOTE ..." type="text"/><button class="btn" disabled="" id="btnAddCustom" type="button">＋ 追加</button></div></div></div><div class="cueTableWrap"><table><thead><tr><th style="width:42%">Label</th><th style="width:28%">TIME</th><th style="width:30%">操作</th></tr></thead><tbody id="cueBody"></tbody></table></div></div></div></div></div><dialog id="chunkDialog"><div class="modalHead"><div class="title"></div></div><div class="modalBody chunkModalBody"><div class="chunkTabs"><div aria-label="bext / cmcd / ログ 切り替え" class="tabBar" role="tablist"><button aria-selected="true" class="tabBtn active" data-tab="bext" role="tab" type="button">bext</button><button aria-selected="false" class="tabBtn" data-tab="cmcd" role="tab" type="button">cmcd</button><button aria-selected="false" class="tabBtn" data-tab="log" role="tab" type="button">ログ</button><button aria-selected="false" class="tabBtn" data-tab="diff" role="tab" type="button">差分</button></div><div class="tabPanels"><!-- bext --><div aria-label="bext panel" class="tabPanel active" data-tabpanel="bext" role="tabpanel"><div class="chunkSectionTitle"><b>bext</b><span class="chunkMeta" id="bextMeta">—</span></div><div class="kvGrid" id="bextViewGrid"></div><div class="fieldBlock" style="margin-top:12px"><label>CodingHistory（任意）</label><textarea id="bextArea" placeholder="例) A=PCM,F=48000,W=16,M=stereo,T=...
 （複数行可 / CRLF推奨）"></textarea></div></div><!-- cmcd --><div aria-label="cmcd panel" class="tabPanel" data-tabpanel="cmcd" role="tabpanel"><div class="chunkSectionTitle"><b>cmcd</b><span class="chunkMeta" id="cmcdMeta">—</span></div><div class="cmcdGridWrap"><div class="kvGrid" id="cmcdViewGrid"></div></div><details class="advBox" style="margin-top:12px"><summary>cmcd（読み取り専用）</summary><div class="fieldBlock" style="margin-top:10px"><label>cmcdテキスト</label><textarea id="cmcdRawArea" placeholder="読み込むとここに表示されます（自動）" readonly=""></textarea></div></details><div style="margin-top:10px"></div></div><!-- log --><div aria-label="log panel" class="tabPanel" data-tabpanel="log" role="tabpanel"><div class="chunkSectionTitle"><b>ログ</b><span class="chunkMeta">（読み取り専用）</span></div><div class="row" style="margin-top:10px;gap:10px;flex-wrap:wrap"><button class="btn" id="btnLogExport" type="button">ログを書き出し</button><button class="btn" id="btnLogCopy" type="button">ログをコピー</button></div><div class="chunkPresence" id="chunkPresenceBox" style="margin-top:10px;padding:10px 12px;border:1px solid #2a2f37;border-radius:12px;background:rgba(255,255,255,0.02)"><div class="rowBetween" style="align-items:flex-start;gap:10px"><div style="font-weight:700">保持情報（参照）</div><div class="muted" style="font-size:12px">編集不可</div></div><div class="kvGrid" id="chunkPresenceGrid" style="margin-top:10px"></div></div><div class="logBox logBoxSmall logBoxTall" id="logBox2"></div></div>
@@ -3275,13 +3279,27 @@ function toast(msg, type="ok", timeout=2600){
     const toastLayer = document.getElementById("toastLayer");
     const toastLayerHost = document.getElementById("toastLayerHost");
     if(toastLayer && toastLayerHost){
+      const hasModal = !!document.querySelector("dialog:modal");
+      const prevFocus = document.activeElement;
+
       // Re-open to bring to the front of the top-layer stack
       try{
         if(toastLayer.open) toastLayer.close();
       }catch(_){}
+
       try{
-        toastLayer.show(); // non-modal, but in top-layer
-      }catch(_){}
+        if(hasModal && typeof toastLayer.showModal === "function"){
+          // Use modal so it can appear above other modal dialogs.
+          toastLayer.showModal();
+        }else{
+          toastLayer.show(); // non-modal, but in top-layer
+        }
+      }catch(_){
+        try{ toastLayer.show(); }catch(__){}
+      }
+
+      // Restore focus so modal input focus is not stolen by toastLayer
+      try{ prevFocus && prevFocus.focus && prevFocus.focus({preventScroll:true}); }catch(_){}
       targetContainer = toastLayerHost;
     }
   }
@@ -6707,7 +6725,6 @@ async function exportWav(){
         const cleanupResult = await window.wavcue?.runCleanupNow?.();
         if(cleanupResult?.ok){
           settingsLogAdd(`書き出し後のクリーンアップ: ${cleanupResult.summary.deletedCount}件削除 / ${formatBytes(cleanupResult.summary.deletedBytes)} 解放。`);
-          window.safeToast && window.safeToast(`自動クリーンアップを実行しました（${cleanupResult.summary.deletedCount}件削除 / ${formatBytes(cleanupResult.summary.deletedBytes)} 解放）`, "ok", 3200);
         }else if(cleanupResult){
           settingsLogAdd(`書き出し後のクリーンアップがエラーで終了しました（エラー ${cleanupResult.summary?.errorCount ?? "不明"}件）。`);
           window.safeToast && window.safeToast("自動クリーンアップがエラーで終了しました", "warn", 3600);
