@@ -6706,6 +6706,70 @@ async function exportWav(){
           lines.push("");
           verifyDiffLines.forEach(l=> lines.push(l));
         }
+        // =========================
+        // QC / CMCD snapshot for team sharing
+        // =========================
+        try{
+          const qc = (typeof getLastQcForCurrentFile === "function") ? getLastQcForCurrentFile() : (window.__wavcueLastQc?.result || null);
+          const qcHas = !!qc;
+          const ex = (typeof extractQcNgItems === "function") ? extractQcNgItems(qc) : { items: (qc?.items||[]), ng: (qc?.items||[]).filter(x=>x && x.ok===false) };
+          const qcItems = Array.isArray(ex.items) ? ex.items : [];
+          const qcNg = Array.isArray(ex.ng) ? ex.ng : [];
+          const qcStatus = !qcHas ? "UNKNOWN" : (qcNg.length>0 ? "NG" : "OK");
+
+          const qcPresetId = (qc && qc.presetId) ? String(qc.presetId) : String(state.qcPresetId || "");
+          const qcPreset = (typeof _scGetPresetById === "function") ? _scGetPresetById(qcPresetId) : null;
+          const qcPresetName = qcPreset ? String(qcPreset.name || "（無名）") : "（不明）";
+
+          lines.push("");
+          lines.push("QC (規格チェック)");
+          lines.push(`- Result: ${qcStatus}`);
+          lines.push(`- Preset: ${qcPresetName}${qcPresetId ? ` (id: ${qcPresetId})` : ""}`);
+
+          if(qcPreset){
+            const sr = Array.isArray(qcPreset.allowedSampleRates) && qcPreset.allowedSampleRates.length ? qcPreset.allowedSampleRates.join(",") : "制限なし";
+            const bd = Array.isArray(qcPreset.allowedBits) && qcPreset.allowedBits.length ? qcPreset.allowedBits.join(",") : "制限なし";
+            const ch = Array.isArray(qcPreset.allowedChannels) && qcPreset.allowedChannels.length ? qcPreset.allowedChannels.join(",") : "制限なし";
+            lines.push(`- Target LUFS: ${qcPreset.targetLufs} ±${qcPreset.tolLufs} LU`);
+            lines.push(`- TruePeak Max: ${qcPreset.maxTruePeakDb} dBTP`);
+            lines.push(`- SampleRate: ${sr}`);
+            lines.push(`- BitDepth: ${bd}`);
+            lines.push(`- Channels: ${ch}`);
+            if(Number.isFinite(qcPreset.silenceMinSec) || Number.isFinite(qcPreset.silenceMaxSec)){
+              const a = Number.isFinite(qcPreset.silenceMinSec) ? qcPreset.silenceMinSec : 0;
+              const b = Number.isFinite(qcPreset.silenceMaxSec) ? qcPreset.silenceMaxSec : 0;
+              lines.push(`- Silence Allowance: ${a}〜${b} sec (前/後それぞれ)`);
+            }
+          }
+
+          if(qcItems.length){
+            lines.push("- Items:");
+            qcItems.forEach(it=>{
+              const label = String(it?.label || it?.name || it?.key || "項目");
+              const ok = !(it && (it.ok===false || it.status==="ng" || it.pass===false));
+              const reason = (it && (it.reason || it.message || it.detail)) ? String(it.reason || it.message || it.detail) : "";
+              lines.push(`  - ${label}: ${ok ? "OK" : "NG"}${reason ? ` / ${reason}` : ""}`);
+            });
+          }else{
+            lines.push("- Items: （詳細なし）");
+          }
+        }catch(e){
+          try{ lines.push(""); lines.push("QC (規格チェック)"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){}
+        }
+
+        try{
+          lines.push("");
+          lines.push("CMCD");
+          const cmcdApplied = !!state.cmcdBytes;
+          const cmcdPresetId = String(state.cmcdPresetId || "");
+          const cmcdPreset = (cmcdPresetId && typeof _cmcdGetPresetById === "function") ? _cmcdGetPresetById(cmcdPresetId) : null;
+          const cmcdPresetName = cmcdPreset ? String(cmcdPreset.name || "（無名）") : (cmcdApplied ? "（手入力/未指定）" : "未適用");
+
+          lines.push(`- Applied: ${cmcdApplied ? "YES" : "NO"}`);
+          lines.push(`- Preset: ${cmcdPresetName}${cmcdPresetId ? ` (id: ${cmcdPresetId})` : ""}`);
+        }catch(e){
+          try{ lines.push(""); lines.push("CMCD"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){}
+        }
         lines.push("");
         lines.push("Log (tail)");
         const logTxt = getLogText();
@@ -6737,6 +6801,23 @@ async function exportWav(){
           exportChannels: Number.isFinite(state.buffer?.numberOfChannels) ? state.buffer.numberOfChannels : null,
           qcResult,
           qcNotes: overallEl?.title ? String(overallEl.title) : null,
+          qcPresetId: (typeof getLastQcForCurrentFile==="function" && getLastQcForCurrentFile()?.presetId)
+            ? String(getLastQcForCurrentFile().presetId)
+            : String(state.qcPresetId || ""),
+          qcPresetName: (()=>{ try{
+            const id = (typeof getLastQcForCurrentFile==="function" && getLastQcForCurrentFile()?.presetId) ? String(getLastQcForCurrentFile().presetId) : String(state.qcPresetId || "");
+            const p = (typeof _scGetPresetById==="function") ? _scGetPresetById(id) : null;
+            return p ? String(p.name || "（無名）") : null;
+          }catch(_){ return null; } })(),
+          qcDetail: (typeof getLastQcForCurrentFile==="function") ? (getLastQcForCurrentFile() || null) : (window.__wavcueLastQc?.result || null),
+
+          cmcdApplied: !!state.cmcdBytes,
+          cmcdPresetId: String(state.cmcdPresetId || ""),
+          cmcdPresetName: (()=>{ try{
+            const id = String(state.cmcdPresetId || "");
+            const p = (id && typeof _cmcdGetPresetById==="function") ? _cmcdGetPresetById(id) : null;
+            return p ? String(p.name || "（無名）") : null;
+          }catch(_){ return null; } })(),
           appVersion: (typeof APP_VERSION === "string") ? APP_VERSION : null,
         });
         if(backupRes?.ok){
