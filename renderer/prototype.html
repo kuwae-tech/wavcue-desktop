@@ -1510,6 +1510,18 @@
       to{ opacity: 0; transform: translateY(-6px) scale(.985); }
     }
   }
+  dialog.toastLayer{ display:none !important; }
+  #toastRoot.toastHost{
+    position: fixed !important;
+    top: 16px !important;
+    left: 50% !important;
+    transform: translateX(-50%) !important;
+    z-index: 2147483647 !important;
+    pointer-events: none !important;  /* host自体は操作を透過 */
+  }
+  #toastRoot.toastHost .toast{
+    pointer-events: auto; /* トースト要素が閉じるボタン等を持つ場合だけ受ける */
+  }
   /* ===== /ProTools+ v2 ===== */
 
 
@@ -3299,44 +3311,10 @@ function log(msg){
 ================================ */
 
 function toast(msg, type="ok", timeout=2600){
-  const openDialogs = Array.from(document.querySelectorAll("dialog[open]"));
-  const anyDialogOpen = openDialogs.length > 0;
-
-  let targetContainer = document.getElementById("toastRoot");
-
-  // Use a dedicated top-layer dialog for toast while any dialog is open
-  if(anyDialogOpen){
-    const toastLayer = document.getElementById("toastLayer");
-    const toastLayerHost = document.getElementById("toastLayerHost");
-    if(toastLayer && toastLayerHost){
-      const hasModal = !!document.querySelector("dialog:modal");
-      const prevFocus = document.activeElement;
-
-      // Re-open to bring to the front of the top-layer stack
-      try{
-        if(toastLayer.open) toastLayer.close();
-      }catch(_){}
-
-      try{
-        if(hasModal && typeof toastLayer.showModal === "function"){
-          // Use modal so it can appear above other modal dialogs.
-          toastLayer.showModal();
-        }else{
-          toastLayer.show(); // non-modal, but in top-layer
-        }
-      }catch(_){
-        try{ toastLayer.show(); }catch(__){}
-      }
-
-      // Restore focus so modal input focus is not stolen by toastLayer
-      try{ prevFocus && prevFocus.focus && prevFocus.focus({preventScroll:true}); }catch(_){}
-      targetContainer = toastLayerHost;
-    }
-  }
-
+  const targetContainer = document.getElementById("toastRoot");
   if(!targetContainer) return;
 
-  console.log("[Toast] show:", msg, "target:", targetContainer, "inDialog:", anyDialogOpen);
+  console.log("[Toast] show:", msg, "target:", targetContainer);
 
   const t = document.createElement("div");
   t.className = `toast ${type}`;
@@ -3356,20 +3334,12 @@ function toast(msg, type="ok", timeout=2600){
   const settingsToastDebug = document.getElementById("settingsToastDebug");
   if(settingsToastDebug) settingsToastDebug.textContent = `debug line: ${msg}`;
 
+  // fade-in (no transform animation)
+  requestAnimationFrame(()=>{ try{ t.classList.add("in"); }catch(_){ } });
+
   window.setTimeout(()=>{
     t.classList.add("out");
-    window.setTimeout(()=>{
-      t.remove();
-
-      // Close toastLayer when empty
-      if(anyDialogOpen){
-        const host = document.getElementById("toastLayerHost");
-        const dlg = document.getElementById("toastLayer");
-        if(dlg && host && host.children.length===0){
-          try{ dlg.close(); }catch(_){}
-        }
-      }
-    }, 200);
+    window.setTimeout(()=>{ try{ t.remove(); }catch(_){ } }, 200);
   }, timeout);
 }
 
