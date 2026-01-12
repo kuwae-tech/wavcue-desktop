@@ -123,12 +123,12 @@
   }
   .main{
     flex:1;min-height:0;
-    display:grid;grid-template-columns: 1fr 360px;gap:10px;
+    display:grid;grid-template-columns: minmax(0, 1fr) 340px;gap:10px;
   }
   .panel{
     min-height:0;background:rgba(15,26,46,.72);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);
   }
-  .left{display:flex;flex-direction:column;min-height:0}
+  .left{display:flex;flex-direction:column;min-height:0;min-width:0;overflow:hidden}
   .sectionHead{
     display:flex;justify-content:space-between;align-items:center;gap:10px;
     padding:10px 12px;border-bottom:1px solid var(--line);
@@ -182,6 +182,14 @@
   .scopeBox{height:100%; width:100%}
   #meterCanvas,#imagerCanvas{width:100%;height:100%;display:block}
   .right{display:flex;flex-direction:column;min-height:0}
+  .cueSide{
+    width: 340px;
+    min-width: 340px;
+    max-width: 340px;
+    flex: 0 0 340px;
+    overflow: auto;
+    border-left: 1px solid rgba(255,255,255,.08);
+  }
   .right .sectionHead{border-bottom:1px solid var(--line)}
   .sidePad{padding:10px;display:flex;flex-direction:column;gap:10px;min-height:0}
   .card{border:1px solid var(--line);border-radius:14px;background:rgba(255,255,255,.03);padding:10px}
@@ -2349,6 +2357,10 @@ dialog *{
 body, #appRoot, .appRoot, .mainLayout{
   -webkit-app-region: no-drag;
 }
+.appRoot,
+.mainLeft{
+  overflow: hidden !important;
+}
 
 .proFileDock{ flex:1; min-width:0; min-height:0; height:100%; display:flex; flex-direction:column; position:relative; }
 #proFileDock{ flex: 1 1 auto; min-width:0; }
@@ -2395,31 +2407,64 @@ body, #appRoot, .appRoot, .mainLayout{
   color: rgba(240,242,246,.65);
   font-size: 12px;
 }
-.proBottomRow{
+.proBottomRow,
+.bottomRow{
+  flex: 0 0 180px;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
   display: flex;
-  gap: 12px;
   align-items: stretch;
-  height: 170px;
-  min-height: 170px;
+  gap: 12px;
+  padding: 10px;
+  overflow: hidden;
+  min-width: 0;
 }
 .proBottomRow .proMeterBox{
-  width: 140px;
-  min-width: 140px;
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
+  flex: 0 0 120px;
   border-radius: 12px;
   overflow: hidden;
 }
-.proBottomRow .proImagerBox{
-  width: 170px;
-  min-width: 170px;
-  aspect-ratio: 1 / 1;
+.meterBox{
+  width: 120px;
+  min-width: 120px;
+  max-width: 120px;
+  flex: 0 0 120px;
   border-radius: 12px;
   overflow: hidden;
 }
-.proBottomRow .proFileListBox{
-  flex: 1;
+.proBottomRow .proImagerBox,
+.imagerBox{
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
+  flex: 0 0 180px;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  align-items: stretch;
+  justify-content: stretch;
+}
+.proBottomRow .proImagerBox canvas,
+.imagerBox canvas{
+  width: 100% !important;
+  height: 100% !important;
+  display: block;
+}
+.proBottomRow .proFileListBox,
+.fileListBox{
+  flex: 1 1 auto;
   min-width: 0;
   border-radius: 12px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 .proFileListWrap{
   flex:1; min-height:0; display:flex; flex-direction:column;
@@ -2430,7 +2475,8 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proFileList{ flex:1 1 auto; min-height:0; overflow:auto; padding:6px 8px; }
 #proFileListWrap{
-  height: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
   overflow: auto;
 }
 .proFileRow{ display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer; }
@@ -2438,7 +2484,14 @@ body, #appRoot, .appRoot, .mainLayout{
 .proFileRow.active{ outline:2px solid rgba(120,200,255,0.7); }
 .proFileRow.selected{ background:rgba(255,255,255,0.10); }
 .proFileRowMain{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; }
-.proName{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proName,
+.proFileRowMain,
+.fileName{
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
 .proFileFlags{ display:flex; gap:6px; }
 .proBadge{ font-size:11px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,0.10); }
 .proFileActions{ display:flex; align-items:center; gap:6px; }
@@ -2548,7 +2601,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div class="proBottomRow"><div class="proMeterBox"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div></div><div class="proImagerBox"><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div><div class="proFileListBox"><div id="proFileDock" class="proFileDock">
+<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div class="proBottomRow bottomRow"><div class="proMeterBox meterBox"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div></div><div class="proImagerBox imagerBox"><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div><div class="proFileListBox fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <button id="proBtnBatchCheck" class="btn">一括チェック</button>
@@ -2592,7 +2645,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div id="proJobLog" class="proJobLog"></div>
   </div>
-</div></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
+</div></div></div></div></div><div class="panel right cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
