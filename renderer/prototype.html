@@ -161,7 +161,7 @@
     backdrop-filter: blur(6px);
   }
   .analyzers{
-    display:grid;grid-template-columns: 120px 1fr;gap:10px;align-items:stretch;
+    display:grid;grid-template-columns: 120px 1fr minmax(420px, 1fr);gap:10px;align-items:stretch;
   }
   .meterBox,.scopeBox{
     border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.12);
@@ -2337,6 +2337,29 @@ dialog *{
 body, #appRoot, .appRoot, .mainLayout{
   -webkit-app-region: no-drag;
 }
+
+.proFileDock{ display:flex; flex-direction:column; height:100%; min-width:420px; position:relative; }
+.proFileDockTop{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; }
+.proFileDockLeft{ display:flex; gap:6px; flex-wrap:wrap; }
+.proFileDockRight{ display:flex; gap:6px; align-items:center; }
+.proInput{ height:28px; padding:0 8px; }
+.proSelect{ height:28px; }
+.proActiveHint{ font-size:12px; opacity:0.85; padding:0 8px 4px; }
+.proFileList{ overflow:auto; height:100%; padding:4px 6px; }
+.proFileRow{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; cursor:pointer; }
+.proFileRow:hover{ background:rgba(255,255,255,0.06); }
+.proFileRow.active{ outline:2px solid rgba(120,200,255,0.7); }
+.proFileRow.selected{ background:rgba(255,255,255,0.10); }
+.proBadge{ font-size:11px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,0.10); }
+.proMeta{ opacity:0.8; font-size:12px; white-space:nowrap; }
+.proName{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proJobMini{ font-size:12px; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,0.10); user-select:none; cursor:pointer; }
+.proJobPanel{ position:absolute; right:12px; bottom:56px; width:420px; max-height:240px; overflow:hidden; border-radius:12px; background:rgba(20,20,24,0.96); border:1px solid rgba(255,255,255,0.12); padding:10px; z-index:9999; }
+.proJobPanel.hidden{ display:none; }
+.proJobPanelRow{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
+.proJobTitle{ font-weight:700; }
+.proJobLog{ overflow:auto; max-height:120px; font-size:12px; opacity:0.9; padding:6px; border-radius:10px; background:rgba(255,255,255,0.06); }
+.btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -2397,7 +2420,52 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
+<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div><div id="proFileDock" class="proFileDock">
+  <div class="proFileDockTop">
+    <div class="proFileDockLeft">
+      <button id="proBtnAddFiles" class="btn">＋追加</button>
+      <button id="proBtnBatchQC" class="btn">一括QC</button>
+      <button id="proBtnBatchExportOK" class="btn">OK書き出し</button>
+      <button id="proBtnRecheckNG" class="btn">NG再チェック</button>
+    </div>
+    <div class="proFileDockRight">
+      <input id="proFileSearch" class="proInput" placeholder="検索…" />
+      <select id="proFilterStatus" class="proSelect">
+        <option value="all">全て</option>
+        <option value="unverified">未確認</option>
+        <option value="ok">規格OK</option>
+        <option value="ng">規格NG</option>
+        <option value="edited">編集あり</option>
+        <option value="exported">書き出し済み</option>
+      </select>
+      <div id="proJobMini" class="proJobMini" title="バッチ進捗">
+        <span id="proJobMiniText">—</span>
+      </div>
+    </div>
+  </div>
+
+  <div id="proJobPanel" class="proJobPanel hidden">
+    <div class="proJobPanelRow">
+      <div class="proJobTitle">バッチ処理</div>
+      <button id="proJobClose" class="btnGhost">閉</button>
+    </div>
+    <div class="proJobPanelRow">
+      <div id="proJobNow">—</div>
+      <div id="proJobCount">0/0</div>
+    </div>
+    <div class="proJobPanelRow">
+      <div id="proJobStat">OK:0 / 失敗:0</div>
+      <button id="proJobRetryFailed" class="btn">失敗のみ再実行</button>
+      <button id="proJobCancel" class="btnGhost">停止</button>
+    </div>
+    <div id="proJobLog" class="proJobLog"></div>
+  </div>
+
+  <div id="proActiveHint" class="proActiveHint">Active: —</div>
+  <div id="proFileList" class="proFileList" tabindex="0"></div>
+
+  <input id="proFilePicker" type="file" accept=".wav" multiple style="display:none" />
+</div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
@@ -11629,6 +11697,212 @@ try{
 
 })();
 
+
+(function(){
+  const project = { files:[], activeId:null, selectedIds:new Set(), filter:{q:'', status:'all'}, lastClickIndex:null };
+  const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
+
+  function esc(str){ return String(str).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
+  function uid(){ return 'f_' + Math.random().toString(16).slice(2) + Date.now().toString(16); }
+
+  function $(id){ return document.getElementById(id); }
+
+  function openPicker(){ $('proFilePicker').value=''; $('proFilePicker').click(); }
+
+  async function addFiles(fileList){
+    const files = Array.from(fileList || []);
+    for(const file of files){
+      const id = uid();
+      project.files.push({
+        id, file, name:file.name,
+        status:{ qc:'unverified', edited:false, exported:false },
+        meta:{},
+      });
+    }
+    if(project.activeId==null && project.files.length>0){
+      setActive(project.files[0].id);
+    }
+    render();
+  }
+
+  function setActive(id){
+    project.activeId = id;
+    const f = project.files.find(x=>x.id===id);
+    if(f) $('proActiveHint').textContent = 'Active: ' + f.name;
+    render();
+  }
+
+  function filtered(){
+    const q = project.filter.q.trim().toLowerCase();
+    const st = project.filter.status;
+    return project.files.filter(f=>{
+      if(q && !f.name.toLowerCase().includes(q)) return false;
+      if(st==='all') return true;
+      if(st==='unverified') return f.status.qc==='unverified';
+      if(st==='ok') return f.status.qc==='ok';
+      if(st==='ng') return f.status.qc==='ng';
+      if(st==='edited') return !!f.status.edited;
+      if(st==='exported') return !!f.status.exported;
+      return true;
+    });
+  }
+
+  function render(){
+    const list = $('proFileList');
+    if(!list) return;
+    const arr = filtered();
+    list.innerHTML = arr.map((f,i)=>{
+      const badges = [];
+      if(f.status.qc==='ok') badges.push('<span class="proBadge">OK</span>');
+      else if(f.status.qc==='ng') badges.push('<span class="proBadge">NG</span>');
+      else badges.push('<span class="proBadge">未</span>');
+      if(f.status.edited) badges.push('<span class="proBadge">編</span>');
+      if(f.status.exported) badges.push('<span class="proBadge">出</span>');
+      const cls = ['proFileRow'];
+      if(f.id===project.activeId) cls.push('active');
+      if(project.selectedIds.has(f.id)) cls.push('selected');
+      return `<div class="${cls.join(' ')}" data-id="${esc(f.id)}" data-idx="${i}">
+        ${badges.join('')}
+        <div class="proName">${esc(f.name)}</div>
+      </div>`;
+    }).join('');
+
+    Array.from(list.querySelectorAll('.proFileRow')).forEach(row=>{
+      row.addEventListener('click', (e)=>{
+        const id = row.getAttribute('data-id');
+        const idx = Number(row.getAttribute('data-idx'));
+        const isCtrl = e.ctrlKey || e.metaKey;
+        const isShift = e.shiftKey;
+
+        if(isShift && project.lastClickIndex!=null){
+          const a = Math.min(project.lastClickIndex, idx);
+          const b = Math.max(project.lastClickIndex, idx);
+          const ids = arr.slice(a,b+1).map(x=>x.id);
+          if(!isCtrl) project.selectedIds.clear();
+          for(const x of ids) project.selectedIds.add(x);
+        }else if(isCtrl){
+          if(project.selectedIds.has(id)) project.selectedIds.delete(id);
+          else project.selectedIds.add(id);
+          project.lastClickIndex = idx;
+        }else{
+          project.selectedIds.clear();
+          project.selectedIds.add(id);
+          project.lastClickIndex = idx;
+          setActive(id);
+          return;
+        }
+        render();
+      });
+      row.addEventListener('dblclick', ()=>{
+        const id = row.getAttribute('data-id');
+        setActive(id);
+      });
+    });
+  }
+
+  function showJob(open){
+    const p = $('proJobPanel');
+    if(!p) return;
+    if(open===undefined) p.classList.toggle('hidden');
+    else p.classList.toggle('hidden', !open);
+  }
+
+  function logJob(s){
+    const box = $('proJobLog');
+    if(!box) return;
+    const t = new Date().toLocaleTimeString();
+    box.innerHTML += `<div>[${esc(t)}] ${esc(s)}</div>`;
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function updateJobUI(now){
+    $('proJobMiniText').textContent = job.running ? `${job.done}/${job.total}` : '—';
+    $('proJobNow').textContent = now || (job.running ? '処理中…' : '—');
+    $('proJobCount').textContent = `${job.done}/${job.total}`;
+    $('proJobStat').textContent = `OK:${job.ok} / 失敗:${job.failed.length}`;
+  }
+
+  async function fakeWork(ms){ return new Promise(r=>setTimeout(r, ms)); }
+
+  async function runJob(type, ids){
+    job.running = true; job.cancel=false; job.failed=[]; job.done=0; job.total=ids.length; job.ok=0;
+    updateJobUI();
+    showJob(true);
+
+    for(const id of ids){
+      if(job.cancel) break;
+      const f = project.files.find(x=>x.id===id);
+      if(!f) continue;
+      setActive(id);
+      updateJobUI(`処理中: ${f.name}`);
+      try{
+        // 仮処理（後で既存QC/Export関数に接続する）
+        await fakeWork(120);
+        if(type==='qc'){ f.status.qc = (Math.random()<0.8) ? 'ok' : 'ng'; }
+        if(type==='export'){ f.status.exported = true; }
+        job.ok++;
+      }catch(e){
+        job.failed.push(id);
+        logJob(`失敗: ${f.name}`);
+      }finally{
+        job.done++;
+        updateJobUI(`処理中: ${f.name}`);
+        render();
+      }
+    }
+
+    logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
+    job.running = false;
+    updateJobUI();
+    render();
+  }
+
+  function idsSelectedOrActive(){
+    const ids = Array.from(project.selectedIds);
+    if(ids.length===0 && project.activeId) ids.push(project.activeId);
+    return ids;
+  }
+
+  function bind(){
+    const addBtn = $('proBtnAddFiles');
+    const picker = $('proFilePicker');
+    if(!addBtn || !picker) return;
+
+    addBtn.addEventListener('click', openPicker);
+    picker.addEventListener('change', ()=> addFiles(picker.files));
+
+    $('proFileSearch').addEventListener('input', (e)=>{ project.filter.q = e.target.value||''; render(); });
+    $('proFilterStatus').addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
+
+    $('proBtnBatchQC').addEventListener('click', ()=> runJob('qc', idsSelectedOrActive()));
+    $('proBtnBatchExportOK').addEventListener('click', ()=>{
+      const base = project.files.filter(f=>f.status.qc==='ok').map(f=>f.id);
+      const ids = project.selectedIds.size ? base.filter(id=>project.selectedIds.has(id)) : base;
+      runJob('export', ids);
+    });
+    $('proBtnRecheckNG').addEventListener('click', ()=>{
+      const base = project.files.filter(f=>f.status.qc==='ng').map(f=>f.id);
+      const ids = project.selectedIds.size ? base.filter(id=>project.selectedIds.has(id)) : base;
+      runJob('qc', ids);
+    });
+
+    $('proJobMini').addEventListener('click', ()=> showJob());
+    $('proJobClose').addEventListener('click', ()=> showJob(false));
+    $('proJobCancel').addEventListener('click', ()=> { job.cancel=true; logJob('停止要求'); });
+    $('proJobRetryFailed').addEventListener('click', ()=>{
+      if(job.failed.length) runJob('qc', job.failed.slice());
+    });
+
+    updateJobUI();
+    render();
+  }
+
+  if(document.readyState==='loading'){
+    document.addEventListener('DOMContentLoaded', bind);
+  }else{
+    bind();
+  }
+})();
 </script>
 <!-- ===== QC Preset Export Selector Overlay ===== -->
 
