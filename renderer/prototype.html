@@ -2350,7 +2350,7 @@ body, #appRoot, .appRoot, .mainLayout{
   -webkit-app-region: no-drag;
 }
 
-.proFileDock{ flex:1; min-width:0; min-height:0; height:auto; display:flex; flex-direction:column; position:relative; }
+.proFileDock{ flex:1; min-width:0; min-height:0; height:100%; display:flex; flex-direction:column; position:relative; }
 .proFileDockTop{
   flex:0 0 auto;
   display:flex; align-items:center; justify-content:space-between; gap:8px;
@@ -2362,6 +2362,62 @@ body, #appRoot, .appRoot, .mainLayout{
 .proFileDockRight{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; justify-content:flex-end; }
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
+#proFilterStatus{
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  height: 32px;
+  padding: 0 34px 0 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,.14);
+  background: rgba(255,255,255,.06);
+  color: rgba(240,242,246,.95);
+  outline: none;
+}
+#proFilterStatus:focus{
+  border-color: rgba(103,167,255,.55);
+  box-shadow: 0 0 0 3px rgba(103,167,255,.18);
+}
+.proFilterWrap{
+  position: relative;
+  display: inline-block;
+}
+.proFilterWrap::after{
+  content: "▾";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-52%);
+  pointer-events: none;
+  color: rgba(240,242,246,.65);
+  font-size: 12px;
+}
+.proBottomRow{
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  height: 170px;
+  min-height: 170px;
+}
+.proBottomRow .proMeterBox{
+  width: 140px;
+  min-width: 140px;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.proBottomRow .proImagerBox{
+  width: 170px;
+  min-width: 170px;
+  aspect-ratio: 1 / 1;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.proBottomRow .proFileListBox{
+  flex: 1;
+  min-width: 0;
+  border-radius: 12px;
+  overflow: hidden;
+}
 .proFileListWrap{
   flex:1; min-height:0; display:flex; flex-direction:column;
   border:1px solid var(--line);
@@ -2370,6 +2426,10 @@ body, #appRoot, .appRoot, .mainLayout{
   overflow:hidden;
 }
 .proFileList{ flex:1 1 auto; min-height:0; overflow:auto; padding:6px 8px; }
+#proFileListWrap{
+  height: 100%;
+  overflow: auto;
+}
 .proFileRow{ display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer; }
 .proFileRow:hover{ background:rgba(255,255,255,0.06); }
 .proFileRow.active{ outline:2px solid rgba(120,200,255,0.7); }
@@ -2485,7 +2545,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div><div id="proFileDock" class="proFileDock">
+<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div class="proBottomRow"><div class="proMeterBox"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div></div><div class="proImagerBox"><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div><div class="proFileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <button id="proBtnBatchCheck" class="btn">一括チェック</button>
@@ -2493,15 +2553,16 @@ body, #appRoot, .appRoot, .mainLayout{
       
     </div>
     <div class="proFileDockRight">
-      <input id="proFileSearch" class="proInput" placeholder="検索…" />
-      <select id="proFilterStatus" class="proSelect">
-        <option value="all">全て</option>
-        <option value="unverified">未確認</option>
-        <option value="ok">規格OK</option>
-        <option value="ng">規格NG</option>
-        <option value="edited">編集あり</option>
-        <option value="exported">書き出し済み</option>
-      </select>
+      <div class="proFilterWrap">
+        <select id="proFilterStatus" class="proSelect">
+          <option value="all">全て</option>
+          <option value="unverified">未確認</option>
+          <option value="ok">規格OK</option>
+          <option value="ng">規格NG</option>
+          <option value="edited">編集あり</option>
+          <option value="exported">書き出し済み</option>
+        </select>
+      </div>
       <div id="proJobMini" class="proJobMini" title="バッチ進捗">
         <span id="proJobMiniText">—</span>
       </div>
@@ -2528,7 +2589,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div id="proJobLog" class="proJobLog"></div>
   </div>
-</div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
+</div></div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
@@ -11780,7 +11841,7 @@ try{
     activeId:null,
     lastLoadedId:null,
     selectedIds:new Set(),
-    filter:{q:'', status:'all'},
+    filter:{status:'all'},
     lastClickIndex:null,
     popover:{openType:null, openFileId:null, anchorEl:null}
   };
@@ -11789,33 +11850,14 @@ try{
   function esc(str){ return String(str).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function uid(){ return 'f_' + Math.random().toString(16).slice(2) + Date.now().toString(16); }
   function $(id){ return document.getElementById(id); }
+  const W = window.WavCue || {};
+  const api = W.api || {};
+  const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
   function isWavFile(file){
     if(!file) return false;
     const name = String(file.name||"").toLowerCase();
     return file.type === "audio/wav" || file.type === "audio/wave"
       || name.endsWith(".wav") || name.endsWith(".wave");
-  }
-  async function loadSingleWav(file, reason){
-    if(!file) return;
-    console.log('[Pro] loadSingleWav', reason || '', file.name);
-
-    // 既存の単品ロード入口を必ず再利用する
-    const fn =
-      (typeof loadFile === 'function') ? loadFile :
-      (typeof window.loadFile === 'function') ? window.loadFile :
-      null;
-
-    if(!fn){
-      console.error('[Pro] loadSingleWav: loadFile not found');
-      return;
-    }
-
-    try{
-      await fn(file);
-    }catch(err){
-      console.error('[Pro] loadSingleWav failed', err);
-      throw err;
-    }
   }
   function qcReasonText(qcResult){
     if(!qcResult) return "未チェック/理由なし";
@@ -11854,6 +11896,7 @@ try{
         status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
         cues:[],
         attachments:[],
+        attachCount:null,
         qcResult:null,
         snapshot:false,
       });
@@ -11867,31 +11910,68 @@ try{
     return addedIds;
   }
   async function setActiveFile(id, opts){
-    const file = project.files.find(f=>f.id===id);
-    if(!file) return;
+    const rec = project.files.find(f=>f.id===id);
+    if(!rec) return;
 
     project.activeId = id;
-    console.log('[Pro] setActiveFile', opts?.force ? '(force)' : '', id, file.name);
-
-    // 先にUI反映（ハイライト）
     render();
 
-    // 同一ファイルでforce無しなら再ロード不要
-    if(project.lastLoadedId===id && !opts?.force) return;
+    // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
+    if(project.lastLoadedId===id && !opts?.force){
+      // UI更新だけはして終わる
+      return;
+    }
+
+    // 本体APIが無いならここで止める（波形が出ない原因を明示）
+    if(typeof loadSingleWav !== "function"){
+      console.warn("[Pro] window.WavCue.api.loadFile が見つかりません。Pro側からWAVを読み込めません。");
+      return;
+    }
 
     try{
-      await loadSingleWav(file.file, 'active-switch');
+      console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
+      await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
       project.lastLoadedId = id;
-      console.log('[Pro] setActiveFile: loaded', file.name);
+
+      // 読み込み後に、本体stateからキュー情報を同期（表示用）
+      const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
+      if(st && Array.isArray(st.cues)){
+        rec.cues = st.cues.map(c=>({
+          id: c.id >>> 0,
+          label: String(c.label ?? ""),
+          sec: Number(c.sec ?? 0),
+        }));
+      }else{
+        rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
+      }
+
+      // クリップ(添付)数は「確実に取れる手段」があれば同期。
+      // 取れない場合でもUIが壊れないように null のままにする（表示側で 0 扱い or “–” 表示）
+      // ※pdfFindAllInWav は window.WavCue.api.modules.pdf.pdfFindAllInWav で参照可能
+      try{
+        const pdfFindAll = window.WavCue?.api?.modules?.pdf?.pdfFindAllInWav;
+        if(typeof pdfFindAll === "function"){
+          // 状態から取れない環境もあるため、必要最小限で遅延取得（ここでは“軽く”やる）
+          // File→ArrayBufferが重い場合があるので、ここでは未取得のときだけ実行
+          if(rec.attachCount == null){
+            const ab = await rec.file.arrayBuffer();
+            const list = pdfFindAll(ab) || [];
+            rec.attachCount = Array.isArray(list) ? list.length : 0;
+          }
+        }
+      }catch(_){
+        // attachCount は null のままでOK
+      }
+
     }catch(err){
-      console.error('[Pro] setActiveFile: load failed', err);
+      console.error("[Pro] setActiveFile: load failed", err);
+    }finally{
+      render();
     }
   }
   function filtered(){
-    const q = project.filter.q.trim().toLowerCase();
     const st = project.filter.status;
     return project.files.filter(f=>{
-      if(q && !f.name.toLowerCase().includes(q)) return false;
       if(st==='all') return true;
       if(st==='unverified') return f.status.qc==='unverified';
       if(st==='ok') return f.status.qc==='ok';
@@ -12089,7 +12169,9 @@ try{
       const statusText = (f.status.qc==='ok') ? 'OK' : (f.status.qc==='ng' ? 'NG' : '未');
       const statusClass = (f.status.qc==='ok') ? 'ok' : (f.status.qc==='ng' ? 'ng' : 'unverified');
       const cueCount = Array.isArray(f.cues) ? f.cues.length : 0;
-      const attCount = Array.isArray(f.attachments) ? f.attachments.length : 0;
+      const attCount = Number.isFinite(f.attachCount)
+        ? f.attachCount
+        : (Array.isArray(f.attachments) ? f.attachments.length : 0);
       const flags = [];
       if(f.status.edited) flags.push('<span class="proBadge">編</span>');
       if(f.status.exported) flags.push('<span class="proBadge">出</span>');
@@ -12163,7 +12245,6 @@ try{
   function bind(){
     window.__wavcueProAddFiles = addFiles;
 
-    $('proFileSearch')?.addEventListener('input', (e)=>{ project.filter.q = e.target.value||''; render(); });
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
 
     $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc', idsSelectedOrActive()));
