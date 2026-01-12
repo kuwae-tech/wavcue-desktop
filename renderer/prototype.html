@@ -173,13 +173,12 @@
     justify-content:center;
   }
   .meterBlock{ flex:0 0 120px; }
-  .imagerBlock{ flex:0 0 180px; }
-  .fileDockBlock{ flex:1 1 auto; min-width:0; display:flex; }
+  .imagerBlock{ flex:0 0 180px; width:180px; height:180px; }
   .meterBox,.scopeBox{
     border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.12);
   }
   .meterBox{height:180px}
-  .scopeBox{height:180px; width:180px}
+  .scopeBox{height:100%; width:100%}
   #meterCanvas,#imagerCanvas{width:100%;height:100%;display:block}
   .right{display:flex;flex-direction:column;min-height:0}
   .right .sectionHead{border-bottom:1px solid var(--line)}
@@ -2350,8 +2349,9 @@ body, #appRoot, .appRoot, .mainLayout{
   -webkit-app-region: no-drag;
 }
 
-.proFileDock{ display:flex; flex-direction:column; height:100%; min-width:0; position:relative; }
+.proFileDock{ flex:1; min-width:0; min-height:0; height:auto; display:flex; flex-direction:column; position:relative; }
 .proFileDockTop{
+  flex:0 0 auto;
   display:flex; align-items:center; justify-content:space-between; gap:8px;
   padding:6px 8px 8px;
   border-bottom:1px solid rgba(255,255,255,0.08);
@@ -2361,21 +2361,13 @@ body, #appRoot, .appRoot, .mainLayout{
 .proInput{ height:28px; padding:0 8px; }
 .proSelect{ height:28px; }
 .proFileListWrap{
-  flex:1; min-height:0; position:relative;
+  flex:1; min-height:0; display:flex; flex-direction:column;
   border:1px solid var(--line);
   border-radius:14px;
   background:rgba(0,0,0,.12);
   overflow:hidden;
 }
-.proFileDropHint{
-  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-  font-size:12px; color:rgba(229,231,235,.6); pointer-events:none; opacity:0;
-  text-align:center; padding:10px;
-}
-.proFileListWrap.is-empty .proFileDropHint,
-.proFileListWrap.is-dragover .proFileDropHint{ opacity:.9; }
-.proFileListWrap.is-dragover{ outline:2px dashed rgba(125,211,252,.7); outline-offset:-6px; }
-.proFileList{ overflow:auto; height:100%; padding:6px 8px; }
+.proFileList{ flex:1 1 auto; min-height:0; overflow:auto; padding:6px 8px; }
 .proFileRow{ display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer; }
 .proFileRow:hover{ background:rgba(255,255,255,0.06); }
 .proFileRow.active{ outline:2px solid rgba(120,200,255,0.7); }
@@ -2491,12 +2483,12 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div><div class="fileDockBlock"><div id="proFileDock" class="proFileDock">
+<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <button id="proBtnBatchCheck" class="btn">一括チェック</button>
       <button id="proBtnBatchExport" class="btn">まとめて書き出し</button>
-      <button id="proBtnTag" class="btn">タグ</button>
+      
     </div>
     <div class="proFileDockRight">
       <input id="proFileSearch" class="proInput" placeholder="検索…" />
@@ -2515,10 +2507,7 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
 
   <div id="proFileListWrap" class="proFileListWrap">
-    <div id="proFileDropHint" class="proFileDropHint">
-      WAVをここにドラッグ＆ドロップ（複数可）
-    </div>
-    <div id="proFileList" class="proFileList" tabindex="0"></div>
+        <div id="proFileList" class="proFileList" tabindex="0"></div>
   </div>
 
   <div id="proJobPanel" class="proJobPanel hidden">
@@ -2537,7 +2526,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div id="proJobLog" class="proJobLog"></div>
   </div>
-</div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
+</div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
@@ -4059,14 +4048,12 @@ function setStatus(text, kind="idle"){
 /* Drag & Drop (from scratch) */
 function setupDragAndDrop(){
   const overlay = $("dropOverlay");
-  const wrap = $("proFileListWrap");
-  const show = ()=>{ if(wrap) wrap.classList.add("is-dragover"); };
-  const hide = ()=>{ if(wrap) wrap.classList.remove("is-dragover"); };
+  const show = ()=>{ overlay?.classList.add("show"); };
+  const hide = ()=>{ overlay?.classList.remove("show"); };
   const isWav = (f)=> f && (
     f.type==="audio/wav" || f.type==="audio/wave" ||
     f.name.toLowerCase().endsWith(".wav") || f.name.toLowerCase().endsWith(".wave")
   );
-  const canHandle = (target)=> wrap && (target === wrap || wrap.contains(target));
 
   // Prevent default browser navigation on file drop (open in new tab)
   // capture:true ensures we run before the browser default
@@ -4074,19 +4061,18 @@ function setupDragAndDrop(){
   window.addEventListener("dragover", guard, {capture:true, passive:false});
   window.addEventListener("drop", guard, {capture:true, passive:false});
 
-  if(wrap){
-    wrap.addEventListener("dragenter", (e)=>{ e.preventDefault(); e.stopPropagation(); show(); }, {passive:false});
-    wrap.addEventListener("dragover", (e)=>{ e.preventDefault(); e.stopPropagation(); if(e.dataTransfer) e.dataTransfer.dropEffect="copy"; show(); }, {passive:false});
-    wrap.addEventListener("dragleave", (e)=>{
-      if(e.relatedTarget && wrap.contains(e.relatedTarget)) return;
-      hide();
-    }, {passive:false});
-  }
+  window.addEventListener("dragenter", (e)=>{
+    if(e.dataTransfer?.types?.includes("Files")) show();
+  }, {passive:true});
+  window.addEventListener("dragover", (e)=>{
+    if(e.dataTransfer?.types?.includes("Files")) show();
+  }, {passive:true});
+  window.addEventListener("dragleave", (e)=>{
+    if(e.target === document.documentElement || e.target === document.body) hide();
+  }, {passive:true});
 
   const onDrop = async (e)=>{
-    if(!canHandle(e.target)) return;
     e.preventDefault();
-    e.stopPropagation();
     hide();
     const dt = e.dataTransfer;
     const files = [];
@@ -4100,7 +4086,7 @@ function setupDragAndDrop(){
         }
       }
     }
-    if(!files.length){ log("WARN: WAV以外がドロップされました。"); return; }
+    if(!files.length){ return; }
     const add = window.__wavcueProAddFiles;
     if(typeof add === "function"){
       await add(files);
@@ -4109,9 +4095,7 @@ function setupDragAndDrop(){
     }
   };
 
-  if(wrap){
-    wrap.addEventListener("drop", onDrop, {passive:false});
-  }
+  window.addEventListener("drop", onDrop, {passive:false});
   overlay?.addEventListener("click", ()=> hide());
 }
 
@@ -11792,12 +11776,14 @@ try{
   const project = {
     files:[],
     activeId:null,
+    lastLoadedId:null,
     selectedIds:new Set(),
     filter:{q:'', status:'all'},
     lastClickIndex:null,
     popover:{openType:null, openFileId:null, anchorEl:null}
   };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
+  const loadSingleWav = (typeof loadFile === "function") ? loadFile : null;
 
   function esc(str){ return String(str).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function uid(){ return 'f_' + Math.random().toString(16).slice(2) + Date.now().toString(16); }
@@ -11807,22 +11793,6 @@ try{
     const name = String(file.name||"").toLowerCase();
     return file.type === "audio/wav" || file.type === "audio/wave"
       || name.endsWith(".wav") || name.endsWith(".wave");
-  }
-  function cloneCues(list){
-    return (Array.isArray(list) ? list : []).map(c=>({
-      id: c.id >>> 0,
-      label: String(c.label ?? ""),
-      sec: Number(c.sec ?? 0),
-    }));
-  }
-  function cloneAttachments(list){
-    return (Array.isArray(list) ? list : []).map(a=>({
-      id: a?.id,
-      name: a?.name,
-      mime: a?.mime,
-      kind: a?.kind,
-      bytes: a?.bytes ? new Uint8Array(a.bytes) : null,
-    }));
   }
   function qcReasonText(qcResult){
     if(!qcResult) return "未チェック/理由なし";
@@ -11848,20 +11818,10 @@ try{
     file.status.qcReason = qcReasonText(qcResult);
     file.qcResult = qcResult;
   }
-  function syncActiveFileData(){
-    if(!project.activeId) return;
-    const file = project.files.find(f=>f.id===project.activeId);
-    if(!file || !state?.file || state.file !== file.file) return;
-    file.cues = cloneCues(state.cues);
-    file.attachments = cloneAttachments(state.attachments);
-    file.snapshot = true;
-    if(state.qcHasRun){
-      applyQcResultToFile(file, getLastQcForCurrentFile());
-    }
-  }
   async function addFiles(fileList){
     const files = Array.from(fileList || []).filter(isWavFile);
     if(!files.length) return;
+    const addedIds = [];
     for(const file of files){
       const id = uid();
       project.files.push({
@@ -11874,55 +11834,25 @@ try{
         qcResult:null,
         snapshot:false,
       });
+      addedIds.push(id);
     }
     if(project.activeId==null && project.files.length>0){
       await setActiveFile(project.files[0].id, {force:true});
     }else{
       render();
     }
-  }
-  function restoreFileSnapshot(file){
-    if(!file || !file.snapshot) return;
-    if(Array.isArray(file.cues)){
-      state.cues = cloneCues(file.cues);
-      state.nextCueId = (state.cues.reduce((m,c)=>Math.max(m,c.id),0)+1)>>>0;
-      renderCues();
-      drawAll();
-    }
-    if(Array.isArray(file.attachments)){
-      pdfSet(file.attachments);
-    }
-    if(file.qcResult){
-      window.__wavcueLastQc = { at: Date.now(), fileKey: String(state.fileName || ""), result: file.qcResult };
-      state.qcHasRun = true;
-    }else{
-      state.qcHasRun = false;
-    }
-  }
-  function snapshotActiveFile(){
-    if(!project.activeId) return;
-    const file = project.files.find(f=>f.id===project.activeId);
-    if(!file || !state?.file || state.file !== file.file) return;
-    file.cues = cloneCues(state.cues);
-    file.attachments = cloneAttachments(state.attachments);
-    file.snapshot = true;
-    if(state.qcHasRun){
-      applyQcResultToFile(file, getLastQcForCurrentFile());
-    }
+    return addedIds;
   }
   async function setActiveFile(id, opts){
     const file = project.files.find(f=>f.id===id);
     if(!file) return;
-    const same = project.activeId===id && state?.file === file.file;
-    if(!same){
-      snapshotActiveFile();
-    }
     project.activeId = id;
     render();
-    if(same && !opts?.force) return;
-    await loadFile(file.file);
-    restoreFileSnapshot(file);
-    syncActiveFileData();
+    if(project.lastLoadedId===id && !opts?.force) return;
+    if(typeof loadSingleWav === "function"){
+      await loadSingleWav(file.file);
+      project.lastLoadedId = id;
+    }
     render();
   }
   function filtered(){
@@ -12113,7 +12043,6 @@ try{
     requestAnimationFrame(positionPopover);
   }
   function render(){
-    syncActiveFileData();
     const list = $('proFileList');
     const wrap = $('proFileListWrap');
     if(!list) return;
@@ -12150,6 +12079,7 @@ try{
 
     Array.from(list.querySelectorAll('.proFileRow')).forEach(row=>{
       row.addEventListener('click', (e)=>{
+        if(e.detail >= 2) return;
         if(e.target.closest('.proFileActionBtn')) return;
         const id = row.getAttribute('data-id');
         const idx = Number(row.getAttribute('data-idx'));
