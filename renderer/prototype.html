@@ -161,13 +161,25 @@
     backdrop-filter: blur(6px);
   }
   .analyzers{
-    display:grid;grid-template-columns: 120px 1fr minmax(420px, 1fr);gap:10px;align-items:stretch;
+    display:flex;
+    gap:10px;
+    align-items:stretch;
+    min-height:0;
   }
+  .meterBlock,
+  .imagerBlock{
+    display:flex;
+    align-items:stretch;
+    justify-content:center;
+  }
+  .meterBlock{ flex:0 0 120px; }
+  .imagerBlock{ flex:0 0 180px; }
+  .fileDockBlock{ flex:1 1 auto; min-width:0; display:flex; }
   .meterBox,.scopeBox{
     border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.12);
   }
-  .meterBox{height:155px}
-  .scopeBox{height:150px}
+  .meterBox{height:180px}
+  .scopeBox{height:180px; width:180px}
   #meterCanvas,#imagerCanvas{width:100%;height:100%;display:block}
   .right{display:flex;flex-direction:column;min-height:0}
   .right .sectionHead{border-bottom:1px solid var(--line)}
@@ -2338,22 +2350,81 @@ body, #appRoot, .appRoot, .mainLayout{
   -webkit-app-region: no-drag;
 }
 
-.proFileDock{ display:flex; flex-direction:column; height:100%; min-width:420px; position:relative; }
-.proFileDockTop{ display:flex; align-items:center; justify-content:space-between; gap:8px; padding:6px 8px; }
+.proFileDock{ display:flex; flex-direction:column; height:100%; min-width:0; position:relative; }
+.proFileDockTop{
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
+  padding:6px 8px 8px;
+  border-bottom:1px solid rgba(255,255,255,0.08);
+}
 .proFileDockLeft{ display:flex; gap:6px; flex-wrap:wrap; }
-.proFileDockRight{ display:flex; gap:6px; align-items:center; }
+.proFileDockRight{ display:flex; gap:6px; align-items:center; flex-wrap:wrap; justify-content:flex-end; }
 .proInput{ height:28px; padding:0 8px; }
 .proSelect{ height:28px; }
-.proActiveHint{ font-size:12px; opacity:0.85; padding:0 8px 4px; }
-.proFileList{ overflow:auto; height:100%; padding:4px 6px; }
-.proFileRow{ display:flex; align-items:center; gap:8px; padding:6px 6px; border-radius:8px; cursor:pointer; }
+.proFileListWrap{
+  flex:1; min-height:0; position:relative;
+  border:1px solid var(--line);
+  border-radius:14px;
+  background:rgba(0,0,0,.12);
+  overflow:hidden;
+}
+.proFileDropHint{
+  position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+  font-size:12px; color:rgba(229,231,235,.6); pointer-events:none; opacity:0;
+  text-align:center; padding:10px;
+}
+.proFileListWrap.is-empty .proFileDropHint,
+.proFileListWrap.is-dragover .proFileDropHint{ opacity:.9; }
+.proFileListWrap.is-dragover{ outline:2px dashed rgba(125,211,252,.7); outline-offset:-6px; }
+.proFileList{ overflow:auto; height:100%; padding:6px 8px; }
+.proFileRow{ display:flex; align-items:center; gap:10px; padding:6px 8px; border-radius:8px; cursor:pointer; }
 .proFileRow:hover{ background:rgba(255,255,255,0.06); }
 .proFileRow.active{ outline:2px solid rgba(120,200,255,0.7); }
 .proFileRow.selected{ background:rgba(255,255,255,0.10); }
-.proBadge{ font-size:11px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,0.10); }
-.proMeta{ opacity:0.8; font-size:12px; white-space:nowrap; }
+.proFileRowMain{ flex:1; min-width:0; display:flex; align-items:center; gap:8px; }
 .proName{ flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proFileFlags{ display:flex; gap:6px; }
+.proBadge{ font-size:11px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,0.10); }
+.proFileActions{ display:flex; align-items:center; gap:6px; }
+.proFileActionBtn{
+  border:1px solid rgba(255,255,255,0.15);
+  background:rgba(255,255,255,0.04);
+  color:var(--text);
+  font-size:11px;
+  padding:4px 8px;
+  border-radius:999px;
+  display:inline-flex;
+  align-items:center;
+  gap:6px;
+  cursor:pointer;
+}
+.proFileActionBtn:hover{ background:rgba(255,255,255,0.08); }
+.proStatusBadge.ok{ border-color:rgba(126,231,162,.45); color:var(--good); }
+.proStatusBadge.ng{ border-color:rgba(251,113,133,.45); color:var(--bad); }
+.proStatusBadge.unverified{ border-color:rgba(148,163,184,.4); color:var(--muted); }
+.proCueBtn{ border-color:rgba(56,189,248,.45); color:#bae6fd; }
+.proClipBtn{ border-color:rgba(255,255,255,0.2); }
+.miniIcon{ width:12px; height:12px; display:inline-block; }
 .proJobMini{ font-size:12px; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,0.10); user-select:none; cursor:pointer; }
+.proGlobalPopover{
+  position:fixed;
+  z-index:10020;
+  max-width:420px;
+  max-height:260px;
+}
+.proGlobalPopover.hidden{ display:none; }
+.proGlobalPopoverInner{
+  border:1px solid rgba(148,163,184,.25);
+  border-radius:14px;
+  background:rgba(17,31,54,.98);
+  box-shadow:0 18px 60px rgba(0,0,0,.55);
+  padding:10px 12px;
+}
+.proPopTitle{ font-weight:700; font-size:12px; margin-bottom:6px; }
+.proPopBody{ font-size:12px; color:rgba(229,231,235,.9); max-height:200px; overflow:auto; }
+.proPopList{ display:grid; gap:6px; }
+.proPopRow{ display:flex; justify-content:space-between; gap:8px; }
+.proPopItem{ padding:6px 8px; border-radius:10px; background:rgba(255,255,255,0.06); }
+.proPopItem button{ all:unset; cursor:pointer; color:inherit; }
 .proJobPanel{ position:absolute; right:12px; bottom:56px; width:420px; max-height:240px; overflow:hidden; border-radius:12px; background:rgba(20,20,24,0.96); border:1px solid rgba(255,255,255,0.12); padding:10px; z-index:9999; }
 .proJobPanel.hidden{ display:none; }
 .proJobPanelRow{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
@@ -2420,13 +2491,12 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div><div id="proFileDock" class="proFileDock">
+<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div><div class="fileDockBlock"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
-      <button id="proBtnAddFiles" class="btn">＋追加</button>
-      <button id="proBtnBatchQC" class="btn">一括QC</button>
-      <button id="proBtnBatchExportOK" class="btn">OK書き出し</button>
-      <button id="proBtnRecheckNG" class="btn">NG再チェック</button>
+      <button id="proBtnBatchCheck" class="btn">一括チェック</button>
+      <button id="proBtnBatchExport" class="btn">まとめて書き出し</button>
+      <button id="proBtnTag" class="btn">タグ</button>
     </div>
     <div class="proFileDockRight">
       <input id="proFileSearch" class="proInput" placeholder="検索…" />
@@ -2442,6 +2512,13 @@ body, #appRoot, .appRoot, .mainLayout{
         <span id="proJobMiniText">—</span>
       </div>
     </div>
+  </div>
+
+  <div id="proFileListWrap" class="proFileListWrap">
+    <div id="proFileDropHint" class="proFileDropHint">
+      WAVをここにドラッグ＆ドロップ（複数可）
+    </div>
+    <div id="proFileList" class="proFileList" tabindex="0"></div>
   </div>
 
   <div id="proJobPanel" class="proJobPanel hidden">
@@ -2460,11 +2537,6 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div id="proJobLog" class="proJobLog"></div>
   </div>
-
-  <div id="proActiveHint" class="proActiveHint">Active: —</div>
-  <div id="proFileList" class="proFileList" tabindex="0"></div>
-
-  <input id="proFilePicker" type="file" accept=".wav" multiple style="display:none" />
 </div></div></div></div><div class="panel right"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
@@ -3987,12 +4059,14 @@ function setStatus(text, kind="idle"){
 /* Drag & Drop (from scratch) */
 function setupDragAndDrop(){
   const overlay = $("dropOverlay");
-  const show = ()=>{ overlay.classList.add("show"); overlay.setAttribute("aria-hidden","false"); };
-  const hide = ()=>{ overlay.classList.remove("show"); overlay.setAttribute("aria-hidden","true"); };
+  const wrap = $("proFileListWrap");
+  const show = ()=>{ if(wrap) wrap.classList.add("is-dragover"); };
+  const hide = ()=>{ if(wrap) wrap.classList.remove("is-dragover"); };
   const isWav = (f)=> f && (
     f.type==="audio/wav" || f.type==="audio/wave" ||
     f.name.toLowerCase().endsWith(".wav") || f.name.toLowerCase().endsWith(".wave")
   );
+  const canHandle = (target)=> wrap && (target === wrap || wrap.contains(target));
 
   // Prevent default browser navigation on file drop (open in new tab)
   // capture:true ensures we run before the browser default
@@ -4000,34 +4074,45 @@ function setupDragAndDrop(){
   window.addEventListener("dragover", guard, {capture:true, passive:false});
   window.addEventListener("drop", guard, {capture:true, passive:false});
 
-  document.addEventListener("dragenter", (e)=>{ e.preventDefault(); show(); }, {passive:false});
-  document.addEventListener("dragover", (e)=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="copy"; }, {passive:false});
-  document.addEventListener("dragleave", (e)=>{ if(e.relatedTarget===null) hide(); });
+  if(wrap){
+    wrap.addEventListener("dragenter", (e)=>{ e.preventDefault(); e.stopPropagation(); show(); }, {passive:false});
+    wrap.addEventListener("dragover", (e)=>{ e.preventDefault(); e.stopPropagation(); if(e.dataTransfer) e.dataTransfer.dropEffect="copy"; show(); }, {passive:false});
+    wrap.addEventListener("dragleave", (e)=>{
+      if(e.relatedTarget && wrap.contains(e.relatedTarget)) return;
+      hide();
+    }, {passive:false});
+  }
 
   const onDrop = async (e)=>{
+    if(!canHandle(e.target)) return;
     e.preventDefault();
     e.stopPropagation();
     hide();
     const dt = e.dataTransfer;
-    let file = null;
-    if(dt?.files && dt.files.length>0){
-      file = dt.files[0];
-    }else if(dt?.items && dt.items.length>0){
-      const item = dt.items[0];
-      if(item.kind==="file") file = item.getAsFile();
+    const files = [];
+    if(dt?.files && dt.files.length){
+      for(const f of dt.files) if(isWav(f)) files.push(f);
+    }else if(dt?.items && dt.items.length){
+      for(const item of dt.items){
+        if(item.kind==="file"){
+          const f = item.getAsFile();
+          if(f && isWav(f)) files.push(f);
+        }
+      }
     }
+    if(!files.length){ log("WARN: WAV以外がドロップされました。"); return; }
+    const add = window.__wavcueProAddFiles;
+    if(typeof add === "function"){
+      await add(files);
+    }else{
+      await loadFile(files[0]);
+    }
+  };
 
-    if(!file){ log("WARN: drop を検出しましたが file を取得できませんでした。"); return; }
-    if(!isWav(file)){ log(`WARN: WAV以外がドロップされました: ${file.name}`); hide(); return; }
-    hide();
-    log(`DROP: ${file.name}`);
-    await loadFile(file);
-};
-
-  document.addEventListener("drop", onDrop, {passive:false});
-  overlay.addEventListener("dragover", (e)=>{ e.preventDefault(); if(e.dataTransfer) e.dataTransfer.dropEffect="copy"; }, {passive:false});
-  overlay.addEventListener("drop", onDrop, {passive:false});
-  overlay.addEventListener("click", ()=> hide());
+  if(wrap){
+    wrap.addEventListener("drop", onDrop, {passive:false});
+  }
+  overlay?.addEventListener("click", ()=> hide());
 }
 
 
@@ -7042,9 +7127,14 @@ if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
 
 $("btnBrowse").addEventListener("click", ()=> $("fileInput").click());
 $("fileInput").addEventListener("change", async (e)=>{
-  const f = e.target.files && e.target.files[0];
-  if(!f) return;
-  await loadFile(f);
+  const files = e.target.files;
+  if(!files || !files.length) return;
+  const add = window.__wavcueProAddFiles;
+  if(typeof add === "function"){
+    await add(files);
+  }else{
+    await loadFile(files[0]);
+  }
   e.target.value = "";
 });
 
@@ -11699,39 +11789,142 @@ try{
 
 
 (function(){
-  const project = { files:[], activeId:null, selectedIds:new Set(), filter:{q:'', status:'all'}, lastClickIndex:null };
+  const project = {
+    files:[],
+    activeId:null,
+    selectedIds:new Set(),
+    filter:{q:'', status:'all'},
+    lastClickIndex:null,
+    popover:{openType:null, openFileId:null, anchorEl:null}
+  };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
 
   function esc(str){ return String(str).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function uid(){ return 'f_' + Math.random().toString(16).slice(2) + Date.now().toString(16); }
-
   function $(id){ return document.getElementById(id); }
-
-  function openPicker(){ $('proFilePicker').value=''; $('proFilePicker').click(); }
-
+  function isWavFile(file){
+    if(!file) return false;
+    const name = String(file.name||"").toLowerCase();
+    return file.type === "audio/wav" || file.type === "audio/wave"
+      || name.endsWith(".wav") || name.endsWith(".wave");
+  }
+  function cloneCues(list){
+    return (Array.isArray(list) ? list : []).map(c=>({
+      id: c.id >>> 0,
+      label: String(c.label ?? ""),
+      sec: Number(c.sec ?? 0),
+    }));
+  }
+  function cloneAttachments(list){
+    return (Array.isArray(list) ? list : []).map(a=>({
+      id: a?.id,
+      name: a?.name,
+      mime: a?.mime,
+      kind: a?.kind,
+      bytes: a?.bytes ? new Uint8Array(a.bytes) : null,
+    }));
+  }
+  function qcReasonText(qcResult){
+    if(!qcResult) return "未チェック/理由なし";
+    const { ng } = extractQcNgItems(qcResult);
+    if(!ng.length) return "規格OK";
+    const reasons = ng.map(it=>{
+      const label = it?.label || it?.key || "NG";
+      const reason = it?.reason ? `: ${it.reason}` : "";
+      return `${label}${reason}`;
+    });
+    return reasons.length ? reasons.join("\n") : "未チェック/理由なし";
+  }
+  function applyQcResultToFile(file, qcResult){
+    if(!file) return;
+    if(!qcResult){
+      file.status.qc = "unverified";
+      file.status.qcReason = null;
+      file.qcResult = null;
+      return;
+    }
+    const { ng } = extractQcNgItems(qcResult);
+    file.status.qc = ng.length ? "ng" : "ok";
+    file.status.qcReason = qcReasonText(qcResult);
+    file.qcResult = qcResult;
+  }
+  function syncActiveFileData(){
+    if(!project.activeId) return;
+    const file = project.files.find(f=>f.id===project.activeId);
+    if(!file || !state?.file || state.file !== file.file) return;
+    file.cues = cloneCues(state.cues);
+    file.attachments = cloneAttachments(state.attachments);
+    file.snapshot = true;
+    if(state.qcHasRun){
+      applyQcResultToFile(file, getLastQcForCurrentFile());
+    }
+  }
   async function addFiles(fileList){
-    const files = Array.from(fileList || []);
+    const files = Array.from(fileList || []).filter(isWavFile);
+    if(!files.length) return;
     for(const file of files){
       const id = uid();
       project.files.push({
-        id, file, name:file.name,
-        status:{ qc:'unverified', edited:false, exported:false },
-        meta:{},
+        id,
+        file,
+        name:file.name,
+        status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
+        cues:[],
+        attachments:[],
+        qcResult:null,
+        snapshot:false,
       });
     }
     if(project.activeId==null && project.files.length>0){
-      setActive(project.files[0].id);
+      await setActiveFile(project.files[0].id, {force:true});
+    }else{
+      render();
     }
-    render();
   }
-
-  function setActive(id){
+  function restoreFileSnapshot(file){
+    if(!file || !file.snapshot) return;
+    if(Array.isArray(file.cues)){
+      state.cues = cloneCues(file.cues);
+      state.nextCueId = (state.cues.reduce((m,c)=>Math.max(m,c.id),0)+1)>>>0;
+      renderCues();
+      drawAll();
+    }
+    if(Array.isArray(file.attachments)){
+      pdfSet(file.attachments);
+    }
+    if(file.qcResult){
+      window.__wavcueLastQc = { at: Date.now(), fileKey: String(state.fileName || ""), result: file.qcResult };
+      state.qcHasRun = true;
+    }else{
+      state.qcHasRun = false;
+    }
+  }
+  function snapshotActiveFile(){
+    if(!project.activeId) return;
+    const file = project.files.find(f=>f.id===project.activeId);
+    if(!file || !state?.file || state.file !== file.file) return;
+    file.cues = cloneCues(state.cues);
+    file.attachments = cloneAttachments(state.attachments);
+    file.snapshot = true;
+    if(state.qcHasRun){
+      applyQcResultToFile(file, getLastQcForCurrentFile());
+    }
+  }
+  async function setActiveFile(id, opts){
+    const file = project.files.find(f=>f.id===id);
+    if(!file) return;
+    const same = project.activeId===id && state?.file === file.file;
+    if(!same){
+      snapshotActiveFile();
+    }
     project.activeId = id;
-    const f = project.files.find(x=>x.id===id);
-    if(f) $('proActiveHint').textContent = 'Active: ' + f.name;
+    render();
+    if(same && !opts?.force) return;
+    await loadFile(file.file);
+    restoreFileSnapshot(file);
+    syncActiveFileData();
     render();
   }
-
   function filtered(){
     const q = project.filter.q.trim().toLowerCase();
     const st = project.filter.status;
@@ -11746,29 +11939,218 @@ try{
       return true;
     });
   }
+  function showJob(open){
+    const p = $('proJobPanel');
+    if(!p) return;
+    if(open===undefined) p.classList.toggle('hidden');
+    else p.classList.toggle('hidden', !open);
+  }
+  function logJob(s){
+    const box = $('proJobLog');
+    if(!box) return;
+    const t = new Date().toLocaleTimeString();
+    box.innerHTML += `<div>[${esc(t)}] ${esc(s)}</div>`;
+    box.scrollTop = box.scrollHeight;
+  }
+  function updateJobUI(now){
+    const mini = $('proJobMiniText');
+    if(mini) mini.textContent = job.running ? `${job.done}/${job.total}` : '—';
+    const nowEl = $('proJobNow');
+    if(nowEl) nowEl.textContent = now || (job.running ? '処理中…' : '—');
+    const count = $('proJobCount');
+    if(count) count.textContent = `${job.done}/${job.total}`;
+    const stat = $('proJobStat');
+    if(stat) stat.textContent = `OK:${job.ok} / 失敗:${job.failed.length}`;
+  }
+  async function runJob(type, ids){
+    if(!ids.length) return;
+    job.running = true; job.cancel=false; job.failed=[]; job.done=0; job.total=ids.length; job.ok=0;
+    updateJobUI();
+    showJob(true);
 
+    for(const id of ids){
+      if(job.cancel) break;
+      const f = project.files.find(x=>x.id===id);
+      if(!f) continue;
+      try{
+        await setActiveFile(id, {force:true});
+        updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
+        if(type==='qc'){
+          try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
+          applyQcResultToFile(f, getLastQcForCurrentFile());
+        }
+        if(type==='export'){
+          await doFinalExport();
+          f.status.exported = true;
+        }
+        job.ok++;
+      }catch(e){
+        job.failed.push(id);
+        logJob(`失敗: ${f.name}`);
+      }finally{
+        job.done++;
+        updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
+        render();
+      }
+    }
+
+    logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
+    job.running = false;
+    updateJobUI();
+    render();
+  }
+  function idsSelectedOrActive(){
+    const ids = Array.from(project.selectedIds);
+    if(ids.length===0 && project.activeId) ids.push(project.activeId);
+    return ids;
+  }
+  function setPopoverContent(title, bodyNode){
+    const titleEl = $('proPopTitle');
+    const bodyEl = $('proPopBody');
+    if(titleEl) titleEl.textContent = title || "";
+    if(bodyEl){
+      bodyEl.innerHTML = "";
+      if(bodyNode) bodyEl.appendChild(bodyNode);
+    }
+  }
+  function positionPopover(){
+    const pop = $('proGlobalPopover');
+    if(!pop || pop.classList.contains('hidden') || !project.popover.anchorEl) return;
+    const anchorRect = project.popover.anchorEl.getBoundingClientRect();
+    pop.style.top = "0px";
+    pop.style.left = "0px";
+    pop.style.visibility = "hidden";
+    const popRect = pop.getBoundingClientRect();
+    let top = anchorRect.top - popRect.height - 8;
+    if(top < 8){
+      top = anchorRect.bottom + 8;
+    }
+    let left = anchorRect.left + anchorRect.width / 2 - popRect.width / 2;
+    const maxLeft = window.innerWidth - popRect.width - 8;
+    left = Math.max(8, Math.min(left, maxLeft));
+    pop.style.top = `${Math.round(top)}px`;
+    pop.style.left = `${Math.round(left)}px`;
+    pop.style.visibility = "visible";
+  }
+  function closePopover(){
+    const pop = $('proGlobalPopover');
+    if(!pop) return;
+    pop.classList.add('hidden');
+    pop.setAttribute('aria-hidden', 'true');
+    project.popover.openType = null;
+    project.popover.openFileId = null;
+    project.popover.anchorEl = null;
+  }
+  function openPopover(type, fileId, anchorEl){
+    const pop = $('proGlobalPopover');
+    if(!pop) return;
+    if(project.popover.openType===type && project.popover.openFileId===fileId){
+      closePopover();
+      return;
+    }
+    const file = project.files.find(f=>f.id===fileId);
+    if(!file) return;
+    const body = document.createElement("div");
+    body.className = "proPopList";
+    if(type==="status"){
+      const item = document.createElement("div");
+      item.className = "proPopItem";
+      item.textContent = qcReasonText(file.qcResult || null);
+      body.appendChild(item);
+      setPopoverContent("ステータス", body);
+    }
+    if(type==="cues"){
+      const cues = Array.isArray(file.cues) ? file.cues : [];
+      if(!cues.length){
+        const item = document.createElement("div");
+        item.className = "proPopItem";
+        item.textContent = "キューなし";
+        body.appendChild(item);
+      }else{
+        cues.forEach(c=>{
+          const row = document.createElement("div");
+          row.className = "proPopItem proPopRow";
+          const label = document.createElement("span");
+          label.textContent = c.label || "—";
+          const time = document.createElement("span");
+          time.className = "mono";
+          time.textContent = (typeof fmtTime === "function") ? fmtTime(c.sec) : `${c.sec.toFixed(3)}s`;
+          row.appendChild(label);
+          row.appendChild(time);
+          body.appendChild(row);
+        });
+      }
+      setPopoverContent("キュー一覧", body);
+    }
+    if(type==="attachments"){
+      const atts = Array.isArray(file.attachments) ? file.attachments : [];
+      for(let i=0;i<9;i++){
+        const a = atts[i];
+        const row = document.createElement("div");
+        row.className = "proPopItem";
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = a ? `#${i+1} ${a.name || "attached"}` : `#${i+1} —`;
+        btn.disabled = !a;
+        if(a){
+          btn.addEventListener("click", async ()=>{
+            await setActiveFile(file.id, {force:true});
+            attachSelectIndex(i);
+            pdfOpenViewer();
+            closePopover();
+          });
+        }
+        row.appendChild(btn);
+        body.appendChild(row);
+      }
+      setPopoverContent("添付一覧", body);
+    }
+    project.popover.openType = type;
+    project.popover.openFileId = fileId;
+    project.popover.anchorEl = anchorEl;
+    pop.classList.remove('hidden');
+    pop.setAttribute('aria-hidden', 'false');
+    requestAnimationFrame(positionPopover);
+  }
   function render(){
+    syncActiveFileData();
     const list = $('proFileList');
+    const wrap = $('proFileListWrap');
     if(!list) return;
     const arr = filtered();
+    if(wrap){
+      wrap.classList.toggle('is-empty', project.files.length===0);
+    }
     list.innerHTML = arr.map((f,i)=>{
-      const badges = [];
-      if(f.status.qc==='ok') badges.push('<span class="proBadge">OK</span>');
-      else if(f.status.qc==='ng') badges.push('<span class="proBadge">NG</span>');
-      else badges.push('<span class="proBadge">未</span>');
-      if(f.status.edited) badges.push('<span class="proBadge">編</span>');
-      if(f.status.exported) badges.push('<span class="proBadge">出</span>');
       const cls = ['proFileRow'];
       if(f.id===project.activeId) cls.push('active');
       if(project.selectedIds.has(f.id)) cls.push('selected');
+      const statusText = (f.status.qc==='ok') ? 'OK' : (f.status.qc==='ng' ? 'NG' : '未');
+      const statusClass = (f.status.qc==='ok') ? 'ok' : (f.status.qc==='ng' ? 'ng' : 'unverified');
+      const cueCount = Array.isArray(f.cues) ? f.cues.length : 0;
+      const attCount = Array.isArray(f.attachments) ? f.attachments.length : 0;
+      const flags = [];
+      if(f.status.edited) flags.push('<span class="proBadge">編</span>');
+      if(f.status.exported) flags.push('<span class="proBadge">出</span>');
       return `<div class="${cls.join(' ')}" data-id="${esc(f.id)}" data-idx="${i}">
-        ${badges.join('')}
-        <div class="proName">${esc(f.name)}</div>
+        <div class="proFileRowMain">
+          <div class="proName">${esc(f.name)}</div>
+          ${flags.length ? `<div class="proFileFlags">${flags.join('')}</div>` : ''}
+        </div>
+        <div class="proFileActions">
+          <button class="proFileActionBtn proStatusBadge ${statusClass}" data-action="status" type="button">${statusText}</button>
+          <button class="proFileActionBtn proCueBtn" data-action="cues" type="button">CUE ${cueCount}</button>
+          <button class="proFileActionBtn proClipBtn" data-action="attachments" type="button">
+            <svg aria-hidden="true" class="miniIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>
+            <span>${attCount}</span>
+          </button>
+        </div>
       </div>`;
     }).join('');
 
     Array.from(list.querySelectorAll('.proFileRow')).forEach(row=>{
       row.addEventListener('click', (e)=>{
+        if(e.target.closest('.proFileActionBtn')) return;
         const id = row.getAttribute('data-id');
         const idx = Number(row.getAttribute('data-idx'));
         const isCtrl = e.ctrlKey || e.metaKey;
@@ -11788,115 +12170,62 @@ try{
           project.selectedIds.clear();
           project.selectedIds.add(id);
           project.lastClickIndex = idx;
-          setActive(id);
+          void setActiveFile(id);
           return;
         }
         render();
       });
       row.addEventListener('dblclick', ()=>{
         const id = row.getAttribute('data-id');
-        setActive(id);
+        void setActiveFile(id, {force:true});
       });
     });
-  }
 
-  function showJob(open){
-    const p = $('proJobPanel');
-    if(!p) return;
-    if(open===undefined) p.classList.toggle('hidden');
-    else p.classList.toggle('hidden', !open);
-  }
+    Array.from(list.querySelectorAll('.proFileActionBtn')).forEach(btn=>{
+      btn.addEventListener('click', (e)=>{
+        e.stopPropagation();
+        const row = btn.closest('.proFileRow');
+        if(!row) return;
+        const id = row.getAttribute('data-id');
+        const action = btn.getAttribute('data-action');
+        openPopover(action, id, btn);
+      });
+    });
 
-  function logJob(s){
-    const box = $('proJobLog');
-    if(!box) return;
-    const t = new Date().toLocaleTimeString();
-    box.innerHTML += `<div>[${esc(t)}] ${esc(s)}</div>`;
-    box.scrollTop = box.scrollHeight;
-  }
-
-  function updateJobUI(now){
-    $('proJobMiniText').textContent = job.running ? `${job.done}/${job.total}` : '—';
-    $('proJobNow').textContent = now || (job.running ? '処理中…' : '—');
-    $('proJobCount').textContent = `${job.done}/${job.total}`;
-    $('proJobStat').textContent = `OK:${job.ok} / 失敗:${job.failed.length}`;
-  }
-
-  async function fakeWork(ms){ return new Promise(r=>setTimeout(r, ms)); }
-
-  async function runJob(type, ids){
-    job.running = true; job.cancel=false; job.failed=[]; job.done=0; job.total=ids.length; job.ok=0;
-    updateJobUI();
-    showJob(true);
-
-    for(const id of ids){
-      if(job.cancel) break;
-      const f = project.files.find(x=>x.id===id);
-      if(!f) continue;
-      setActive(id);
-      updateJobUI(`処理中: ${f.name}`);
-      try{
-        // 仮処理（後で既存QC/Export関数に接続する）
-        await fakeWork(120);
-        if(type==='qc'){ f.status.qc = (Math.random()<0.8) ? 'ok' : 'ng'; }
-        if(type==='export'){ f.status.exported = true; }
-        job.ok++;
-      }catch(e){
-        job.failed.push(id);
-        logJob(`失敗: ${f.name}`);
-      }finally{
-        job.done++;
-        updateJobUI(`処理中: ${f.name}`);
-        render();
-      }
+    if(project.popover.openType && project.popover.anchorEl && !document.body.contains(project.popover.anchorEl)){
+      closePopover();
     }
-
-    logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
-    job.running = false;
-    updateJobUI();
-    render();
   }
-
-  function idsSelectedOrActive(){
-    const ids = Array.from(project.selectedIds);
-    if(ids.length===0 && project.activeId) ids.push(project.activeId);
-    return ids;
-  }
-
   function bind(){
-    const addBtn = $('proBtnAddFiles');
-    const picker = $('proFilePicker');
-    if(!addBtn || !picker) return;
+    window.__wavcueProAddFiles = addFiles;
 
-    addBtn.addEventListener('click', openPicker);
-    picker.addEventListener('change', ()=> addFiles(picker.files));
+    $('proFileSearch')?.addEventListener('input', (e)=>{ project.filter.q = e.target.value||''; render(); });
+    $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
 
-    $('proFileSearch').addEventListener('input', (e)=>{ project.filter.q = e.target.value||''; render(); });
-    $('proFilterStatus').addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
+    $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc', idsSelectedOrActive()));
+    $('proBtnBatchExport')?.addEventListener('click', ()=> runJob('export', idsSelectedOrActive()));
 
-    $('proBtnBatchQC').addEventListener('click', ()=> runJob('qc', idsSelectedOrActive()));
-    $('proBtnBatchExportOK').addEventListener('click', ()=>{
-      const base = project.files.filter(f=>f.status.qc==='ok').map(f=>f.id);
-      const ids = project.selectedIds.size ? base.filter(id=>project.selectedIds.has(id)) : base;
-      runJob('export', ids);
-    });
-    $('proBtnRecheckNG').addEventListener('click', ()=>{
-      const base = project.files.filter(f=>f.status.qc==='ng').map(f=>f.id);
-      const ids = project.selectedIds.size ? base.filter(id=>project.selectedIds.has(id)) : base;
-      runJob('qc', ids);
-    });
-
-    $('proJobMini').addEventListener('click', ()=> showJob());
-    $('proJobClose').addEventListener('click', ()=> showJob(false));
-    $('proJobCancel').addEventListener('click', ()=> { job.cancel=true; logJob('停止要求'); });
-    $('proJobRetryFailed').addEventListener('click', ()=>{
+    $('proJobMini')?.addEventListener('click', ()=> showJob());
+    $('proJobClose')?.addEventListener('click', ()=> showJob(false));
+    $('proJobCancel')?.addEventListener('click', ()=> { job.cancel=true; logJob('停止要求'); });
+    $('proJobRetryFailed')?.addEventListener('click', ()=>{
       if(job.failed.length) runJob('qc', job.failed.slice());
     });
 
+    document.addEventListener('click', (e)=>{
+      const pop = $('proGlobalPopover');
+      if(!pop || pop.classList.contains('hidden')) return;
+      if(pop.contains(e.target)) return;
+      closePopover();
+    });
+    document.addEventListener('keydown', (e)=>{ if(e.key==="Escape") closePopover(); });
+    window.addEventListener('resize', ()=>{ if(project.popover.openType) positionPopover(); });
+    window.addEventListener('scroll', ()=>{ if(project.popover.openType) positionPopover(); }, {passive:true});
+    $('proFileListWrap')?.addEventListener('scroll', ()=>{ if(project.popover.openType) positionPopover(); }, {passive:true});
+
     updateJobUI();
     render();
   }
-
   if(document.readyState==='loading'){
     document.addEventListener('DOMContentLoaded', bind);
   }else{
@@ -11963,6 +12292,12 @@ try{
 </dialog>
 <!-- ===== /CHANGELOG ===== -->
 
+<div id="proGlobalPopover" class="proGlobalPopover hidden" role="dialog" aria-hidden="true">
+  <div class="proGlobalPopoverInner">
+    <div id="proPopTitle" class="proPopTitle"></div>
+    <div id="proPopBody" class="proPopBody"></div>
+  </div>
+</div>
 <div aria-atomic="true" aria-live="polite" class="toastHost" id="toastRoot"></div>
 <dialog id="toastLayer" class="toastLayer" aria-live="polite" aria-atomic="true">
   <div class="toastHost" id="toastLayerHost"></div>
