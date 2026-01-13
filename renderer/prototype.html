@@ -4767,6 +4767,7 @@ function moveCueToTime(cueId, targetSec, jumpAfter){
   }
 
   log(`CUE: ${cue.label} を ${fmtTime(cue.sec)} に移動${(state.linkPair && isPair) ? "（連動）" : ""}`);
+  proCommitActiveCues("move");
 }
 
 function _commitTimeEdit(cueId, inputEl){
@@ -5431,6 +5432,13 @@ function pause(){
 }
 
 /* Cues */
+function proCommitActiveCues(reason){
+  try{
+    if(typeof window.__wavcueProCommitActiveCues === "function"){
+      window.__wavcueProCommitActiveCues(reason);
+    }
+  }catch(_){}
+}
 function addCue(label){
   if(!state.buffer) return;
 
@@ -5448,6 +5456,7 @@ function addCue(label){
   log(`CUE+: ${label} @ ${sec.toFixed(3)}s`);
   renderCues();
   drawAll();
+  proCommitActiveCues("add");
 }
 
 
@@ -5477,6 +5486,7 @@ function addStartStopCues(){
   log(`CUE+: BC$STOP @ ${dur.toFixed(3)}s`);
   renderCues();
   drawAll();
+  proCommitActiveCues("add-start-stop");
 }
 
 function addCuePair(){
@@ -5508,6 +5518,7 @@ function addCuePair(){
   log(`CUE+: BC$END @ ${sec1.toFixed(3)}s (gap ${gap}s)`);
   renderCues();
   drawAll();
+  proCommitActiveCues("add-pair");
 }
 
 function deleteCue(id){
@@ -5515,6 +5526,7 @@ function deleteCue(id){
   state.cues = state.cues.filter(c=>c.id!==id);
   renderCues();
   drawAll();
+  proCommitActiveCues("delete");
 }
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
@@ -5868,6 +5880,7 @@ window.addEventListener("mouseup",()=>{
       }else{
         log(`CUE MOVE: ${c.label} -> ${c.sec.toFixed(3)}s`);
       }
+      proCommitActiveCues("drag-move");
     }
   }
   state.draggingCueId = null;
@@ -8308,6 +8321,7 @@ $("btnAddCustom").addEventListener("click", ()=>{
       log(`CUE+: ${label} @ 0.000s`);
       renderCues();
       drawAll();
+      proCommitActiveCues("add-note");
       toast(`${label} を先頭(0秒)に追加しました`, "ok");
       return;
     }
@@ -12692,20 +12706,34 @@ try{
     const sig = proCueSignature(cues);
     if(!force && sig === rec.cuesSig) return;
 
-    rec.cuesSnapshot = cues.map(c=>({
+    rec.cues = cues.map(c=>({
       id: c.id >>> 0,
       label: String(c.label ?? ""),
       sec: Number(c.sec ?? 0),
     }));
     rec.cuesSig = sig;
     rec.dirty = true;
+    if(rec.status) rec.status.edited = true;
+    try{
+      const st = window.WavCue?.state;
+      if(st && Number.isFinite(st.nextCueId)) rec.nextCueId = st.nextCueId;
+    }catch(_){}
 
-    console.log(`[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.cuesSnapshot.length}`);
+    console.log(`[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.cues.length}`);
+    render();
   }
   function proApplyEditsToApp(rec, reason){
     const st = window.WavCue?.state;
     if(!st || !rec) return;
-    const cues = Array.isArray(rec.cuesSnapshot) ? rec.cuesSnapshot : null;
+    let cues = Array.isArray(rec.cues) ? rec.cues : null;
+    if(!cues && Array.isArray(st.cues)){
+      rec.cues = st.cues.map(c=>({
+        id: c.id >>> 0,
+        label: String(c.label ?? ""),
+        sec: Number(c.sec ?? 0),
+      }));
+      cues = rec.cues;
+    }
     if(!cues) return;
     st.cues = cues.map(c=>({
       id: c.id >>> 0,
@@ -12713,16 +12741,27 @@ try{
       sec: Number(c.sec ?? 0),
     }));
     try{
-      const maxId = st.cues.reduce((m,c)=> Math.max(m, Number(c.id)||0), 0);
-      st.nextCueId = maxId + 1;
+      if(Number.isFinite(rec.nextCueId)){
+        st.nextCueId = rec.nextCueId;
+      }else{
+        const maxId = st.cues.reduce((m,c)=> Math.max(m, Number(c.id)||0), 0);
+        st.nextCueId = maxId + 1;
+      }
     }catch(_){}
+    try{ rec.nextCueId = st.nextCueId; }catch(_){}
     try{
-      rec.cues = Array.isArray(rec.cuesSnapshot) ? rec.cuesSnapshot.slice() : rec.cues;
+      rec.cues = st.cues.map(c=>({
+        id: c.id >>> 0,
+        label: String(c.label ?? ""),
+        sec: Number(c.sec ?? 0),
+      }));
     }catch(_){}
+    try{ rec.cuesSig = proCueSignature(rec.cues); }catch(_){}
     try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
     try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
     try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
     if(reason){ console.log(`[Pro] applyEdits(${reason}) -> ${rec.name} cues=${st.cues.length}`); }
+    render();
   }
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
@@ -12776,6 +12815,8 @@ try{
         name:file.name,
         status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
         cues:[],
+        nextCueId:null,
+        cuesSig:"",
         attachments:[],
         attachCount:null,
         qcResult:null,
@@ -12794,6 +12835,7 @@ try{
   async function setActiveFile(id, opts){
     const rec = project.files.find(f=>f.id===id);
     if(!rec) return;
+    if(!Array.isArray(rec.cues)) rec.cues = [];
 
     proSaveActiveEdits("before-switch", true);
 
@@ -12818,18 +12860,6 @@ try{
       project.lastLoadedId = id;
       proForceRedraw("after-load");
       proApplyEditsToApp(rec, "after-load");
-
-      // 読み込み後に、本体stateからキュー情報を同期（表示用）
-      const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
-      if(st && Array.isArray(st.cues)){
-        rec.cues = st.cues.map(c=>({
-          id: c.id >>> 0,
-          label: String(c.label ?? ""),
-          sec: Number(c.sec ?? 0),
-        }));
-      }else{
-        rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
-      }
 
       // クリップ(添付)数は「確実に取れる手段」があれば同期。
       // 取れない場合でもUIが壊れないように null のままにする（表示側で 0 扱い or “–” 表示）
@@ -13130,6 +13160,7 @@ try{
   }
   function bind(){
     window.__wavcueProAddFiles = addFiles;
+    window.__wavcueProCommitActiveCues = (reason, force)=> proSaveActiveEdits(reason, force);
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
 
