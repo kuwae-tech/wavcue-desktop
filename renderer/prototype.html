@@ -4729,6 +4729,12 @@ function _getCueById(id){
   return state.cues.find(c=>c.id===id) || null;
 }
 
+function _markProCueEdited(){
+  if(typeof window.WavCue?.proMarkCueEdited === "function"){
+    window.WavCue.proMarkCueEdited("cue-edit");
+  }
+}
+
 function moveCueToTime(cueId, targetSec, jumpAfter){
   const cue = _getCueById(cueId);
   if(!cue || !state.buffer) return;
@@ -4759,6 +4765,7 @@ function moveCueToTime(cueId, targetSec, jumpAfter){
   // UI更新
   renderCues();
   _forceWaveRedraw();
+  _markProCueEdited();
 
   if(jumpAfter){
     setPlayhead(cue.sec);
@@ -5448,6 +5455,7 @@ function addCue(label){
   log(`CUE+: ${label} @ ${sec.toFixed(3)}s`);
   renderCues();
   drawAll();
+  _markProCueEdited();
 }
 
 
@@ -5477,6 +5485,7 @@ function addStartStopCues(){
   log(`CUE+: BC$STOP @ ${dur.toFixed(3)}s`);
   renderCues();
   drawAll();
+  _markProCueEdited();
 }
 
 function addCuePair(){
@@ -5508,6 +5517,7 @@ function addCuePair(){
   log(`CUE+: BC$END @ ${sec1.toFixed(3)}s (gap ${gap}s)`);
   renderCues();
   drawAll();
+  _markProCueEdited();
 }
 
 function deleteCue(id){
@@ -5515,6 +5525,7 @@ function deleteCue(id){
   state.cues = state.cues.filter(c=>c.id!==id);
   renderCues();
   drawAll();
+  _markProCueEdited();
 }
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
@@ -8308,6 +8319,7 @@ $("btnAddCustom").addEventListener("click", ()=>{
       log(`CUE+: ${label} @ 0.000s`);
       renderCues();
       drawAll();
+      _markProCueEdited();
       toast(`${label} を先頭(0秒)に追加しました`, "ok");
       return;
     }
