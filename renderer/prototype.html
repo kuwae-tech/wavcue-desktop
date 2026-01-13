@@ -7487,7 +7487,15 @@ async function exportWav(){
     try{ logExportPreflight(); }catch(_){ }
 
     // JPPA-1-2018: cue-point max 99 / NOTE label uniqueness
-    const __cues = Array.isArray(state.cues) ? state.cues : [];
+    let __cues = Array.isArray(state.cues) ? state.cues : [];
+    try{
+      if(typeof normalizeCueIds === "function"){
+        __cues = normalizeCueIds(__cues);
+        state.cues = __cues.map(c=>({ ...c, id: c.id >>> 0 }));
+        const maxId = state.cues.reduce((m,c)=> Math.max(m, Number(c.id)||0), 0);
+        state.nextCueId = maxId + 1;
+      }
+    }catch(_){ }
     if(__cues.length > 99){
       window.safeToast && window.safeToast("CUEは最大99件です（規格）","ng");
       log(`WARN: CUE数が上限（99）を超えています: ${__cues.length}件`);
@@ -12676,9 +12684,83 @@ try{
       sec: Number(c.sec ?? 0),
     }));
   }
+  function proCloneCues(cues){
+    return (Array.isArray(cues) ? cues : []).map(c=>({
+      id: c.id >>> 0,
+      label: String(c.label ?? ""),
+      sec: Number(c.sec ?? 0),
+    }));
+  }
+  function proCloneAttachments(atts){
+    return (Array.isArray(atts) ? atts : []).map(a=>{
+      if(!a) return a;
+      let bytes = a.bytes;
+      if(bytes && bytes.buffer){
+        try{ bytes = new Uint8Array(bytes); }catch(_){ bytes = a.bytes; }
+      }
+      return { ...a, bytes };
+    });
+  }
+  function proAttachmentsSignature(atts){
+    const list = Array.isArray(atts) ? atts : [];
+    return list.map(a=>{
+      const name = String(a?.name ?? "");
+      const size = Number(a?.bytes?.length ?? 0);
+      const cueId = Number(a?.cueId ?? 0);
+      const kind = String(a?.kind ?? "");
+      return `${name}|${size}|${cueId}|${kind}`;
+    }).join(";");
+  }
+  function proEnsureFileState(rec){
+    if(!rec) return;
+    if(!rec.state){
+      rec.state = {
+        cues: [],
+        attachments: [],
+        qcResult: null,
+        dirty: false,
+        cuesSig: "",
+        attachmentsSig: "",
+      };
+    }
+    if(!Array.isArray(rec.state.cues)) rec.state.cues = [];
+    if(!Array.isArray(rec.state.attachments)) rec.state.attachments = [];
+  }
   function proCueSignature(cues){
     if(!Array.isArray(cues)) return "";
     return cues.map(c=>`${c.id >>> 0}:${String(c.label ?? "")}:${Number(c.sec ?? 0)}`).join("|");
+  }
+  function proGetAppSnapshot(){
+    const st = window.WavCue?.state;
+    if(!st) return null;
+    const cues = proGetAppCues() || [];
+    const attachments = proCloneAttachments(st.attachments);
+    const qc = (typeof getLastQcForCurrentFile === "function")
+      ? (getLastQcForCurrentFile() || null)
+      : (window.__wavcueLastQc?.result || null);
+    return { cues, attachments, qcResult: qc || null };
+  }
+  function proCaptureAppState(rec, reason, markDirty){
+    if(!rec) return;
+    const snap = proGetAppSnapshot();
+    if(!snap) return;
+    proEnsureFileState(rec);
+    const cues = proCloneCues(snap.cues);
+    const attachments = proCloneAttachments(snap.attachments);
+    rec.state.cues = cues;
+    rec.state.attachments = attachments;
+    rec.state.qcResult = snap.qcResult;
+    rec.state.cuesSig = proCueSignature(cues);
+    rec.state.attachmentsSig = proAttachmentsSignature(attachments);
+    rec.attachCount = attachments.length;
+    if(markDirty){
+      rec.state.dirty = true;
+      rec.status.edited = true;
+      rec.dirty = true;
+    }
+    if(reason){
+      console.log(`[Pro] captureState(${reason}) -> ${rec.name} cues=${cues.length} atts=${attachments.length}`);
+    }
   }
   function proSaveActiveEdits(reason, force){
     const id = project.activeId;
@@ -12686,28 +12768,36 @@ try{
     const rec = project.files.find(f=>f.id===id);
     if(!rec) return;
 
-    const cues = proGetAppCues();
-    if(!cues) return;
+    proEnsureFileState(rec);
+    const snap = proGetAppSnapshot();
+    if(!snap) return;
 
-    const sig = proCueSignature(cues);
-    if(!force && sig === rec.cuesSig) return;
+    const cues = proCloneCues(snap.cues);
+    const attachments = proCloneAttachments(snap.attachments);
+    const cuesSig = proCueSignature(cues);
+    const attSig = proAttachmentsSignature(attachments);
+    if(!force && cuesSig === rec.state.cuesSig && attSig === rec.state.attachmentsSig) return;
 
-    rec.cuesSnapshot = cues.map(c=>({
-      id: c.id >>> 0,
-      label: String(c.label ?? ""),
-      sec: Number(c.sec ?? 0),
-    }));
-    rec.cuesSig = sig;
+    rec.state.cues = cues;
+    rec.state.attachments = attachments;
+    rec.state.qcResult = snap.qcResult;
+    rec.state.cuesSig = cuesSig;
+    rec.state.attachmentsSig = attSig;
+    rec.attachCount = attachments.length;
+    rec.state.dirty = true;
+    rec.status.edited = true;
     rec.dirty = true;
 
-    console.log(`[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.cuesSnapshot.length}`);
+    console.log(`[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.state.cues.length}`);
   }
   function proApplyEditsToApp(rec, reason){
     const st = window.WavCue?.state;
     if(!st || !rec) return;
-    const cues = Array.isArray(rec.cuesSnapshot) ? rec.cuesSnapshot : null;
+    proEnsureFileState(rec);
+    const cues = Array.isArray(rec.state.cues) ? rec.state.cues : null;
     if(!cues) return;
-    st.cues = cues.map(c=>({
+    const norm = (typeof normalizeCueIds === "function") ? normalizeCueIds(cues) : cues;
+    st.cues = norm.map(c=>({
       id: c.id >>> 0,
       label: String(c.label ?? ""),
       sec: Number(c.sec ?? 0),
@@ -12717,7 +12807,19 @@ try{
       st.nextCueId = maxId + 1;
     }catch(_){}
     try{
-      rec.cues = Array.isArray(rec.cuesSnapshot) ? rec.cuesSnapshot.slice() : rec.cues;
+      rec.state.cues = Array.isArray(norm) ? proCloneCues(norm) : rec.state.cues;
+      rec.state.cuesSig = proCueSignature(rec.state.cues);
+    }catch(_){}
+    try{
+      const atts = proCloneAttachments(rec.state.attachments);
+      if(typeof attachSetAll === "function"){
+        attachSetAll(atts);
+      }else{
+        st.attachments = atts;
+      }
+      rec.state.attachments = atts;
+      rec.state.attachmentsSig = proAttachmentsSignature(atts);
+      rec.attachCount = atts.length;
     }catch(_){}
     try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
     try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
@@ -12752,16 +12854,17 @@ try{
   }
   function applyQcResultToFile(file, qcResult){
     if(!file) return;
+    proEnsureFileState(file);
     if(!qcResult){
       file.status.qc = "unverified";
       file.status.qcReason = null;
-      file.qcResult = null;
+      file.state.qcResult = null;
       return;
     }
     const { ng } = extractQcNgItems(qcResult);
     file.status.qc = ng.length ? "ng" : "ok";
     file.status.qcReason = qcReasonText(qcResult);
-    file.qcResult = qcResult;
+    file.state.qcResult = qcResult;
   }
   async function addFiles(fileList){
     const files = Array.from(fileList || []).filter(isWavFile);
@@ -12775,10 +12878,15 @@ try{
         file,
         name:file.name,
         status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
-        cues:[],
-        attachments:[],
+        state:{
+          cues:[],
+          attachments:[],
+          qcResult:null,
+          dirty:false,
+          cuesSig:"",
+          attachmentsSig:"",
+        },
         attachCount:null,
-        qcResult:null,
         snapshot:false,
       });
       addedIds.push(id);
@@ -12803,6 +12911,8 @@ try{
     // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
     if(project.lastLoadedId===id && !opts?.force){
       // UI更新だけはして終わる
+      proApplyEditsToApp(rec, "switch-no-reload");
+      render();
       return;
     }
 
@@ -12817,18 +12927,15 @@ try{
       await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
       project.lastLoadedId = id;
       proForceRedraw("after-load");
-      proApplyEditsToApp(rec, "after-load");
 
-      // 読み込み後に、本体stateからキュー情報を同期（表示用）
-      const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
-      if(st && Array.isArray(st.cues)){
-        rec.cues = st.cues.map(c=>({
-          id: c.id >>> 0,
-          label: String(c.label ?? ""),
-          sec: Number(c.sec ?? 0),
-        }));
+      proEnsureFileState(rec);
+      const hasStoredState = !!(rec.state.cuesSig || rec.state.attachmentsSig || rec.state.dirty
+        || (Array.isArray(rec.state.cues) && rec.state.cues.length)
+        || (Array.isArray(rec.state.attachments) && rec.state.attachments.length));
+      if(hasStoredState){
+        proApplyEditsToApp(rec, "after-load-restore");
       }else{
-        rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
+        proCaptureAppState(rec, "after-load-initial", false);
       }
 
       // クリップ(添付)数は「確実に取れる手段」があれば同期。
@@ -12978,17 +13085,18 @@ try{
     }
     const file = project.files.find(f=>f.id===fileId);
     if(!file) return;
+    proEnsureFileState(file);
     const body = document.createElement("div");
     body.className = "proPopList";
     if(type==="status"){
       const item = document.createElement("div");
       item.className = "proPopItem";
-      item.textContent = qcReasonText(file.qcResult || null);
+      item.textContent = qcReasonText(file.state.qcResult || null);
       body.appendChild(item);
       setPopoverContent("ステータス", body);
     }
     if(type==="cues"){
-      const cues = Array.isArray(file.cues) ? file.cues : [];
+      const cues = Array.isArray(file.state.cues) ? file.state.cues : [];
       if(!cues.length){
         const item = document.createElement("div");
         item.className = "proPopItem";
@@ -13011,7 +13119,7 @@ try{
       setPopoverContent("キュー一覧", body);
     }
     if(type==="attachments"){
-      const atts = Array.isArray(file.attachments) ? file.attachments : [];
+      const atts = Array.isArray(file.state.attachments) ? file.state.attachments : [];
       for(let i=0;i<9;i++){
         const a = atts[i];
         const row = document.createElement("div");
@@ -13049,15 +13157,16 @@ try{
       wrap.classList.toggle('is-empty', project.files.length===0);
     }
     list.innerHTML = arr.map((f,i)=>{
+      proEnsureFileState(f);
       const cls = ['proFileRow'];
       if(f.id===project.activeId) cls.push('active');
       if(project.selectedIds.has(f.id)) cls.push('selected');
       const statusText = (f.status.qc==='ok') ? 'OK' : (f.status.qc==='ng' ? 'NG' : '未');
       const statusClass = (f.status.qc==='ok') ? 'ok' : (f.status.qc==='ng' ? 'ng' : 'unverified');
-      const cueCount = Array.isArray(f.cues) ? f.cues.length : 0;
+      const cueCount = Array.isArray(f.state.cues) ? f.state.cues.length : 0;
       const attCount = Number.isFinite(f.attachCount)
         ? f.attachCount
-        : (Array.isArray(f.attachments) ? f.attachments.length : 0);
+        : (Array.isArray(f.state.attachments) ? f.state.attachments.length : 0);
       const flags = [];
       if(f.status.edited) flags.push('<span class="proBadge">編</span>');
       if(f.status.exported) flags.push('<span class="proBadge">出</span>');
