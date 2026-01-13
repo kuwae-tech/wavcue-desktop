@@ -2953,6 +2953,30 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0;
   }
 
+  /* ===== FIX: .proBottomRow width collapse (was 180px) ===== */
+  #analyzersRow .proBottomRow,
+  .workBottom .proBottomRow{
+    width: 100% !important;       /* ★横幅180px固定を解除 */
+    flex: 1 1 auto !important;    /* ★flex-basis固定(180px)を打ち消す */
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+
+  /* 子要素が幅0にならないための再保証 */
+  #analyzersRow .proFileListBox,
+  #analyzersRow #proFileDock{
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+  /* ファイルリスト内部は縦スクロール */
+  #analyzersRow #proFileListWrap{
+    height: 100% !important;
+    overflow: auto !important;
+    min-height: 0 !important;
+  }
+  /* ===== end ===== */
+
   /* ===== end ===== */
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
