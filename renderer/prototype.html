@@ -3083,6 +3083,35 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0;
   }
   /* ===== /Bottom analyzers layout hardening ===== */
+
+  /* ===== FIX: bottom row (meter/imager/file list) collapsing to width:0 ===== */
+  /* analyzersRow は「下段」を縦方向のスタックとして固定（row化すると proBottomRow が幅180扱いで潰れる） */
+  #analyzersRow,
+  .workBottom.analyzers{
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    min-height: 0 !important;
+  }
+
+  /* proBottomRow は “高さ180pxの段” であり、幅を100%保証する */
+  .proBottomRow,
+  .bottomRow{
+    width: 100% !important;
+    flex: 0 0 180px !important;   /* column時は高さとして効く */
+    box-sizing: border-box !important;
+    min-width: 0 !important;
+  }
+
+  /* 中身（ファイルリスト側）が 0 幅にならないための保険 */
+  .proBottomRow .proFileListBox,
+  .fileListBox,
+  #proFileDock,
+  .proFileDock{
+    flex: 1 1 0% !important;
+    min-width: 0 !important;
+  }
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -11217,11 +11246,20 @@ window.addEventListener("resize", ()=>{
 
 function init(){
   setupDragAndDrop();
+
+  // 1回目：従来どおり
   resizeAll();
   updateButtons();
   drawAll();
-  requestAnimationFrame(()=>{ forceDrawAnalyzersOnBoot(); });
   log("Ready.");
+
+  // 2回目：レイアウト確定後に再描画（起動直後にメーター目盛り/LRが消える対策）
+  requestAnimationFrame(()=>{
+    try{ resizeAll(); drawAll(); }catch(_){}
+  });
+  setTimeout(()=>{
+    try{ resizeAll(); drawAll(); }catch(_){}
+  }, 60);
 }
 init();
 
