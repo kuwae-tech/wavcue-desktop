@@ -2602,6 +2602,115 @@ body, #appRoot, .appRoot, .mainLayout{
 .proJobTitle{ font-weight:700; }
 .proJobLog{ overflow:auto; max-height:120px; font-size:12px; opacity:0.9; padding:6px; border-radius:10px; background:rgba(255,255,255,0.06); }
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
+
+
+/* ===== Layout lock (Pro multi-file) ===== */
+
+/* main: 左可変 / 右固定 */
+.main{
+  display:grid !important;
+  grid-template-columns: minmax(0,1fr) 340px !important;
+  gap: 12px !important;
+  height: calc(100vh - var(--topbar-h, 0px)) !important; /* 既存があればそれ優先でもOK */
+  min-height: 0 !important;
+}
+
+/* 左カラム：縦flexで「上可変 + 下固定」を成立させる */
+.left{
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+.waveWrap{
+  display:flex !important;
+  flex-direction: column !important;
+  min-height: 0 !important;
+  height: 100% !important;
+}
+.waveBox{
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+}
+
+/* ★下段 analyzers を“固定高さ”にする（他を押し出さない） */
+.analyzers, #analyzersRow{
+  flex: 0 0 190px !important;     /* 固定 */
+  height: 190px !important;
+  min-height: 190px !important;
+  display:flex !important;
+  gap: 12px !important;
+  align-items: stretch !important;
+  overflow: hidden !important;
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+/* メーター：固定幅 */
+.meterBlock{
+  width: 140px !important;
+  min-width: 140px !important;
+  height: 100% !important;
+  overflow: hidden !important;
+  border-radius: 12px !important;
+}
+
+/* イメージャ：正方形固定（ユーザー要望） */
+.imagerBlock{
+  width: 190px !important;
+  min-width: 190px !important;
+  height: 100% !important;
+  aspect-ratio: 1 / 1 !important;
+  overflow: hidden !important;
+  border-radius: 12px !important;
+}
+
+/* ファイルリスト：残り横幅すべて（可変は横だけ。縦は固定枠内スクロール） */
+#proFileDock, .proFileDock{
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;  /* 外枠は隠す */
+  border-radius: 12px !important;
+}
+#proFileListWrap{
+  height: 100% !important;
+  overflow: auto !important;    /* 中だけスクロール */
+}
+
+/* キャンバスは親のサイズに追従（はみ出し防止） */
+#meterCanvas, #imagerCanvas{
+  width: 100% !important;
+  height: 100% !important;
+  display:block !important;
+}
+
+/* 右サイド（CUE）を grid の2列目に固定 */
+#cueSide, .cueSide{
+  grid-column: 2 / 3 !important;
+  min-height: 0 !important;
+  height: 100% !important;
+  overflow: hidden !important;
+}
+
+/* CUEメニュー上部ボタンが2列に折れるのを防止 */
+#cueSide .btnRow, 
+#cueSide .row, 
+#cueSide .cueTopRow{
+  display:flex !important;
+  flex-wrap: nowrap !important;
+  gap: 10px !important;
+}
+#cueSide button{
+  white-space: nowrap !important;
+}
+
+/* もし “position:fixed/absolute” でCUEが浮いていたら殺す */
+#cueSide{
+  position: relative !important;
+}
+
+/* ===== end ===== */
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -2662,7 +2771,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="panel left"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers"><div class="proBottomRow bottomRow"><div class="proMeterBox meterBox"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div></div><div class="proImagerBox imagerBox"><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div><div class="proFileListBox fileListBox"><div id="proFileDock" class="proFileDock">
+<div class="main"><div class="left panel"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers" id="analyzersRow"><div class="proBottomRow bottomRow"><div class="proMeterBox meterBox"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div></div><div class="proImagerBox imagerBox"><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div><div class="proFileListBox fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <button id="proBtnBatchCheck" class="btn">一括チェック</button>
@@ -2706,7 +2815,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div id="proJobLog" class="proJobLog"></div>
   </div>
-</div></div></div></div></div></div><div class="panel right cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
+</div></div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
@@ -2737,7 +2846,7 @@ body, #appRoot, .appRoot, .mainLayout{
 </optgroup>
 </select>
 <button class="btn" disabled="" id="btnAddBcLabel" style="padding:6px 10px;font-size:12px" type="button">＋ 追加</button>
-</div><div style="margin-top:10px"><label>任意Label</label><div class="row" style="margin-top:6px"><input id="customLabel" placeholder="例) CLIENT / CM / NOTE ..." type="text"/><button class="btn" disabled="" id="btnAddCustom" type="button">＋ 追加</button></div></div></div><div class="cueTableWrap"><table><thead><tr><th style="width:42%">Label</th><th style="width:28%">TIME</th><th style="width:30%">操作</th></tr></thead><tbody id="cueBody"></tbody></table></div></div></div></div><dialog id="chunkDialog"><div class="modalHead"><div class="title"></div></div><div class="modalBody chunkModalBody"><div class="chunkTabs"><div aria-label="bext / cmcd / ログ 切り替え" class="tabBar" role="tablist"><button aria-selected="true" class="tabBtn active" data-tab="bext" role="tab" type="button">bext</button><button aria-selected="false" class="tabBtn" data-tab="cmcd" role="tab" type="button">cmcd</button><button aria-selected="false" class="tabBtn" data-tab="log" role="tab" type="button">ログ</button><button aria-selected="false" class="tabBtn" data-tab="diff" role="tab" type="button">差分</button></div><div class="tabPanels"><!-- bext --><div aria-label="bext panel" class="tabPanel active" data-tabpanel="bext" role="tabpanel"><div class="chunkSectionTitle"><b>bext</b><span class="chunkMeta" id="bextMeta">—</span></div><div class="kvGrid" id="bextViewGrid"></div><div class="fieldBlock" style="margin-top:12px"><label>CodingHistory（任意）</label><textarea id="bextArea" placeholder="例) A=PCM,F=48000,W=16,M=stereo,T=...
+</div><div style="margin-top:10px"><label>任意Label</label><div class="row" style="margin-top:6px"><input id="customLabel" placeholder="例) CLIENT / CM / NOTE ..." type="text"/><button class="btn" disabled="" id="btnAddCustom" type="button">＋ 追加</button></div></div></div><div class="cueTableWrap"><table><thead><tr><th style="width:42%">Label</th><th style="width:28%">TIME</th><th style="width:30%">操作</th></tr></thead><tbody id="cueBody"></tbody></table></div></div></aside></div><dialog id="chunkDialog"><div class="modalHead"><div class="title"></div></div><div class="modalBody chunkModalBody"><div class="chunkTabs"><div aria-label="bext / cmcd / ログ 切り替え" class="tabBar" role="tablist"><button aria-selected="true" class="tabBtn active" data-tab="bext" role="tab" type="button">bext</button><button aria-selected="false" class="tabBtn" data-tab="cmcd" role="tab" type="button">cmcd</button><button aria-selected="false" class="tabBtn" data-tab="log" role="tab" type="button">ログ</button><button aria-selected="false" class="tabBtn" data-tab="diff" role="tab" type="button">差分</button></div><div class="tabPanels"><!-- bext --><div aria-label="bext panel" class="tabPanel active" data-tabpanel="bext" role="tabpanel"><div class="chunkSectionTitle"><b>bext</b><span class="chunkMeta" id="bextMeta">—</span></div><div class="kvGrid" id="bextViewGrid"></div><div class="fieldBlock" style="margin-top:12px"><label>CodingHistory（任意）</label><textarea id="bextArea" placeholder="例) A=PCM,F=48000,W=16,M=stereo,T=...
 （複数行可 / CRLF推奨）"></textarea></div></div><!-- cmcd --><div aria-label="cmcd panel" class="tabPanel" data-tabpanel="cmcd" role="tabpanel"><div class="chunkSectionTitle"><b>cmcd</b><span class="chunkMeta" id="cmcdMeta">—</span></div><div class="cmcdGridWrap"><div class="kvGrid" id="cmcdViewGrid"></div></div><details class="advBox" style="margin-top:12px"><summary>cmcd（読み取り専用）</summary><div class="fieldBlock" style="margin-top:10px"><label>cmcdテキスト</label><textarea id="cmcdRawArea" placeholder="読み込むとここに表示されます（自動）" readonly=""></textarea></div></details><div style="margin-top:10px"></div></div><!-- log --><div aria-label="log panel" class="tabPanel" data-tabpanel="log" role="tabpanel"><div class="chunkSectionTitle"><b>ログ</b><span class="chunkMeta">（読み取り専用）</span></div><div class="row" style="margin-top:10px;gap:10px;flex-wrap:wrap"><button class="btn" id="btnLogExport" type="button">ログを書き出し</button><button class="btn" id="btnLogCopy" type="button">ログをコピー</button></div><div class="chunkPresence" id="chunkPresenceBox" style="margin-top:10px;padding:10px 12px;border:1px solid #2a2f37;border-radius:12px;background:rgba(255,255,255,0.02)"><div class="rowBetween" style="align-items:flex-start;gap:10px"><div style="font-weight:700">保持情報（参照）</div><div class="muted" style="font-size:12px">編集不可</div></div><div class="kvGrid" id="chunkPresenceGrid" style="margin-top:10px"></div></div><div class="logBox logBoxSmall logBoxTall" id="logBox2"></div></div>
 <!-- diff -->
 <div aria-label="diff panel" class="tabPanel" data-tabpanel="diff" role="tabpanel">
