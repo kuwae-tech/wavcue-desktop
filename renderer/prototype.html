@@ -6077,6 +6077,45 @@ function forceDrawAnalyzersOnBoot(){
   }
 }
 
+let _bootDrawAnalyzersRunning = false;
+function bootDrawAnalyzers(trigger){
+  if(_bootDrawAnalyzersRunning) return;
+  _bootDrawAnalyzersRunning = true;
+
+  const meter = $("meterCanvas");
+  const imager = $("imagerCanvas");
+  if(!meter || !imager){
+    _bootDrawAnalyzersRunning = false;
+    return;
+  }
+
+  const maxTries = 6;
+  let tries = 0;
+  const hasRects = ()=>{
+    const mr = meter.getBoundingClientRect();
+    const ir = imager.getBoundingClientRect();
+    return mr.width > 1 && mr.height > 1 && ir.width > 1 && ir.height > 1;
+  };
+  const step = ()=>{
+    try{
+      if(hasRects()){
+        try{ resizeCanvas(meter); }catch(_){}
+        try{ resizeCanvas(imager); }catch(_){}
+        try{ forceDrawAnalyzersOnBoot(); }catch(_){}
+        _bootDrawAnalyzersRunning = false;
+        return;
+      }
+    }catch(_){}
+    tries += 1;
+    if(tries >= maxTries){
+      _bootDrawAnalyzersRunning = false;
+      return;
+    }
+    requestAnimationFrame(()=>{ requestAnimationFrame(step); });
+  };
+  requestAnimationFrame(()=>{ requestAnimationFrame(step); });
+}
+
 function _recoverProFileDockLayout(source){
   const dock = $("proFileDock");
   if(!dock) return;
@@ -11372,10 +11411,12 @@ init();
 
 document.addEventListener("DOMContentLoaded", ()=>{
   _recoverProFileDockLayout("dom");
+  bootDrawAnalyzers("dom");
 });
 requestAnimationFrame(()=>{ _recoverProFileDockLayout("boot-raf"); });
 window.addEventListener("load", ()=>{
   _recoverProFileDockLayout("load");
+  bootDrawAnalyzers("load");
 });
 
 setupCmcdDialog();
