@@ -2978,6 +2978,111 @@ body, #appRoot, .appRoot, .mainLayout{
   /* ===== end ===== */
 
   /* ===== end ===== */
+
+  /* ===== Bottom analyzers layout hardening (2026) ===== */
+  /* 下部行：必ず横いっぱいを占有し、子が押し出されても幅0にならない */
+  #analyzersRow, .analyzersRow, .analyzers {
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 210px !important;
+    min-height: 0 !important;
+    flex: 0 0 210px !important;
+  }
+  .bottomRow, .proBottomRow {
+    display: flex !important;
+    align-items: stretch !important;
+    gap: 12px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 210px !important;           /* 少し増やす：ファイルリスト領域を広げる */
+    flex: 0 0 210px !important;
+    overflow: hidden !important;
+  }
+
+  /* メーター：固定幅 */
+  .bottomRow .meterBox, .bottomRow .proMeterBox {
+    width: 140px !important;
+    min-width: 140px !important;
+    height: 100% !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+
+  /* イメージャ：正方形固定（高さに追従） */
+  .bottomRow .imagerBox, .bottomRow .proImagerBox {
+    width: 210px !important;            /* bottomRowの高さと揃えると正方形に見える */
+    min-width: 210px !important;
+    height: 100% !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+
+  /* ファイルリスト：残り全部。幅0禁止。左下見切れ対策で内側padding */
+  .bottomRow .fileListBox, .bottomRow .proFileListBox {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+    padding: 8px 8px 14px 8px;   /* 左下見切れ対策 */
+    box-sizing: border-box !important;
+  }
+
+  /* これが幅0になっていた本丸：必ず伸びるように固定 */
+  #proFileDock, .proFileDock {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+    height: 100% !important;
+    overflow: auto !important;
+    position: relative !important;
+  }
+
+  /* 波形ビュー縦幅を現状の約80%へ */
+  .waveWrap{
+    flex: 0 0 auto !important;
+    min-height: 0 !important;
+  }
+
+  /* 左パネルがflex縦なら、波形部分を少し抑える */
+  .panel.left, .left.panel{
+    display: flex !important;
+    flex-direction: column !important;
+    min-height: 0 !important;
+  }
+  .panel.left .waveWrap, .left.panel .waveWrap{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+  }
+
+  /* 左パネルがgridなら、grid-template-rows を「1fr 210px」にする */
+  .workCol{
+    grid-template-rows: 1fr 210px !important;
+  }
+  .workBottom{
+    height: 210px !important;
+    min-height: 210px !important;
+  }
+
+  /* CUEメニュー内ボタンの折り返し防止 */
+  .cueTopControls{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+  .cueTopControls > *{
+    min-width: 0;
+  }
+  .cueTopControls button,
+  .cueTopControls .btn{
+    white-space: nowrap;
+  }
+  .cueTopControls input{
+    flex: 1;
+    min-width: 0;
+  }
+  /* ===== /Bottom analyzers layout hardening ===== */
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -3038,7 +3143,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers" id="analyzersRow"><div class="proBottomRow"><div class="proMeterBox meterBox"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div></div><div class="proImagerBox imagerBox"><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div><div class="proFileListBox fileListBox"><div id="proFileDock" class="proFileDock">
+<div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <button id="proBtnBatchCheck" class="btn">一括チェック</button>
@@ -3082,7 +3187,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div id="proJobLog" class="proJobLog"></div>
   </div>
-</div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
+</div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow cueTopControls" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
@@ -5852,6 +5957,21 @@ function drawAnalyzers(){
   const avg = rangeAvgDbfs();
   const now = dbfs(Math.sqrt((a.rmsL*a.rmsL + a.rmsR*a.rmsR)*0.5));
   }
+
+function forceDrawAnalyzersOnBoot(){
+  try{
+    // メーター：無音状態の目盛りだけでも描く（実データ不要）
+    if(typeof drawMeter === "function"){
+      drawMeter({ pkL: 1e-6, pkR: 1e-6, rmsL: 1e-6, rmsR: 1e-6 });
+    }
+    // イメージャ：枠とLR表記だけでも描く
+    if(typeof drawImager === "function"){
+      drawImager({ pts: [] });
+    }
+  }catch(e){
+    console.warn("[UI] forceDrawAnalyzersOnBoot failed", e);
+  }
+}
 
 /* Draw all */
 function _forceWaveRedraw(){
@@ -11089,13 +11209,18 @@ window.addEventListener("keydown", (e)=>{
   }
 });
 /* Resize */
-window.addEventListener("resize", ()=>{ resizeAll(); drawAll(); });
+window.addEventListener("resize", ()=>{
+  resizeAll();
+  drawAll();
+  requestAnimationFrame(()=>{ forceDrawAnalyzersOnBoot(); });
+});
 
 function init(){
   setupDragAndDrop();
   resizeAll();
   updateButtons();
   drawAll();
+  requestAnimationFrame(()=>{ forceDrawAnalyzersOnBoot(); });
   log("Ready.");
 }
 init();
