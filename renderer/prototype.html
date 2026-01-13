@@ -2745,7 +2745,7 @@ body, #appRoot, .appRoot, .mainLayout{
     overflow: hidden !important;
   }
 
-  .proBottomRow{
+.proBottomRow{
     display: flex !important;
     gap: var(--gap) !important;
     align-items: stretch !important;
@@ -2753,6 +2753,8 @@ body, #appRoot, .appRoot, .mainLayout{
     min-height: 0 !important;
     padding: 0 !important;
     margin: 0 !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   .proMeterBox{
@@ -2778,9 +2780,11 @@ body, #appRoot, .appRoot, .mainLayout{
     flex: 1 1 auto !important;
     min-width: 0 !important;
     height: 100% !important;
+    width: 100% !important;
     border-radius: 12px;
     overflow: hidden;
     position: relative;
+    box-sizing: border-box !important;
   }
 
   #proFileListWrap, #proFileDock{
@@ -2789,6 +2793,8 @@ body, #appRoot, .appRoot, .mainLayout{
     overflow: auto !important;
     position: relative !important;
     inset: auto !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
   }
 
   #meterCanvas, canvas#meterCanvas{
