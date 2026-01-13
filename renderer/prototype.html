@@ -3112,6 +3112,65 @@ body, #appRoot, .appRoot, .mainLayout{
     flex: 1 1 0% !important;
     min-width: 0 !important;
   }
+
+  /* ===== Stability patch: bottom row width + cue pair layout ===== */
+  .bottomRow,
+  .proBottomRow,
+  #analyzersRow,
+  .analyzers{
+    width: 100% !important;
+    min-width: 0 !important;
+    flex-basis: auto !important;
+  }
+  .fileListBox,
+  .proFileListBox,
+  #proFileDock,
+  .proFileDock,
+  #proFileListWrap{
+    min-width: 0 !important;
+  }
+  #proFileDock{
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+  #proFileListWrap{
+    flex: 1 1 auto !important;
+    overflow: hidden !important;
+  }
+  .proFileList{
+    overflow: auto !important;
+  }
+  .cuePairTop,
+  .cuePairBottom{
+    display: flex !important;
+    align-items: center !important;
+    gap: 10px !important;
+    flex-wrap: nowrap !important;
+    min-width: 0 !important;
+  }
+  .cuePairTop{
+    white-space: nowrap !important;
+  }
+  .cuePairTop .pairRow{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: nowrap;
+    min-width: 0;
+  }
+  .cuePairBottom{
+    overflow: hidden !important;
+  }
+  .cuePairBottom .linkMiniLabel{
+    white-space: nowrap !important;
+    flex: 0 0 auto !important;
+  }
+  #pairSeconds{
+    flex: 0 0 auto !important;
+    width: 84px !important;
+    max-width: 84px !important;
+  }
+  /* ===== /Stability patch ===== */
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -3216,7 +3275,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div id="proJobLog" class="proJobLog"></div>
   </div>
-</div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow cueTopControls" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
+</div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow cueTopControls cuePairTop" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div></div><div class="row cueButtonsRow cuePairBottom" style="margin-top:6px;align-items:center"><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
@@ -5989,17 +6048,62 @@ function drawAnalyzers(){
 
 function forceDrawAnalyzersOnBoot(){
   try{
-    // メーター：無音状態の目盛りだけでも描く（実データ不要）
-    if(typeof drawMeter === "function"){
-      drawMeter({ pkL: 1e-6, pkR: 1e-6, rmsL: 1e-6, rmsR: 1e-6 });
+    const meter = $("meterCanvas");
+    const imager = $("imagerCanvas");
+    const needsResize = (canvas)=>{
+      if(!canvas) return false;
+      const rect = canvas.getBoundingClientRect();
+      return rect.width <= 1 || rect.height <= 1;
+    };
+    const drawBoot = ()=>{
+      // メーター：無音状態の目盛りだけでも描く（実データ不要）
+      if(typeof drawMeter === "function"){
+        drawMeter({ pkL: 1e-6, pkR: 1e-6, rmsL: 1e-6, rmsR: 1e-6 });
+      }
+      // イメージャ：枠とLR表記だけでも描く
+      if(typeof drawImager === "function"){
+        drawImager({ pts: [] });
+      }
+    };
+    if(needsResize(meter) || needsResize(imager)){
+      try{ if(meter) resizeCanvas(meter); }catch(_){}
+      try{ if(imager) resizeCanvas(imager); }catch(_){}
+      requestAnimationFrame(drawBoot);
+      return;
     }
-    // イメージャ：枠とLR表記だけでも描く
-    if(typeof drawImager === "function"){
-      drawImager({ pts: [] });
-    }
+    drawBoot();
   }catch(e){
     console.warn("[UI] forceDrawAnalyzersOnBoot failed", e);
   }
+}
+
+function _recoverProFileDockLayout(source){
+  const dock = $("proFileDock");
+  if(!dock) return;
+  const rect = dock.getBoundingClientRect();
+  if(rect.width > 1) return;
+  const parents = [];
+  const selectors = [".bottomRow", ".proBottomRow", "#analyzersRow", ".analyzers"];
+  selectors.forEach((sel)=>{
+    document.querySelectorAll(sel).forEach((el)=>{
+      parents.push(el);
+    });
+  });
+  parents.forEach((el)=>{
+    try{
+      el.style.width = "100%";
+      el.style.minWidth = "0";
+      el.style.flexBasis = "auto";
+    }catch(_){}
+  });
+  try{ void dock.offsetHeight; }catch(_){}
+  const rerun = ()=>{
+    try{ resizeAll(); }catch(_){}
+    try{ forceDrawAnalyzersOnBoot(); }catch(_){}
+    try{ drawAll(); }catch(_){}
+  };
+  requestAnimationFrame(rerun);
+  setTimeout(rerun, 90);
 }
 
 /* Draw all */
@@ -11242,6 +11346,7 @@ window.addEventListener("resize", ()=>{
   resizeAll();
   drawAll();
   requestAnimationFrame(()=>{ forceDrawAnalyzersOnBoot(); });
+  _recoverProFileDockLayout("resize");
 });
 
 function init(){
@@ -11256,12 +11361,22 @@ function init(){
   // 2回目：レイアウト確定後に再描画（起動直後にメーター目盛り/LRが消える対策）
   requestAnimationFrame(()=>{
     try{ resizeAll(); drawAll(); }catch(_){}
+    _recoverProFileDockLayout("raf");
   });
   setTimeout(()=>{
     try{ resizeAll(); drawAll(); }catch(_){}
+    _recoverProFileDockLayout("timeout");
   }, 60);
 }
 init();
+
+document.addEventListener("DOMContentLoaded", ()=>{
+  _recoverProFileDockLayout("dom");
+});
+requestAnimationFrame(()=>{ _recoverProFileDockLayout("boot-raf"); });
+window.addEventListener("load", ()=>{
+  _recoverProFileDockLayout("load");
+});
 
 setupCmcdDialog();
 setupPdfDialog();
