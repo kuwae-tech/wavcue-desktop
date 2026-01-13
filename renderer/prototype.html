@@ -2711,6 +2711,120 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 
 /* ===== end ===== */
+  :root{
+    --cueW: 340px;
+    --bottomH: 170px;
+    --meterW: 140px;
+    --imagerS: 170px;
+    --gap: 12px;
+  }
+
+  /* ===== Work area layout lock ===== */
+  .workCol{
+    display: grid !important;
+    grid-template-rows: 1fr var(--bottomH) !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    overflow: hidden !important;
+  }
+
+  .workTop{
+    min-height: 0 !important;
+    position: relative !important;
+    overflow: hidden !important;
+    z-index: 1 !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .workBottom{
+    min-height: var(--bottomH) !important;
+    height: var(--bottomH) !important;
+    position: relative !important;
+    z-index: 2 !important;
+    overflow: hidden !important;
+  }
+
+  .proBottomRow{
+    display: flex !important;
+    gap: var(--gap) !important;
+    align-items: stretch !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .proMeterBox{
+    width: var(--meterW) !important;
+    min-width: var(--meterW) !important;
+    height: 100% !important;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .proImagerBox{
+    width: var(--imagerS) !important;
+    min-width: var(--imagerS) !important;
+    height: 100% !important;
+    aspect-ratio: 1 / 1;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .proFileListBox{
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #proFileListWrap, #proFileDock{
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow: auto !important;
+    position: relative !important;
+    inset: auto !important;
+  }
+
+  #meterCanvas, canvas#meterCanvas{
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+  #imagerCanvas, canvas#imagerCanvas{
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  .workTop .overlay,
+  .workTop .dropOverlay,
+  .workTop .dropHint,
+  .workTop .modalOverlay,
+  .workTop .blockingOverlay{
+    max-height: 100% !important;
+  }
+
+  .analyzers{
+    height: var(--bottomH) !important;
+    overflow: hidden !important;
+  }
+
+  .cueRow, .cueRowTop, .cueAddRow, .cueButtonsRow{
+    display: flex !important;
+    gap: 10px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+  }
+  .cueRow button, .cueRowTop button, .cueAddRow button, .cueButtonsRow button{
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+  }
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -2771,7 +2885,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="left panel"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div><div class="analyzers" id="analyzersRow"><div class="proBottomRow bottomRow"><div class="proMeterBox meterBox"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div></div><div class="proImagerBox imagerBox"><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div><div class="proFileListBox fileListBox"><div id="proFileDock" class="proFileDock">
+<div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers" id="analyzersRow"><div class="proBottomRow"><div class="proMeterBox meterBox"><div class="meterBlock"><div class="meterBox"><canvas id="meterCanvas"></canvas></div></div></div><div class="proImagerBox imagerBox"><div class="imagerBlock"><div class="scopeBox"><canvas id="imagerCanvas"></canvas></div></div></div><div class="proFileListBox fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <button id="proBtnBatchCheck" class="btn">一括チェック</button>
@@ -2815,7 +2929,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div id="proJobLog" class="proJobLog"></div>
   </div>
-</div></div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row" style="margin-top:8px;gap:8px;align-items:center">
+</div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
