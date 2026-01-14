@@ -12733,6 +12733,31 @@ try{
       try{ if(typeof window.drawAll === "function") window.drawAll(); }catch(_){}
     }, 120);
   }
+  function finalizeUiAfterSwitch(rec, reason){
+    const name = rec?.name ? rec.name : "";
+    console.log(`[Pro] finalizeUI after switch -> ${name}`);
+    const drawOnce = ()=>{
+      try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
+      try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+    };
+    const waveTarget = document.getElementById("waveBox") || document.getElementById("wave");
+    let tries = 0;
+    const maxTries = 3;
+    const attempt = ()=>{
+      drawOnce();
+      requestAnimationFrame(()=>{
+        try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+        if(waveTarget){
+          const rect = waveTarget.getBoundingClientRect();
+          if((rect.width === 0 || rect.height === 0) && tries < maxTries){
+            tries += 1;
+            requestAnimationFrame(attempt);
+          }
+        }
+      });
+    };
+    attempt();
+  }
   function isWavFile(file){
     if(!file) return false;
     const name = String(file.name||"").toLowerCase();
@@ -12803,12 +12828,14 @@ try{
     // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
     if(project.lastLoadedId===id && !opts?.force){
       // UI更新だけはして終わる
+      finalizeUiAfterSwitch(rec, "already-loaded");
       return;
     }
 
     // 本体APIが無いならここで止める（波形が出ない原因を明示）
     if(typeof loadSingleWav !== "function"){
       console.warn("[Pro] window.WavCue.api.loadFile が見つかりません。Pro側からWAVを読み込めません。");
+      finalizeUiAfterSwitch(rec, "missing-api");
       return;
     }
 
@@ -12853,6 +12880,7 @@ try{
       console.error("[Pro] setActiveFile: load failed", err);
     }finally{
       render();
+      finalizeUiAfterSwitch(rec, "after-load");
     }
   }
   function filtered(){
