@@ -12849,6 +12849,14 @@ try{
         // attachCount は null のままでOK
       }
 
+      try{
+        if(typeof renderCues === "function") renderCues();
+        if(typeof drawAll === "function") drawAll();
+        console.log("[Switch] renderCues+drawAll fired");
+      }catch(err){
+        console.warn("[Switch] renderCues+drawAll failed", err);
+      }
+      console.log(`[Switch] setActiveFile done file=${rec.name}`);
     }catch(err){
       console.error("[Pro] setActiveFile: load failed", err);
     }finally{
