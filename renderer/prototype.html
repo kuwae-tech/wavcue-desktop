@@ -12733,6 +12733,18 @@ try{
       try{ if(typeof window.drawAll === "function") window.drawAll(); }catch(_){}
     }, 120);
   }
+  function proFinalizeUiAfterSwitch(rec){
+    const name = rec?.name ? rec.name : "";
+    console.log(`[Pro] finalize UI after switch ${name}`);
+    try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
+    try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+    try{ if(typeof drawWaveform === "function") drawWaveform(); }catch(_){}
+    try{
+      requestAnimationFrame(()=>{
+        try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+      });
+    }catch(_){}
+  }
   function isWavFile(file){
     if(!file) return false;
     const name = String(file.name||"").toLowerCase();
@@ -12817,7 +12829,9 @@ try{
       await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
       project.lastLoadedId = id;
       proForceRedraw("after-load");
+      proFinalizeUiAfterSwitch(rec);
       proApplyEditsToApp(rec, "after-load");
+      proFinalizeUiAfterSwitch(rec);
 
       // 読み込み後に、本体stateからキュー情報を同期（表示用）
       const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
