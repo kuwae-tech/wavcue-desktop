@@ -5516,6 +5516,15 @@ function deleteCue(id){
   renderCues();
   drawAll();
 }
+function commitEditCues(reason){
+  try{
+    if(typeof renderCues === "function") renderCues();
+    if(typeof drawAll === "function") drawAll();
+    if(typeof updateButtons === "function") updateButtons();
+  }catch(err){
+    console.warn("[CUE] commitEditCues failed", err);
+  }
+}
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
   if(!c) return;
@@ -12739,6 +12748,16 @@ try{
     return file.type === "audio/wav" || file.type === "audio/wave"
       || name.endsWith(".wav") || name.endsWith(".wave");
   }
+  async function fullLoad(rec){
+    if(!rec) throw new Error("missing file record");
+    if(typeof loadSingleWav !== "function"){
+      throw new Error("loadSingleWav missing");
+    }
+    await setActiveFile(rec.id, {force:true});
+    const cueCount = Array.isArray(rec.cues) ? rec.cues.length : 0;
+    const peaksOk = !!window.WavCue?.state?.peaks;
+    return { cueCount, peaksOk };
+  }
   function qcReasonText(qcResult){
     if(!qcResult) return "未チェック/理由なし";
     const { ng } = extractQcNgItems(qcResult);
@@ -12789,6 +12808,24 @@ try{
       render();
     }
     console.log(`[Pro] addFiles done total=${project.files.length}`);
+    const restoreId = project.activeId;
+    const total = project.files.length;
+    let index = 0;
+    for(const rec of project.files){
+      index++;
+      console.log(`[Pro] fullLoad ${index}/${total} start file=${rec.name}`);
+      try{
+        const { cueCount, peaksOk } = await fullLoad(rec);
+        console.log(`[Pro] fullLoad ${index}/${total} done file=${rec.name} cues=${cueCount} peaks=${peaksOk ? "ok" : "failed"}`);
+      }catch(err){
+        console.warn("[Pro] fullLoad failed", err);
+        console.log(`[Pro] fullLoad ${index}/${total} done file=${rec.name} cues=0 peaks=failed`);
+      }
+    }
+    if(restoreId && project.activeId !== restoreId){
+      await setActiveFile(restoreId, {force:true});
+    }
+    console.log(`[Pro] fullLoad all done total=${total}`);
     return addedIds;
   }
   async function setActiveFile(id, opts){
