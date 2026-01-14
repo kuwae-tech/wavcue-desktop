@@ -12702,6 +12702,12 @@ try{
 
     console.log(`[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.cuesSnapshot.length}`);
   }
+  function commitCues(reason, force){
+    return proSaveActiveEdits(reason, force);
+  }
+  function commitEditCues(reason, force){
+    return commitCues(reason, force);
+  }
   function proApplyEditsToApp(rec, reason){
     const st = window.WavCue?.state;
     if(!st || !rec) return;
@@ -12795,7 +12801,11 @@ try{
     const rec = project.files.find(f=>f.id===id);
     if(!rec) return;
 
-    proSaveActiveEdits("before-switch", true);
+    try{
+      commitCues("before-switch", true);
+    }catch(err){
+      console.warn("[Pro] setActiveFile: commitCues failed", err);
+    }
 
     project.activeId = id;
     render();
