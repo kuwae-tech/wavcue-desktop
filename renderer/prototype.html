@@ -4181,6 +4181,7 @@ function undoDo(){
   const cur = _captureUndoState();
   _undo.future.push({sig:_undoSig(cur), snapshot:cur});
   _applyUndoState(prev.snapshot);
+  try{ commitCues("undo"); }catch(_){}
 }
 function redoDo(){
   if(_undo.lock) return;
@@ -4190,6 +4191,7 @@ function redoDo(){
   _undo.past.push({sig:_undoSig(cur), snapshot:cur});
   if(_undo.past.length > _undo.max) _undo.past.shift();
   _applyUndoState(next.snapshot);
+  try{ commitCues("redo"); }catch(_){}
 }
 
 // Track text-like edits on blur (do not override native per-field undo while typing)
@@ -4767,6 +4769,7 @@ function moveCueToTime(cueId, targetSec, jumpAfter){
   }
 
   log(`CUE: ${cue.label} を ${fmtTime(cue.sec)} に移動${(state.linkPair && isPair) ? "（連動）" : ""}`);
+  commitCues("move");
 }
 
 function _commitTimeEdit(cueId, inputEl){
@@ -5431,6 +5434,57 @@ function pause(){
 }
 
 /* Cues */
+function _deepCopyCues(cues){
+  return (Array.isArray(cues) ? cues : []).map(c=>({
+    id: c.id >>> 0,
+    label: String(c.label ?? ""),
+    sec: Number(c.sec ?? 0),
+  }));
+}
+function _getActiveProRec(){
+  try{
+    if(typeof window.__wavcueProGetActiveRec === "function"){
+      return window.__wavcueProGetActiveRec();
+    }
+  }catch(_){}
+  return null;
+}
+function commitCues(reason){
+  let normalized = [];
+  const before = Array.isArray(state.cues) ? state.cues.length : 0;
+  const rec = _getActiveProRec();
+  try{
+    const sorted = _deepCopyCues(state.cues).sort((a,b)=> (a.sec - b.sec) || (a.id - b.id));
+    normalized = normalizeCueIds(sorted);
+  }catch(_){
+    normalized = _deepCopyCues(state.cues);
+  }
+
+  try{
+    if(rec){
+      rec.cues = _deepCopyCues(normalized);
+    }
+  }catch(_){}
+
+  if(rec && Array.isArray(rec.cues)){
+    state.cues = _deepCopyCues(rec.cues);
+  }else{
+    state.cues = _deepCopyCues(normalized);
+  }
+  try{
+    const maxId = state.cues.reduce((m,c)=> Math.max(m, (c.id >>> 0)), 0);
+    state.nextCueId = maxId + 1;
+  }catch(_){}
+
+  try{ if(typeof window.__wavcueProRefresh === "function") window.__wavcueProRefresh(); }catch(_){}
+  try{ renderCues(); }catch(_){}
+  try{ drawAll(); }catch(_){}
+  try{ requestAnimationFrame(()=>{ try{ drawAll(); }catch(_){}}); }catch(_){}
+
+  const after = Array.isArray(state.cues) ? state.cues.length : 0;
+  const name = rec?.name || "unknown";
+  console.log(`[Commit] cues ${reason||""} file=${name} cues=${before}->${after}`);
+}
 function addCue(label){
   if(!state.buffer) return;
 
@@ -5446,8 +5500,7 @@ function addCue(label){
   const id = state.nextCueId++;
   state.cues.push({id, label, sec});
   log(`CUE+: ${label} @ ${sec.toFixed(3)}s`);
-  renderCues();
-  drawAll();
+  commitCues("add");
 }
 
 
@@ -5475,8 +5528,7 @@ function addStartStopCues(){
 
   log(`CUE+: BC$START @ 0.000s`);
   log(`CUE+: BC$STOP @ ${dur.toFixed(3)}s`);
-  renderCues();
-  drawAll();
+  commitCues("add-start-stop");
 }
 
 function addCuePair(){
@@ -5506,15 +5558,13 @@ function addCuePair(){
 
   log(`CUE+: BC$STANDBY @ ${sec0.toFixed(3)}s`);
   log(`CUE+: BC$END @ ${sec1.toFixed(3)}s (gap ${gap}s)`);
-  renderCues();
-  drawAll();
+  commitCues("add-pair");
 }
 
 function deleteCue(id){
   undoCheckpoint();
   state.cues = state.cues.filter(c=>c.id!==id);
-  renderCues();
-  drawAll();
+  commitCues("delete");
 }
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
@@ -5868,6 +5918,7 @@ window.addEventListener("mouseup",()=>{
       }else{
         log(`CUE MOVE: ${c.label} -> ${c.sec.toFixed(3)}s`);
       }
+      commitCues("drag-end");
     }
   }
   state.draggingCueId = null;
@@ -8306,8 +8357,7 @@ $("btnAddCustom").addEventListener("click", ()=>{
       const id = state.nextCueId++;
       state.cues.push({id, label, sec: 0});
       log(`CUE+: ${label} @ 0.000s`);
-      renderCues();
-      drawAll();
+      commitCues("add-note");
       toast(`${label} を先頭(0秒)に追加しました`, "ok");
       return;
     }
@@ -12667,62 +12717,19 @@ try{
   const W = window.WavCue || {};
   const api = W.api || {};
   const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
-  function proGetAppCues(){
-    const st = window.WavCue?.state;
-    if(!st || !Array.isArray(st.cues)) return null;
-    return st.cues.map(c=>({
-      id: c.id >>> 0,
-      label: String(c.label ?? ""),
-      sec: Number(c.sec ?? 0),
-    }));
+  function getActiveRec(){
+    return project.files.find(f=>f.id===project.activeId) || null;
   }
-  function proCueSignature(cues){
-    if(!Array.isArray(cues)) return "";
-    return cues.map(c=>`${c.id >>> 0}:${String(c.label ?? "")}:${Number(c.sec ?? 0)}`).join("|");
-  }
-  function proSaveActiveEdits(reason, force){
-    const id = project.activeId;
-    if(!id) return;
-    const rec = project.files.find(f=>f.id===id);
-    if(!rec) return;
+  window.__wavcueProGetActiveRec = getActiveRec;
+  window.__wavcueProRefresh = ()=>{ try{ render(); }catch(_){ } };
 
-    const cues = proGetAppCues();
-    if(!cues) return;
-
-    const sig = proCueSignature(cues);
-    if(!force && sig === rec.cuesSig) return;
-
-    rec.cuesSnapshot = cues.map(c=>({
-      id: c.id >>> 0,
-      label: String(c.label ?? ""),
-      sec: Number(c.sec ?? 0),
-    }));
-    rec.cuesSig = sig;
-    rec.dirty = true;
-
-    console.log(`[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.cuesSnapshot.length}`);
-  }
-  function proApplyEditsToApp(rec, reason){
-    const st = window.WavCue?.state;
-    if(!st || !rec) return;
-    const cues = Array.isArray(rec.cuesSnapshot) ? rec.cuesSnapshot : null;
-    if(!cues) return;
-    st.cues = cues.map(c=>({
-      id: c.id >>> 0,
-      label: String(c.label ?? ""),
-      sec: Number(c.sec ?? 0),
-    }));
+  function syncCuesFromRec(rec){
     try{
-      const maxId = st.cues.reduce((m,c)=> Math.max(m, Number(c.id)||0), 0);
-      st.nextCueId = maxId + 1;
+      state.cues = _deepCopyCues(rec?.cues);
+      renderCues();
+      drawAll();
+      requestAnimationFrame(()=>{ try{ drawAll(); }catch(_){ } });
     }catch(_){}
-    try{
-      rec.cues = Array.isArray(rec.cuesSnapshot) ? rec.cuesSnapshot.slice() : rec.cues;
-    }catch(_){}
-    try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
-    try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
-    try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
-    if(reason){ console.log(`[Pro] applyEdits(${reason}) -> ${rec.name} cues=${st.cues.length}`); }
   }
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
@@ -12776,6 +12783,9 @@ try{
         name:file.name,
         status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
         cues:[],
+        qc:{},
+        loudness:{},
+        cmcd:{},
         attachments:[],
         attachCount:null,
         qcResult:null,
@@ -12795,10 +12805,11 @@ try{
     const rec = project.files.find(f=>f.id===id);
     if(!rec) return;
 
-    proSaveActiveEdits("before-switch", true);
+    commitCues("before-switch");
 
     project.activeId = id;
     render();
+    syncCuesFromRec(rec);
 
     // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
     if(project.lastLoadedId===id && !opts?.force){
@@ -12817,19 +12828,11 @@ try{
       await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
       project.lastLoadedId = id;
       proForceRedraw("after-load");
-      proApplyEditsToApp(rec, "after-load");
+      rec.cues = _deepCopyCues(state.cues);
+      syncCuesFromRec(rec);
 
       // 読み込み後に、本体stateからキュー情報を同期（表示用）
-      const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
-      if(st && Array.isArray(st.cues)){
-        rec.cues = st.cues.map(c=>({
-          id: c.id >>> 0,
-          label: String(c.label ?? ""),
-          sec: Number(c.sec ?? 0),
-        }));
-      }else{
-        rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
-      }
+      rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
 
       // クリップ(添付)数は「確実に取れる手段」があれば同期。
       // 取れない場合でもUIが壊れないように null のままにする（表示側で 0 扱い or “–” 表示）
