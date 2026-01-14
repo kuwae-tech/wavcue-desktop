@@ -4756,17 +4756,13 @@ function moveCueToTime(cueId, targetSec, jumpAfter){
     cue.sec = t;
   }
 
-  // UI更新
-  renderCues();
-  _forceWaveRedraw();
-
   if(jumpAfter){
     setPlayhead(cue.sec);
     ensureVisibleSec(cue.sec);
-    _forceWaveRedraw();
   }
 
   log(`CUE: ${cue.label} を ${fmtTime(cue.sec)} に移動${(state.linkPair && isPair) ? "（連動）" : ""}`);
+  commitEdit("cues", "move");
 }
 
 function _commitTimeEdit(cueId, inputEl){
@@ -4970,6 +4966,33 @@ function normalizeCueIds(cues){
     }
   }
   return out;
+}
+
+function commitEdit(kind, reason){
+  if(kind !== "cues") return;
+  const before = Array.isArray(state.cues) ? state.cues.length : 0;
+  const fileName = state.fileName || "";
+
+  if(Array.isArray(state.cues)){
+    const normalized = normalizeCueIds(state.cues);
+    normalized.sort((a,b)=> (a.sec - b.sec) || (a.id - b.id));
+    state.cues = normalized;
+    try{
+      const maxId = state.cues.reduce((m,c)=> Math.max(m, (c.id>>>0)), 0);
+      state.nextCueId = Math.max(state.nextCueId || 1, maxId + 1);
+    }catch(_){}
+  }
+
+  try{
+    if(typeof window.__wavcueProSyncCues === "function") window.__wavcueProSyncCues(reason || "");
+  }catch(_){}
+
+  renderCues();
+  drawAll();
+  requestAnimationFrame(()=>{ try{ drawAll(); }catch(_){} });
+
+  const reasonText = reason ? ` ${reason}` : "";
+  console.log(`[Edit] commit cues${reasonText} file=${fileName} cues=${before}->${Array.isArray(state.cues) ? state.cues.length : 0}`);
 }
 
 
@@ -5446,8 +5469,7 @@ function addCue(label){
   const id = state.nextCueId++;
   state.cues.push({id, label, sec});
   log(`CUE+: ${label} @ ${sec.toFixed(3)}s`);
-  renderCues();
-  drawAll();
+  commitEdit("cues", "add");
 }
 
 
@@ -5475,8 +5497,7 @@ function addStartStopCues(){
 
   log(`CUE+: BC$START @ 0.000s`);
   log(`CUE+: BC$STOP @ ${dur.toFixed(3)}s`);
-  renderCues();
-  drawAll();
+  commitEdit("cues", "add-start-stop");
 }
 
 function addCuePair(){
@@ -5506,15 +5527,13 @@ function addCuePair(){
 
   log(`CUE+: BC$STANDBY @ ${sec0.toFixed(3)}s`);
   log(`CUE+: BC$END @ ${sec1.toFixed(3)}s (gap ${gap}s)`);
-  renderCues();
-  drawAll();
+  commitEdit("cues", "add-standby-end");
 }
 
 function deleteCue(id){
   undoCheckpoint();
   state.cues = state.cues.filter(c=>c.id!==id);
-  renderCues();
-  drawAll();
+  commitEdit("cues", "delete");
 }
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
@@ -5868,6 +5887,7 @@ window.addEventListener("mouseup",()=>{
       }else{
         log(`CUE MOVE: ${c.label} -> ${c.sec.toFixed(3)}s`);
       }
+      commitEdit("cues", "drag");
     }
   }
   state.draggingCueId = null;
@@ -8306,8 +8326,7 @@ $("btnAddCustom").addEventListener("click", ()=>{
       const id = state.nextCueId++;
       state.cues.push({id, label, sec: 0});
       log(`CUE+: ${label} @ 0.000s`);
-      renderCues();
-      drawAll();
+      commitEdit("cues", "add-note");
       toast(`${label} を先頭(0秒)に追加しました`, "ok");
       return;
     }
@@ -12724,6 +12743,24 @@ try{
     try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
     if(reason){ console.log(`[Pro] applyEdits(${reason}) -> ${rec.name} cues=${st.cues.length}`); }
   }
+  function proSyncActiveCues(reason){
+    const id = project.activeId;
+    if(!id) return;
+    const rec = project.files.find(f=>f.id===id);
+    if(!rec) return;
+    const cues = proGetAppCues();
+    if(!cues) return;
+    rec.cues = cues.map(c=>({
+      id: c.id >>> 0,
+      label: String(c.label ?? ""),
+      sec: Number(c.sec ?? 0),
+    }));
+    rec.cuesSnapshot = rec.cues.map(c=>({ ...c }));
+    rec.cuesSig = proCueSignature(rec.cuesSnapshot);
+    rec.dirty = true;
+    render();
+    if(reason){ console.log(`[Pro] syncCues(${reason}) -> ${rec.name} cues=${rec.cues.length}`); }
+  }
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
     try{ if(typeof window.resizeAll === "function") window.resizeAll(); }catch(_){}
@@ -13130,6 +13167,7 @@ try{
   }
   function bind(){
     window.__wavcueProAddFiles = addFiles;
+    window.__wavcueProSyncCues = proSyncActiveCues;
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
 
