@@ -12667,6 +12667,152 @@ try{
   const W = window.WavCue || {};
   const api = W.api || {};
   const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
+  const PRO_CACHE_KEYS = [
+    "file",
+    "fileName",
+    "audioUrl",
+    "audioEl",
+    "audioCtx",
+    "buffer",
+    "sr",
+    "fileSr",
+    "fileBlockAlign",
+    "fileTotalSamples",
+    "peaks",
+    "zoom",
+    "vZoom",
+    "scrollPx",
+    "playheadSec",
+    "isPlaying",
+    "playStartSec",
+    "draggingCueId",
+    "dragOffsetSec",
+    "dragPair",
+    "linkPair",
+    "srcAb",
+    "srcChunks",
+    "cmcdLayout",
+    "cmcdBytes",
+    "origBuffer",
+    "procApplied",
+    "procDataPayload",
+    "procInfo",
+    "previewUrl",
+    "attachSel",
+    "pdfViewUrl",
+    "srcFmtPayload",
+    "srcDataPayload",
+    "srcBextPayload",
+    "srcIXmlPayload",
+    "srcCmcdPayload",
+    "cuePatchMeta",
+    "loadedCueSig",
+    "_pcmInfo",
+    "originalSnapshot",
+  ];
+  function proCloneItems(list){
+    if(!Array.isArray(list)) return [];
+    return list.map(item=> (item && typeof item === "object") ? { ...item } : item);
+  }
+  function proCloneCues(list){
+    if(!Array.isArray(list)) return [];
+    return list.map(c=>({
+      id: c.id >>> 0,
+      label: String(c.label ?? ""),
+      sec: Number(c.sec ?? 0),
+    }));
+  }
+  function proCacheFromState(rec){
+    const st = window.WavCue?.state;
+    if(!rec || !st) return;
+    const cache = {};
+    for(const key of PRO_CACHE_KEYS){
+      const val = st[key];
+      if(key === "srcChunks"){
+        cache[key] = Array.isArray(val) ? proCloneItems(val) : val;
+      }else{
+        cache[key] = val ?? null;
+      }
+    }
+    cache.cues = proCloneCues(st.cues);
+    cache.attachments = proCloneItems(st.attachments);
+    cache.pdfAttach = st.pdfAttach ? { ...st.pdfAttach } : null;
+    cache.nextCueId = Number.isFinite(st.nextCueId) ? st.nextCueId : (cache.cues.length + 1);
+    rec.cache = cache;
+    rec.fullLoaded = true;
+    rec.fullLoadFailed = false;
+    rec.cues = cache.cues.slice();
+    rec.cuesSnapshot = cache.cues.slice();
+    rec.cuesSig = proCueSignature(cache.cues);
+    rec.attachments = cache.attachments.slice();
+    rec.attachCount = cache.attachments.length;
+  }
+  function proRestoreFromCache(rec){
+    const st = window.WavCue?.state;
+    if(!rec || !rec.cache || !st) return false;
+    const cache = rec.cache;
+    for(const key of PRO_CACHE_KEYS){
+      const val = cache[key];
+      if(key === "srcChunks"){
+        st[key] = Array.isArray(val) ? proCloneItems(val) : (val ?? null);
+      }else{
+        st[key] = val ?? null;
+      }
+    }
+    st.cues = proCloneCues(cache.cues);
+    st.nextCueId = Number.isFinite(cache.nextCueId)
+      ? cache.nextCueId
+      : (st.cues.reduce((m,c)=> Math.max(m, Number(c.id)||0), 0) + 1);
+    st.attachments = proCloneItems(cache.attachments);
+    st.attachSel = Number.isFinite(cache.attachSel) ? cache.attachSel : 0;
+    st.pdfAttach = cache.pdfAttach ? { ...cache.pdfAttach } : (st.attachments[st.attachSel] || null);
+    st.cuePatchMeta = cache.cuePatchMeta ?? null;
+    st.loadedCueSig = cache.loadedCueSig ?? null;
+    st.ui = st.ui || { isLoadingWav: false };
+    st.ui.isLoadingWav = false;
+
+    rec.cues = proCloneCues(st.cues);
+    rec.cuesSnapshot = rec.cues.slice();
+    rec.cuesSig = proCueSignature(rec.cues);
+    rec.attachments = proCloneItems(st.attachments);
+    rec.attachCount = rec.attachments.length;
+    return true;
+  }
+  async function proFullLoadRecords(ids){
+    if(!Array.isArray(ids) || !ids.length) return;
+    if(typeof loadSingleWav !== "function"){
+      console.warn("[Pro] window.WavCue.api.loadFile が見つかりません。Pro側からWAVを読み込めません。");
+      return;
+    }
+    const restoreId = project.activeId;
+    let idx = 0;
+    const total = ids.length;
+    for(const id of ids){
+      idx++;
+      const rec = project.files.find(f=>f.id===id);
+      if(!rec) continue;
+      if(rec.fullLoaded && rec.cache){
+        const cachedCues = Array.isArray(rec.cache.cues) ? rec.cache.cues.length : 0;
+        const cachedPeaks = rec.cache.peaks ? "ok" : "none";
+        console.log(`[Pro] fullLoad ${idx}/${total} file=${rec.name} cues=${cachedCues} peaks=${cachedPeaks}`);
+        continue;
+      }
+      try{
+        await loadSingleWav(rec.file);
+        proCacheFromState(rec);
+        const cuesLen = Array.isArray(rec.cache?.cues) ? rec.cache.cues.length : 0;
+        const peaksState = rec.cache?.peaks ? "ok" : "none";
+        console.log(`[Pro] fullLoad ${idx}/${total} file=${rec.name} cues=${cuesLen} peaks=${peaksState}`);
+      }catch(err){
+        rec.fullLoadFailed = true;
+        console.warn("[Pro] fullLoad failed", rec.name, err);
+        console.log(`[Pro] fullLoad ${idx}/${total} file=${rec.name} cues=0 peaks=fail`);
+      }
+    }
+    if(restoreId){
+      await setActiveFile(restoreId, {force:true});
+    }
+  }
   function proGetAppCues(){
     const st = window.WavCue?.state;
     if(!st || !Array.isArray(st.cues)) return null;
@@ -12780,6 +12926,9 @@ try{
         attachCount:null,
         qcResult:null,
         snapshot:false,
+        fullLoaded:false,
+        fullLoadFailed:false,
+        cache:null,
       });
       addedIds.push(id);
     }
@@ -12788,6 +12937,7 @@ try{
     }else{
       render();
     }
+    await proFullLoadRecords(addedIds);
     console.log(`[Pro] addFiles done total=${project.files.length}`);
     return addedIds;
   }
@@ -12813,26 +12963,29 @@ try{
     }
 
     try{
+      if(rec.fullLoaded && rec.cache){
+        console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name} (cache)`);
+        const restored = proRestoreFromCache(rec);
+        if(restored){
+          project.lastLoadedId = id;
+          proApplyEditsToApp(rec, "cache-restore");
+          try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
+          try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+          try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
+          render();
+          return;
+        }
+      }
+
       console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
       await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
       project.lastLoadedId = id;
       proForceRedraw("after-load");
+      proCacheFromState(rec);
       proApplyEditsToApp(rec, "after-load");
 
-      // 読み込み後に、本体stateからキュー情報を同期（表示用）
-      const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
-      if(st && Array.isArray(st.cues)){
-        rec.cues = st.cues.map(c=>({
-          id: c.id >>> 0,
-          label: String(c.label ?? ""),
-          sec: Number(c.sec ?? 0),
-        }));
-      }else{
-        rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
-      }
-
       // クリップ(添付)数は「確実に取れる手段」があれば同期。
-      // 取れない場合でもUIが壊れないように null のままにする（表示側で 0 扱い or “–” 表示）
+      // 取れない場合でもUIが壊れないように null のままでにする（表示側で 0 扱い or “–” 表示）
       // ※pdfFindAllInWav は window.WavCue.api.modules.pdf.pdfFindAllInWav で参照可能
       try{
         const pdfFindAll = window.WavCue?.api?.modules?.pdf?.pdfFindAllInWav;
