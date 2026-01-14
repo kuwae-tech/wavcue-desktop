@@ -12816,6 +12816,11 @@ try{
       console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
       await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
       project.lastLoadedId = id;
+      const postLoadState = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
+      if(postLoadState && postLoadState.buffer){
+        postLoadState.peaks = buildPeaks(postLoadState.buffer, 6000);
+        console.log(`[Switch] peaks rebuilt file=${rec.name}`);
+      }
       proForceRedraw("after-load");
       proApplyEditsToApp(rec, "after-load");
 
@@ -12849,6 +12854,13 @@ try{
         // attachCount は null のままでOK
       }
 
+      renderCues();
+      if(typeof resizeAll === "function"){
+        resizeAll();
+      }
+      drawAll();
+      requestAnimationFrame(()=>drawAll());
+      console.log(`[Switch] renderCues+drawAll fired file=${rec.name}`);
     }catch(err){
       console.error("[Pro] setActiveFile: load failed", err);
     }finally{
