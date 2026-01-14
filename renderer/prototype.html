@@ -4756,9 +4756,7 @@ function moveCueToTime(cueId, targetSec, jumpAfter){
     cue.sec = t;
   }
 
-  // UI更新
-  renderCues();
-  _forceWaveRedraw();
+  commitEditCues("move");
 
   if(jumpAfter){
     setPlayhead(cue.sec);
@@ -5431,6 +5429,29 @@ function pause(){
 }
 
 /* Cues */
+function commitEditCues(reason){
+  const rec = project.files.find(f=>f.id===project.activeId);
+  const before = Array.isArray(rec?.cues) ? rec.cues.length : 0;
+  const dur = Number.isFinite(state.buffer?.duration) ? state.buffer.duration : null;
+  const normalized = (Array.isArray(state.cues) ? state.cues : []).map(c=>({
+    id: c.id >>> 0,
+    label: String(c.label ?? ""),
+    sec: clamp(Number(c.sec ?? 0), 0, (dur != null ? dur : Number(c.sec ?? 0))),
+  }));
+  state.cues = normalized;
+  if(rec){
+    rec.cues = normalized.map(c=>({ ...c }));
+  }
+  render();
+  renderCues();
+  drawAll();
+  requestAnimationFrame(()=>{ drawAll(); });
+  try{
+    const after = normalized.length;
+    const name = rec?.name || "(unknown)";
+    console.log(`[Commit] cues ${reason} file=${name} cues=${before}->${after}`);
+  }catch(_){}
+}
 function addCue(label){
   if(!state.buffer) return;
 
@@ -5446,8 +5467,7 @@ function addCue(label){
   const id = state.nextCueId++;
   state.cues.push({id, label, sec});
   log(`CUE+: ${label} @ ${sec.toFixed(3)}s`);
-  renderCues();
-  drawAll();
+  commitEditCues("add");
 }
 
 
@@ -5475,8 +5495,7 @@ function addStartStopCues(){
 
   log(`CUE+: BC$START @ 0.000s`);
   log(`CUE+: BC$STOP @ ${dur.toFixed(3)}s`);
-  renderCues();
-  drawAll();
+  commitEditCues("add-start-stop");
 }
 
 function addCuePair(){
@@ -5506,15 +5525,13 @@ function addCuePair(){
 
   log(`CUE+: BC$STANDBY @ ${sec0.toFixed(3)}s`);
   log(`CUE+: BC$END @ ${sec1.toFixed(3)}s (gap ${gap}s)`);
-  renderCues();
-  drawAll();
+  commitEditCues("add-pair");
 }
 
 function deleteCue(id){
   undoCheckpoint();
   state.cues = state.cues.filter(c=>c.id!==id);
-  renderCues();
-  drawAll();
+  commitEditCues("delete");
 }
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
@@ -5868,6 +5885,7 @@ window.addEventListener("mouseup",()=>{
       }else{
         log(`CUE MOVE: ${c.label} -> ${c.sec.toFixed(3)}s`);
       }
+      commitEditCues("drag");
     }
   }
   state.draggingCueId = null;
@@ -8306,8 +8324,7 @@ $("btnAddCustom").addEventListener("click", ()=>{
       const id = state.nextCueId++;
       state.cues.push({id, label, sec: 0});
       log(`CUE+: ${label} @ 0.000s`);
-      renderCues();
-      drawAll();
+      commitEditCues("add-note");
       toast(`${label} を先頭(0秒)に追加しました`, "ok");
       return;
     }
@@ -12802,7 +12819,15 @@ try{
 
     // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
     if(project.lastLoadedId===id && !opts?.force){
-      // UI更新だけはして終わる
+      proApplyEditsToApp(rec, "cache-restore");
+      try{ renderCues(); }catch(_){}
+      try{ drawAll(); }catch(_){}
+      requestAnimationFrame(()=>{ try{ drawAll(); }catch(_){}} );
+      render();
+      try{
+        const cueN = Array.isArray(state.cues) ? state.cues.length : 0;
+        console.log(`[Switch] after cache-restore render fired file=${rec.name} cues=${cueN}`);
+      }catch(_){}
       return;
     }
 
