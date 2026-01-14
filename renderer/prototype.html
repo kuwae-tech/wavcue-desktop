@@ -12697,6 +12697,7 @@ try{
       label: String(c.label ?? ""),
       sec: Number(c.sec ?? 0),
     }));
+    rec.cues = rec.cuesSnapshot.slice();
     rec.cuesSig = sig;
     rec.dirty = true;
 
@@ -12763,14 +12764,245 @@ try{
     file.status.qcReason = qcReasonText(qcResult);
     file.qcResult = qcResult;
   }
+  function proExtractFmtInfo(payload){
+    if(!payload || payload.byteLength < 16) return { sampleRate:null, blockAlign:null };
+    try{
+      const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+      return {
+        sampleRate: dv.getUint32(4, true),
+        blockAlign: dv.getUint16(12, true),
+      };
+    }catch(_){
+      return { sampleRate:null, blockAlign:null };
+    }
+  }
+  async function proFullLoadRecord(rec, index, total){
+    console.log(`[Pro] fullLoad ${index}/${total} file=${rec.name}`);
+    let ab;
+    try{
+      ab = await rec.file.arrayBuffer();
+    }catch(err){
+      console.error("[Pro] fullLoad arrayBuffer failed", err);
+      return;
+    }
+    rec.arrayBuffer = ab;
+    const parsed = {};
+    try{ parsed.containerInfo = detectWavContainer(ab); }catch(_){ parsed.containerInfo = null; }
+    try{ parsed.srcFmtPayload = _riffExtractChunkPayload(ab, "fmt "); }catch(_){ parsed.srcFmtPayload = null; }
+    try{ parsed.srcDataPayload = _riffExtractChunkPayload(ab, "data"); }catch(_){ parsed.srcDataPayload = null; }
+    try{ parsed.srcBextPayload = _riffExtractChunkPayload(ab, "bext"); }catch(_){ parsed.srcBextPayload = null; }
+    try{ parsed.srcIXmlPayload = _riffExtractChunkPayload(ab, "iXML"); }catch(_){ parsed.srcIXmlPayload = null; }
+    try{ parsed.srcCmcdPayload = _riffExtractChunkPayload(ab, "cmcd"); }catch(_){ parsed.srcCmcdPayload = null; }
+    try{ parsed.srcChunks = parseRiffChunks(ab); }catch(_){ parsed.srcChunks = null; }
+
+    const fmtInfo = proExtractFmtInfo(parsed.srcFmtPayload);
+    parsed.fileSr = fmtInfo.sampleRate || null;
+    parsed.fileBlockAlign = fmtInfo.blockAlign || null;
+    if(parsed.srcDataPayload && parsed.fileBlockAlign && isFinite(parsed.fileBlockAlign)){
+      parsed.fileTotalSamples = Math.floor(parsed.srcDataPayload.byteLength / parsed.fileBlockAlign);
+    }else{
+      parsed.fileTotalSamples = null;
+    }
+
+    let cues = [];
+    try{
+      const cueSr = (parsed.fileSr && isFinite(parsed.fileSr)) ? parsed.fileSr : 48000;
+      cues = parseWavCues(ab, cueSr) || [];
+      if(cues.length){
+        cues = normalizeCueIds(cues);
+      }
+    }catch(_){
+      cues = [];
+    }
+
+    let attachments = [];
+    try{
+      attachments = pdfFindAllInWav(ab) || [];
+    }catch(_){
+      attachments = [];
+    }
+
+    let audioBuffer = null;
+    try{
+      const ctx = await ensureAudioCtx();
+      audioBuffer = await new Promise((resolve,reject)=> ctx.decodeAudioData(ab.slice(0), resolve, reject));
+    }catch(_){
+      audioBuffer = null;
+    }
+
+    if(audioBuffer && Array.isArray(cues) && isFinite(audioBuffer.duration)){
+      cues = cues.map(c=>({ ...c, sec: clamp(c.sec, 0, audioBuffer.duration) }));
+    }else if(parsed.fileTotalSamples && parsed.fileSr){
+      const dur = parsed.fileTotalSamples / parsed.fileSr;
+      cues = cues.map(c=>({ ...c, sec: clamp(c.sec, 0, dur) }));
+    }
+
+    let peaks = null;
+    let peaksOk = false;
+    if(audioBuffer){
+      try{
+        peaks = await buildPeaksAsync(audioBuffer, 6000);
+        peaksOk = !!peaks;
+      }catch(_){
+        peaks = null;
+      }
+    }
+
+    parsed.cuePatchMeta = null;
+    parsed.loadedCueSig = null;
+    try{
+      parsed.cuePatchMeta = extractCuePatchMeta(ab) || null;
+      parsed.loadedCueSig = cueSig(cues);
+    }catch(_){
+      parsed.cuePatchMeta = null;
+      parsed.loadedCueSig = null;
+    }
+
+    parsed.cmcdRawText = "";
+    parsed.cmcdObj = null;
+    parsed.cmcdBytes = null;
+    parsed.bextText = "";
+    try{
+      if(parsed.srcChunks){
+        for(const ch of parsed.srcChunks){
+          if(ch.id==="cmcd"){
+            const u8 = new Uint8Array(ab, ch.dataOff, Math.min(ch.size, 2048));
+            const buf = new Uint8Array(2048); buf.fill(0); buf.set(u8.slice(0,2048), 0);
+            parsed.cmcdBytes = buf;
+          }
+          if(ch.id==="bext"){
+            const u8 = new Uint8Array(ab, ch.dataOff, ch.size);
+            parsed.bextText = bextExtractCodingHistoryText(u8) || "";
+          }
+        }
+      }
+    }catch(_){ }
+    try{
+      if(parsed.srcCmcdPayload){
+        const parsedCmcd = cmcdParseFromPayload(new Uint8Array(parsed.srcCmcdPayload));
+        parsed.cmcdRawText = parsedCmcd.rawText || "";
+        parsed.cmcdObj = parsedCmcd.obj || null;
+      }
+    }catch(_){ }
+
+    rec.parsed = parsed;
+    rec.cues = Array.isArray(cues) ? cues.map(c=>({
+      id: c.id >>> 0,
+      label: String(c.label ?? ""),
+      sec: Number(c.sec ?? 0),
+    })) : [];
+    rec.cuesSnapshot = rec.cues.slice();
+    rec.cuesSig = proCueSignature(rec.cues);
+    rec.attachments = attachments;
+    rec.attachCount = Array.isArray(attachments) ? attachments.length : 0;
+    rec.peaks = peaks;
+    rec.audioBuffer = audioBuffer;
+
+    console.log(`[Pro] fullLoad done file=${rec.name} cues=${rec.cues.length} attach=${rec.attachCount} peaks=${peaksOk ? "ok" : "skip"} audio=${audioBuffer ? "ok" : "skip"}`);
+  }
+  async function proApplyRecToApp(rec){
+    const st = window.WavCue?.state;
+    if(!st || !rec) return;
+
+    st.fileName = rec.name || st.fileName;
+    st.file = rec.file || st.file;
+    st.procApplied = false;
+    st.procDataPayload = null;
+    st.procInfo = null;
+    st.scLast = null;
+
+    try{ $("fileName").textContent = rec.name || ""; }catch(_){}
+
+    try{
+      const audio = await ensureAudioEl();
+      if(st.previewUrl){ try{ URL.revokeObjectURL(st.previewUrl); }catch(_){ } st.previewUrl=null; }
+      if(st.audioUrl) URL.revokeObjectURL(st.audioUrl);
+      if(rec.arrayBuffer){
+        const blob = new Blob([rec.arrayBuffer], { type: "audio/wav" });
+        st.audioUrl = URL.createObjectURL(blob);
+        audio.src = st.audioUrl;
+        audio.currentTime = 0;
+      }
+    }catch(_){ }
+
+    st.srcAb = rec.arrayBuffer || null;
+    st.srcFmtPayload = rec.parsed?.srcFmtPayload || null;
+    st.srcDataPayload = rec.parsed?.srcDataPayload || null;
+    st.srcBextPayload = rec.parsed?.srcBextPayload || null;
+    st.srcIXmlPayload = rec.parsed?.srcIXmlPayload || null;
+    st.srcCmcdPayload = rec.parsed?.srcCmcdPayload || null;
+    st.srcChunks = rec.parsed?.srcChunks || null;
+    st.fileSr = rec.parsed?.fileSr ?? null;
+    st.fileBlockAlign = rec.parsed?.fileBlockAlign ?? null;
+    st.fileTotalSamples = rec.parsed?.fileTotalSamples ?? null;
+    st.cuePatchMeta = rec.parsed?.cuePatchMeta ?? null;
+    st.loadedCueSig = rec.parsed?.loadedCueSig ?? null;
+
+    st.cues = Array.isArray(rec.cues) ? rec.cues.map(c=>({
+      id: c.id >>> 0,
+      label: String(c.label ?? ""),
+      sec: Number(c.sec ?? 0),
+    })) : [];
+    try{
+      const maxId = st.cues.reduce((m,c)=> Math.max(m, Number(c.id)||0), 0);
+      st.nextCueId = maxId + 1;
+    }catch(_){
+      st.nextCueId = 1;
+    }
+
+    st.buffer = rec.audioBuffer || null;
+    st.origBuffer = rec.audioBuffer || null;
+    st.sr = rec.audioBuffer ? rec.audioBuffer.sampleRate : null;
+    st.peaks = rec.peaks || null;
+
+    st.zoom = 1;
+    st.vZoom = 1;
+    st.scrollPx = 0;
+    st.playheadSec = 0;
+    st.playStartSec = 0;
+
+    try{
+      if(typeof pdfSet === "function"){
+        pdfSet(Array.isArray(rec.attachments) ? rec.attachments : []);
+      }
+    }catch(_){ }
+
+    try{
+      if(rec.parsed?.cmcdBytes && typeof cmcdFillInputsFromBytes === "function"){
+        cmcdFillInputsFromBytes(rec.parsed.cmcdBytes);
+      }
+      if($("cmcdRawArea")) $("cmcdRawArea").value = rec.parsed?.cmcdRawText || "";
+      if(rec.parsed?.cmcdObj && typeof cmcdApplyObjToInputs === "function"){
+        cmcdApplyObjToInputs(rec.parsed.cmcdObj);
+      }
+    }catch(_){ }
+
+    try{
+      const ta = $("bextArea");
+      if(ta) ta.value = rec.parsed?.bextText || "";
+    }catch(_){ }
+
+    try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
+    try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+    requestAnimationFrame(()=>{
+      try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+    });
+    try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
+    try{ if(typeof undoReset === "function") undoReset(); }catch(_){}
+    try{ if(typeof takeSnapshot === "function") st.originalSnapshot = takeSnapshot(); }catch(_){ st.originalSnapshot = null; }
+    try{ if(typeof scheduleDiffUpdate === "function") scheduleDiffUpdate(true); }catch(_){}
+  }
   async function addFiles(fileList){
     const files = Array.from(fileList || []).filter(isWavFile);
     if(!files.length) return;
     console.log(`[Pro] addFiles count=${files.length}`);
     const addedIds = [];
+    const total = files.length;
+    let idx = 0;
     for(const file of files){
+      idx += 1;
       const id = uid();
-      project.files.push({
+      const rec = {
         id,
         file,
         name:file.name,
@@ -12780,14 +13012,23 @@ try{
         attachCount:null,
         qcResult:null,
         snapshot:false,
-      });
+        arrayBuffer:null,
+        parsed:null,
+        peaks:null,
+        audioBuffer:null,
+      };
+      project.files.push(rec);
       addedIds.push(id);
+      render();
+      await proFullLoadRecord(rec, idx, total);
+      render();
     }
     if(project.activeId==null && project.files.length>0){
       await setActiveFile(project.files[0].id, {force:true});
     }else{
       render();
     }
+    console.log(`[Pro] fullLoad all done total=${files.length}`);
     console.log(`[Pro] addFiles done total=${project.files.length}`);
     return addedIds;
   }
@@ -12800,55 +13041,14 @@ try{
     project.activeId = id;
     render();
 
-    // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
-    if(project.lastLoadedId===id && !opts?.force){
-      // UI更新だけはして終わる
-      return;
-    }
-
-    // 本体APIが無いならここで止める（波形が出ない原因を明示）
-    if(typeof loadSingleWav !== "function"){
-      console.warn("[Pro] window.WavCue.api.loadFile が見つかりません。Pro側からWAVを読み込めません。");
-      return;
-    }
-
     try{
-      console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
-      await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
+      if(!rec.arrayBuffer || !rec.parsed){
+        console.warn("[Pro] setActiveFile: cached data missing", rec.name);
+        return;
+      }
+      console.log(`[Switch] use cached rec file=${rec.name} cues=${Array.isArray(rec.cues) ? rec.cues.length : 0}`);
+      await proApplyRecToApp(rec);
       project.lastLoadedId = id;
-      proForceRedraw("after-load");
-      proApplyEditsToApp(rec, "after-load");
-
-      // 読み込み後に、本体stateからキュー情報を同期（表示用）
-      const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
-      if(st && Array.isArray(st.cues)){
-        rec.cues = st.cues.map(c=>({
-          id: c.id >>> 0,
-          label: String(c.label ?? ""),
-          sec: Number(c.sec ?? 0),
-        }));
-      }else{
-        rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
-      }
-
-      // クリップ(添付)数は「確実に取れる手段」があれば同期。
-      // 取れない場合でもUIが壊れないように null のままにする（表示側で 0 扱い or “–” 表示）
-      // ※pdfFindAllInWav は window.WavCue.api.modules.pdf.pdfFindAllInWav で参照可能
-      try{
-        const pdfFindAll = window.WavCue?.api?.modules?.pdf?.pdfFindAllInWav;
-        if(typeof pdfFindAll === "function"){
-          // 状態から取れない環境もあるため、必要最小限で遅延取得（ここでは“軽く”やる）
-          // File→ArrayBufferが重い場合があるので、ここでは未取得のときだけ実行
-          if(rec.attachCount == null){
-            const ab = await rec.file.arrayBuffer();
-            const list = pdfFindAll(ab) || [];
-            rec.attachCount = Array.isArray(list) ? list.length : 0;
-          }
-        }
-      }catch(_){
-        // attachCount は null のままでOK
-      }
-
     }catch(err){
       console.error("[Pro] setActiveFile: load failed", err);
     }finally{
