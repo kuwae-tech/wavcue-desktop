@@ -4729,6 +4729,28 @@ function _getCueById(id){
   return state.cues.find(c=>c.id===id) || null;
 }
 
+function commitEdit(kind, reason, details){
+  if(!kind) return;
+  const info = (typeof window.__wavcueProGetActiveInfo === "function") ? window.__wavcueProGetActiveInfo() : null;
+  const nameTxt = info?.name ? ` file=${info.name}` : "";
+  const idTxt = info?.id ? ` activeId=${info.id}` : "";
+  const before = Number.isFinite(details?.before) ? details.before : null;
+  const after = Number.isFinite(details?.after) ? details.after : null;
+  const extra = details?.extra ? ` ${details.extra}` : "";
+  let cueTxt = "";
+  if(kind === "cues"){
+    const cueCount = Array.isArray(state.cues) ? state.cues.length : 0;
+    const cueBefore = before == null ? cueCount : before;
+    const cueAfter = after == null ? cueCount : after;
+    cueTxt = ` cues=${cueBefore}->${cueAfter}`;
+  }
+  console.log(`[Edit] commit ${kind} ${reason || ""}${nameTxt}${idTxt}${cueTxt}${extra}`.trim());
+  if(kind === "cues"){
+    if(typeof window.__wavcueProMarkCueEdited === "function") window.__wavcueProMarkCueEdited(reason);
+    if(typeof window.__wavcueProSaveActiveEdits === "function") window.__wavcueProSaveActiveEdits(reason);
+  }
+}
+
 function moveCueToTime(cueId, targetSec, jumpAfter){
   const cue = _getCueById(cueId);
   if(!cue || !state.buffer) return;
@@ -5442,18 +5464,21 @@ function addCue(label){
   }
 
   undoCheckpoint();
+  const beforeCount = state.cues.length;
   const sec = currentPlayheadSec();
   const id = state.nextCueId++;
   state.cues.push({id, label, sec});
   log(`CUE+: ${label} @ ${sec.toFixed(3)}s`);
   renderCues();
   drawAll();
+  commitEdit("cues", "add", {before: beforeCount, after: state.cues.length, extra: `label=${label}`});
 }
 
 
 function addStartStopCues(){
   if(!state.buffer) return;
   undoCheckpoint();
+  const beforeCount = state.cues.length;
   const dur = state.buffer.duration;
 
   const idStart = fourccToU32("BC01");
@@ -5477,11 +5502,13 @@ function addStartStopCues(){
   log(`CUE+: BC$STOP @ ${dur.toFixed(3)}s`);
   renderCues();
   drawAll();
+  commitEdit("cues", "add-start-stop", {before: beforeCount, after: state.cues.length});
 }
 
 function addCuePair(){
   if(!state.buffer) return;
   undoCheckpoint();
+  const beforeCount = state.cues.length;
   const sec0 = currentPlayheadSec();
   const sTxt = ($("pairSeconds")?.value || "20").trim();
   const gapRaw = Number(sTxt);
@@ -5508,13 +5535,17 @@ function addCuePair(){
   log(`CUE+: BC$END @ ${sec1.toFixed(3)}s (gap ${gap}s)`);
   renderCues();
   drawAll();
+  commitEdit("cues", "add-pair", {before: beforeCount, after: state.cues.length});
 }
 
 function deleteCue(id){
   undoCheckpoint();
+  const beforeCount = state.cues.length;
+  const cue = _getCueById(id);
   state.cues = state.cues.filter(c=>c.id!==id);
   renderCues();
   drawAll();
+  commitEdit("cues", "delete", {before: beforeCount, after: state.cues.length, extra: `label=${cue?.label || ""}`.trim()});
 }
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
@@ -5585,11 +5616,16 @@ function renderCues(){
       const snap = inp._undoSnap; inp._undoSnap = null;
       const t = parseTimeInput(inp.value);
       if(t===null){ inp.value = fmtTime(c.sec); return; }
+      const beforeCount = state.cues.length;
       const oldSec = (_getCueById(c.id)?.sec ?? c.sec);
       if(snap && Math.abs(oldSec - t) > 1e-6) _undoPushSnapshot(snap);
       moveCueToTime(c.id, t, true);
       const cc = _getCueById(c.id);
       inp.value = fmtTime(cc ? cc.sec : c.sec);
+      if(cc && Math.abs(oldSec - cc.sec) > 1e-6){
+        const extra = `label=${cc.label} sec=${oldSec.toFixed(3)}->${cc.sec.toFixed(3)}`;
+        commitEdit("cues", "time", {before: beforeCount, after: state.cues.length, extra});
+      }
     });
     tdT.appendChild(inp);
 
@@ -5847,26 +5883,35 @@ window.addEventListener("mousemove",(e)=>{
 });
 window.addEventListener("mouseup",()=>{
   if(state.draggingCueId!==null){
+    let moved = false;
     try{
       const snap = state._undoDragSnap;
       if(snap){
         const after = _captureUndoState();
-        if(_undoSig(after) !== _undoSig(snap)) _undoPushSnapshot(snap);
+        moved = _undoSig(after) !== _undoSig(snap);
+        if(moved) _undoPushSnapshot(snap);
       }
     }catch(_){ }
     state._undoDragSnap = null;
     const c = state.cues.find(k=>k.id===state.draggingCueId);
     if(c){
+      let extra = "";
       if(state.dragPair){
         const st = state.cues.find(x=>x.id===state.dragPair.stId);
         const en = state.cues.find(x=>x.id===state.dragPair.enId);
         if(st && en){
           log(`CUE MOVE(LINK): ST=${st.sec.toFixed(3)}s / EN=${en.sec.toFixed(3)}s / gap=${(en.sec-st.sec).toFixed(3)}s`);
+          extra = `st=${st.sec.toFixed(3)} en=${en.sec.toFixed(3)}`;
         }else{
           log(`CUE MOVE: ${c.label} -> ${c.sec.toFixed(3)}s`);
+          extra = `label=${c.label} sec=${c.sec.toFixed(3)}`;
         }
       }else{
         log(`CUE MOVE: ${c.label} -> ${c.sec.toFixed(3)}s`);
+        extra = `label=${c.label} sec=${c.sec.toFixed(3)}`;
+      }
+      if(moved && extra){
+        commitEdit("cues", "drag", {before: state.cues.length, after: state.cues.length, extra});
       }
     }
   }
@@ -8295,6 +8340,7 @@ $("btnAddCustom").addEventListener("click", ()=>{
     if(!state.buffer) return;
     const label = (sel.value || "").trim();
     if(!label) return;
+    const beforeCount = state.cues.length;
 
     // NOTE is fixed at head (0s) and must be unique per NOTE number
     if(/^BC\$NOTE[1-9]$/.test(label)){
@@ -8308,6 +8354,7 @@ $("btnAddCustom").addEventListener("click", ()=>{
       log(`CUE+: ${label} @ 0.000s`);
       renderCues();
       drawAll();
+      commitEdit("cues", "add-note", {before: beforeCount, after: state.cues.length, extra: `label=${label}`});
       toast(`${label} を先頭(0秒)に追加しました`, "ok");
       return;
     }
@@ -12702,6 +12749,23 @@ try{
 
     console.log(`[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.cuesSnapshot.length}`);
   }
+  function proMarkCueEdited(reason){
+    const id = project.activeId;
+    if(!id) return;
+    const rec = project.files.find(f=>f.id===id);
+    if(!rec) return;
+    const cues = proGetAppCues();
+    if(cues){
+      rec.cues = cues.map(c=>({
+        id: c.id >>> 0,
+        label: String(c.label ?? ""),
+        sec: Number(c.sec ?? 0),
+      }));
+    }
+    rec.status.edited = true;
+    if(reason){ console.log(`[Pro] markCueEdited(${reason}) -> ${rec.name} cues=${rec.cues ? rec.cues.length : 0}`); }
+    render();
+  }
   function proApplyEditsToApp(rec, reason){
     const st = window.WavCue?.state;
     if(!st || !rec) return;
@@ -13130,6 +13194,13 @@ try{
   }
   function bind(){
     window.__wavcueProAddFiles = addFiles;
+    window.__wavcueProSaveActiveEdits = proSaveActiveEdits;
+    window.__wavcueProMarkCueEdited = proMarkCueEdited;
+    window.__wavcueProGetActiveInfo = ()=>{
+      const id = project.activeId;
+      const rec = project.files.find(f=>f.id===id);
+      return { id, name: rec?.name || "" };
+    };
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
 
