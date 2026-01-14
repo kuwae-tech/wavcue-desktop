@@ -12724,6 +12724,33 @@ try{
     try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
     if(reason){ console.log(`[Pro] applyEdits(${reason}) -> ${rec.name} cues=${st.cues.length}`); }
   }
+  function applyActiveRecToStateAndUI(reason){
+    const id = project.activeId;
+    if(!id) return;
+    const rec = project.files.find(f=>f.id===id);
+    if(!rec) return;
+    const st = window.WavCue?.state;
+    if(!st) return;
+    const cuesSource = Array.isArray(rec.cuesSnapshot) ? rec.cuesSnapshot
+      : Array.isArray(rec.cues) ? rec.cues : null;
+    if(!cuesSource) return;
+    st.cues = cuesSource.map(c=>({
+      id: c.id >>> 0,
+      label: String(c.label ?? ""),
+      sec: Number(c.sec ?? 0),
+    }));
+    try{
+      const maxId = st.cues.reduce((m,c)=> Math.max(m, Number(c.id)||0), 0);
+      st.nextCueId = maxId + 1;
+    }catch(_){}
+    console.log(`[Switch] apply rec->state file=${rec.name} cues=${st.cues.length}`);
+    try{ renderCues(); }catch(_){}
+    try{ drawAll(); }catch(_){}
+    console.log("[Switch] renderCues+drawAll fired");
+    requestAnimationFrame(()=>{
+      try{ drawAll(); }catch(_){}
+    });
+  }
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
     try{ if(typeof window.resizeAll === "function") window.resizeAll(); }catch(_){}
@@ -12803,6 +12830,7 @@ try{
     // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
     if(project.lastLoadedId===id && !opts?.force){
       // UI更新だけはして終わる
+      applyActiveRecToStateAndUI("switch-no-load");
       return;
     }
 
@@ -12849,6 +12877,7 @@ try{
         // attachCount は null のままでOK
       }
 
+      applyActiveRecToStateAndUI("after-load");
     }catch(err){
       console.error("[Pro] setActiveFile: load failed", err);
     }finally{
