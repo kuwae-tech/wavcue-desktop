@@ -12763,6 +12763,68 @@ try{
     file.status.qcReason = qcReasonText(qcResult);
     file.qcResult = qcResult;
   }
+  function proGetFmtSampleRate(ab){
+    let sr = 48000;
+    try{
+      if(typeof _riffExtractChunkPayload === "function"){
+        const fmtPayload = _riffExtractChunkPayload(ab, "fmt ");
+        if(fmtPayload && fmtPayload.byteLength >= 8){
+          const dv = new DataView(fmtPayload.buffer, fmtPayload.byteOffset, fmtPayload.byteLength);
+          const readSr = dv.getUint32(4, true);
+          if(readSr && isFinite(readSr)) sr = readSr;
+        }
+      }
+    }catch(_){ }
+    return sr;
+  }
+  async function proPreloadRecord(rec, index, total){
+    let cues = Array.isArray(rec.cues) ? rec.cues : [];
+    let attachCount = Number.isFinite(rec.attachCount) ? rec.attachCount : null;
+    try{
+      const ab = await rec.file.arrayBuffer();
+      if(ab){
+        const sr = proGetFmtSampleRate(ab);
+        try{
+          const parsed = parseWavCues(ab, sr) || [];
+          cues = normalizeCueIds(parsed);
+        }catch(_){ cues = []; }
+        try{
+          const pdfFindAll = window.WavCue?.api?.modules?.pdf?.pdfFindAllInWav;
+          if(typeof pdfFindAll === "function"){
+            const list = pdfFindAll(ab) || [];
+            attachCount = Array.isArray(list) ? list.length : 0;
+          }
+        }catch(_){ }
+      }
+    }catch(err){
+      console.warn("[Pro] preload failed", rec?.name, err);
+    }
+    rec.cues = cues;
+    rec.cuesSnapshot = cues.map(c=>({
+      id: c.id >>> 0,
+      label: String(c.label ?? ""),
+      sec: Number(c.sec ?? 0),
+    }));
+    rec.cuesSig = proCueSignature(rec.cuesSnapshot);
+    if(attachCount != null) rec.attachCount = attachCount;
+    const attachLog = Number.isFinite(rec.attachCount)
+      ? rec.attachCount
+      : (Array.isArray(rec.attachments) ? rec.attachments.length : 0);
+    console.log(`[Pro] preload ${index}/${total} file=${rec.name} cues=${rec.cues.length} attach=${attachLog}`);
+  }
+  async function proPreloadRecords(ids){
+    if(!ids.length) return;
+    const total = ids.length;
+    let index = 0;
+    for(const id of ids){
+      index++;
+      const rec = project.files.find(f=>f.id===id);
+      if(!rec) continue;
+      await proPreloadRecord(rec, index, total);
+    }
+    console.log(`[Pro] preload done total=${total}`);
+    render();
+  }
   async function addFiles(fileList){
     const files = Array.from(fileList || []).filter(isWavFile);
     if(!files.length) return;
@@ -12788,6 +12850,7 @@ try{
     }else{
       render();
     }
+    await proPreloadRecords(addedIds);
     console.log(`[Pro] addFiles done total=${project.files.length}`);
     return addedIds;
   }
