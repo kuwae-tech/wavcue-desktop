@@ -5515,6 +5515,13 @@ function deleteCue(id){
   state.cues = state.cues.filter(c=>c.id!==id);
   renderCues();
   drawAll();
+  if(typeof commitEdit === "function"){
+    commitEdit("cues","delete");
+  }else if(typeof window?.commitEdit === "function"){
+    window.commitEdit("cues","delete");
+  }else if(typeof window?.WavCue?.proMarkCueEdited === "function"){
+    window.WavCue.proMarkCueEdited("cue-edit");
+  }
 }
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
