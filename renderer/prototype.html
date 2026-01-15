@@ -4391,6 +4391,601 @@ if (typeof window.diagState !== "function") {
   };
 }
 
+/* --- compat: prevent ReferenceError for cmcd scan helpers --- */
+(function(){
+  if (typeof window.findCmcdInTextChunks !== "function") {
+    window.findCmcdInTextChunks = function(){
+      try{
+        console.warn("[ARTIFACT][CMCD] findCmcdInTextChunks missing -> skip");
+        return null;
+      }catch(_){ return null; }
+    };
+  }
+})();
+
+/* --- CMCD: compat + hard guard (do not break import) --- */
+(function(){
+  if (typeof window._cmcdInputsHasValues === "function") return;
+
+  // if legacy function exists, alias it
+  if (typeof window.cmcdInputsHasValues === "function") {
+    window._cmcdInputsHasValues = window.cmcdInputsHasValues;
+    return;
+  }
+
+  // fallback: detect any non-empty value in object
+  window._cmcdInputsHasValues = function(obj){
+    try{
+      if(!obj || typeof obj !== "object") return false;
+      for(const k of Object.keys(obj)){
+        const v = obj[k];
+        if(v == null) continue;
+        if(typeof v === "string" && v.trim() !== "") return true;
+        if(typeof v === "number" && Number.isFinite(v)) return true;
+        if(typeof v === "boolean" && v) return true;
+        if(typeof v === "object"){
+          if(Array.isArray(v) && v.length) return true;
+          const s = JSON.stringify(v);
+          if(s && s !== "{}" && s !== "[]") return true;
+        }
+      }
+      return false;
+    }catch(_){
+      return false;
+    }
+  };
+})();
+
+/* --- CMCD extractor (real implementation; must not throw) --- */
+(function(){
+  window.findCmcdInTextChunks = function(textChunks, fileId){
+    try{
+      if (!Array.isArray(textChunks) || textChunks.length === 0) return null;
+
+      const tryParseJSON = (s)=>{
+        try{
+          const obj = JSON.parse(s);
+          if(obj && typeof obj === "object") return obj;
+        }catch(_){}
+        return null;
+      };
+      const KEY_HINTS = (window.CMCD_KEYS_UI || []).concat([
+        "共通コード","局内コード","素材秒数","素材タイトル","素材略号","素材コード",
+        "ポスプロコメント","放送局コメント","COMMENT","NOTE","CLIENT"
+      ]);
+      const hasHint = (txt)=> KEY_HINTS.some(k=>txt.includes(k));
+
+      const normalizeChunks = textChunks.map((c)=>{
+        if(typeof c === "string") return { id: "text", text: c };
+        if(c && typeof c === "object"){
+          const id = String(c.id || c.chunkId || c.name || "chunk");
+          const text = String(c.text || c.headText || c.preview || "");
+          return { id, text };
+        }
+        return { id: "chunk", text: String(c) };
+      });
+
+      // marker scan (future-proof placeholders; best-effort)
+      const MARKERS = ["WAVCUE_CMCD:", "WAVCUE:CMCD=", "WVCMCD:"];
+      for(const {id, text} of normalizeChunks){
+        if(!text) continue;
+        for(const m of MARKERS){
+          const p = text.indexOf(m);
+          if(p >= 0){
+            let cand = text.slice(p + m.length).trim();
+            const b1 = cand.indexOf("{");
+            const b2 = cand.lastIndexOf("}");
+            if(b1 >= 0 && b2 > b1) cand = cand.slice(b1, b2 + 1);
+            const obj = tryParseJSON(cand);
+            if(obj){
+              const keysPreview = Object.keys(obj).slice(0, 12);
+              console.log("[ARTIFACT][CMCD] found by marker", { fileId, src: `chunk:${id}`, len: cand.length });
+              console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+              return obj;
+            }
+          }
+        }
+      }
+
+      // JSON/key-hint scan
+      for(const {id, text} of normalizeChunks){
+        if(!text || !hasHint(text)) continue;
+        const b1 = text.indexOf("{");
+        const b2 = text.lastIndexOf("}");
+        if(b1 >= 0 && b2 > b1){
+          const cand = text.slice(b1, b2 + 1);
+          const obj = tryParseJSON(cand);
+          if(obj){
+            const keysPreview = Object.keys(obj).slice(0, 12);
+            console.log("[ARTIFACT][CMCD] found by key-hints", { fileId, src: `chunk:${id}`, len: cand.length });
+            console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+            return obj;
+          }
+        }
+        const kvObj = {};
+        text.split(/\r?\n/).forEach(line=>{
+          const idx = line.indexOf(":");
+          if(idx>0){
+            const k = line.slice(0, idx).trim();
+            const v = line.slice(idx+1).trim();
+            if(k && v) kvObj[k] = v;
+          }
+        });
+        if(Object.keys(kvObj).length){
+          const keysPreview = Object.keys(kvObj).slice(0, 12);
+          console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+          return kvObj;
+        }
+      }
+
+      // XML fallback
+      for(const {id, text} of normalizeChunks){
+        if(!text) continue;
+        const idLower = id.toLowerCase();
+        if(!(idLower.includes("ixml") || idLower.includes("axml") || text.includes("<"))){
+          continue;
+        }
+        const m = text.match(/<WAVCUE_CMCD>([\s\S]*?)<\/WAVCUE_CMCD>/i)
+          || text.match(/<cmcd>([\s\S]*?)<\/cmcd>/i);
+        if(m && m[1]){
+          const cand = m[1].trim();
+          const obj = tryParseJSON(cand);
+          if(obj){
+            const keysPreview = Object.keys(obj).slice(0, 12);
+            console.log("[ARTIFACT][CMCD] found in XML tag", { fileId, src: `chunk:${id}`, len: cand.length });
+            console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+            return obj;
+          }
+        }
+      }
+
+      console.warn("[CMCD]", "notfound", { fileId, checked: ["chunk","ixml","list","bext"], note: "preserve existing" });
+      console.warn("[ARTIFACT][CMCD] not found in textChunks", { fileId });
+      return null;
+    }catch(e){
+      console.error("[ARTIFACT][CMCD] extractor failed (non-fatal)", e);
+      return null;
+    }
+  };
+})();
+
+/* --- normalize rec artifacts (cmcd/pdf) : prevent undefined crash --- */
+(function(){
+  if (typeof window.normalizeRecArtifacts === "function") return;
+
+  /* --- safe summarize + deep find helpers (no behavior change) --- */
+  if (typeof window.safeCloneLite !== "function") {
+    window.safeCloneLite = function(obj){
+      try{
+        if (!obj || typeof obj !== "object") return obj;
+        // shallow clone only + drop huge binary-like fields
+        const out = Array.isArray(obj) ? obj.slice(0, 50) : {};
+        const keys = Object.keys(obj).slice(0, 120);
+        for (const k of keys){
+          const v = obj[k];
+          if (v instanceof ArrayBuffer) continue;
+          if (typeof Buffer !== "undefined" && v && v.constructor && v.constructor.name === "Buffer") continue;
+          if (Array.isArray(v) && v.length > 2000) { out[k] = v.slice(0, 50); continue; }
+          out[k] = v;
+        }
+        return out;
+      }catch(e){ return null; }
+    };
+  }
+
+  if (typeof window.summarizeKeys !== "function") {
+    window.summarizeKeys = function(obj, label){
+      try{
+        if (!obj || typeof obj !== "object") return;
+        const keys = Object.keys(obj);
+        console.log("[MIGRATE][KEYS]", label || "", {keyCount: keys.length, keys: keys.slice(0, 60)});
+      }catch(e){}
+    };
+  }
+
+  if (typeof window.deepFindByKey !== "function") {
+    window.deepFindByKey = function(root, matcher, maxHits){
+      const hits = [];
+      const seen = new Set();
+      const limit = maxHits || 20;
+
+      function walk(node, path, depth){
+        if (!node || typeof node !== "object") return;
+        if (seen.has(node)) return;
+        seen.add(node);
+        if (depth > 5) return;
+
+        const keys = Object.keys(node);
+        for (const k of keys){
+          const v = node[k];
+          const p = path ? (path + "." + k) : k;
+
+          try{
+            if (matcher(k, v, p)) {
+              hits.push({path: p, key: k, type: Array.isArray(v) ? "array" : typeof v});
+              if (hits.length >= limit) return;
+            }
+          }catch(_){}
+
+          if (v && typeof v === "object"){
+            walk(v, p, depth + 1);
+            if (hits.length >= limit) return;
+          }
+        }
+      }
+      walk(root, "", 0);
+      return hits;
+    };
+  }
+
+  function sliceBytes(buf, start, len){
+    try{
+      if(!buf) return new Uint8Array();
+      const u8 = (buf instanceof Uint8Array) ? buf : new Uint8Array(buf);
+      return u8.slice(start, start + len);
+    }catch(_){ return new Uint8Array(); }
+  }
+  function u8StartsWith(u8, asciiString){
+    try{
+      if(!u8 || !asciiString) return false;
+      for(let i=0;i<asciiString.length;i++){
+        if(u8[i] !== asciiString.charCodeAt(i)) return false;
+      }
+      return true;
+    }catch(_){ return false; }
+  }
+  function tryDecodeUtf8(u8, maxLen){
+    try{
+      const lim = Math.max(0, Math.min(u8.length, maxLen || 65536));
+      return new TextDecoder("utf-8", {fatal:false}).decode(u8.slice(0, lim));
+    }catch(_){ return ""; }
+  }
+  function decodeLatin1(u8, maxLen){
+    try{
+      const lim = Math.max(0, Math.min(u8.length, maxLen || 65536));
+      let out = "";
+      for(let i=0;i<lim;i++){
+        out += String.fromCharCode(u8[i]);
+      }
+      return out;
+    }catch(_){ return ""; }
+  }
+  function asciiPreview(u8, maxLen){
+    try{
+      const lim = Math.max(0, Math.min(u8.length, maxLen || 64));
+      let out = "";
+      for(let i=0;i<lim;i++){
+        const ch = u8[i];
+        out += (ch >= 0x20 && ch <= 0x7e) ? String.fromCharCode(ch) : ".";
+      }
+      return out;
+    }catch(_){ return ""; }
+  }
+  function parseInfoSubchunks(u8){
+    try{
+      const out = {};
+      const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+      const u32 = (o)=>dv.getUint32(o,true);
+      const str4 = (o)=>String.fromCharCode(u8[o],u8[o+1],u8[o+2],u8[o+3]);
+      if(u8.length < 4 || str4(0) !== "INFO") return out;
+      let off = 4;
+      while(off + 8 <= u8.length){
+        const id = str4(off);
+        const size = u32(off+4);
+        const dataOff = off + 8;
+        const end = Math.min(u8.length, dataOff + size);
+        const txt = tryDecodeUtf8(u8.slice(dataOff, end), 65536).replace(/\0/g,"").trim();
+        if(txt) out[id] = txt;
+        off = end + (size % 2);
+      }
+      return out;
+    }catch(_){ return {}; }
+  }
+  function findPdfChunks(chunks, fileBuf){
+    try{
+      if(typeof pdfFindAllInWav === "function"){
+        const list = pdfFindAllInWav(fileBuf) || [];
+        return Array.isArray(list) ? list.slice(0,9) : [];
+      }
+    }catch(_){ }
+    try{
+      if(!Array.isArray(chunks)) return [];
+      const out = [];
+      for(const ch of chunks){
+        const id = ch?.id || "";
+        const off = ch?.dataOff;
+        const size = ch?.size;
+        if(!off || !size) continue;
+        const u8 = new Uint8Array(fileBuf, off, Math.min(size, 8));
+        if(u8StartsWith(u8, "%PDF-")){
+          const bytes = new Uint8Array(fileBuf, off, size);
+          out.push({ name: "attached.pdf", bytes, kind: "PDF", mime: "application/pdf" });
+        }
+      }
+      return out.slice(0,9);
+    }catch(_){ return []; }
+  }
+  function findCmcdInTextChunks(chunks, fileBuf, fileId){
+    try{
+      if(!Array.isArray(chunks)) return null;
+      const targets = new Set(["axml","iXML","INFO","bext","JUNK","LIST","ID3 ","ICMT","ISFT"]);
+      const keys = ["Ver4","Ver","共通コード","素材秒数","素材タイトル","素材略号","素材コード","局内コード","ポスプロコメント","放送局コメント","COMMENT","NOTE","CLIENT"];
+      const keyHit = (txt)=> keys.some(k=>txt.includes(k));
+      const parseText = (txt, mode, chunkId)=>{
+        if(!txt) return null;
+        if(!keyHit(txt)) return null;
+        try{
+          const m = txt.match(/\{[\s\S]*?\}/);
+          if(m){
+            const obj = JSON.parse(m[0]);
+            if(obj && typeof obj === "object"){
+              console.log("[ARTIFACT][CMCD]", "found", { fileId, chunkId, mode, keys: Object.keys(obj).slice(0, 12) });
+              return obj;
+            }
+          }
+        }catch(_){ }
+        const obj = {};
+        txt.split(/\r?\n/).forEach(line=>{
+          const idx = line.indexOf(":");
+          if(idx>0){
+            const k = line.slice(0, idx).trim();
+            const v = line.slice(idx+1).trim();
+            if(k && v) obj[k] = v;
+          }
+        });
+        if(Object.keys(obj).length){
+          console.log("[ARTIFACT][CMCD]", "found", { fileId, chunkId, mode, keys: Object.keys(obj).slice(0, 12) });
+          return obj;
+        }
+        return null;
+      };
+      for(const ch of chunks){
+        const id = String(ch?.id || "");
+        if(!targets.has(id)) continue;
+        const off = ch?.dataOff;
+        const size = ch?.size;
+        if(!off || !size) continue;
+        if(id === "LIST"){
+          const listType = tryDecodeUtf8(new Uint8Array(fileBuf, off, Math.min(size, 4)), 4);
+          if(listType === "INFO"){
+            const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+            const info = parseInfoSubchunks(u8);
+            const text = Object.values(info).join("\n");
+            const parsed = parseText(text, "info", "LIST:INFO");
+            if(parsed) return parsed;
+          }
+        }
+        const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+        const txt = tryDecodeUtf8(u8, 65536);
+        const parsedUtf8 = parseText(txt, "utf8", id);
+        if(parsedUtf8) return parsedUtf8;
+        const latin = decodeLatin1(u8, 65536);
+        const parsedLatin = parseText(latin, "latin1", id);
+        if(parsedLatin) return parsedLatin;
+      }
+      // fallback: scan all chunks quickly
+      for(const ch of chunks){
+        const id = String(ch?.id || "");
+        const off = ch?.dataOff;
+        const size = ch?.size;
+        if(!off || !size) continue;
+        const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+        const txt = tryDecodeUtf8(u8, 65536);
+        const parsedUtf8 = parseText(txt, "utf8", id);
+        if(parsedUtf8) return parsedUtf8;
+        const latin = decodeLatin1(u8, 65536);
+        const parsedLatin = parseText(latin, "latin1", id);
+        if(parsedLatin) return parsedLatin;
+      }
+    }catch(_){ }
+    try{ console.warn("[ARTIFACT][CMCD]", "not found", { fileId }); }catch(_){ }
+    return null;
+  }
+  // --- CMCD parser for artifact scan (D&D full-load) ---
+  // NOTE: scanArtifactsFromFile() expects this to exist.
+  function cmcdParseFromPayload(u8){
+    try{
+      if(!u8) return { obj:null, rawText:"" };
+      // normalize to exactly 2048 bytes
+      const buf = new Uint8Array(2048);
+      buf.fill(0);
+      if(u8 instanceof Uint8Array){
+        buf.set(u8.slice(0, 2048), 0);
+      }else{
+        // allow ArrayBuffer etc
+        const tmp = new Uint8Array(u8);
+        buf.set(tmp.slice(0, 2048), 0);
+      }
+
+      const obj = {};
+      const ver = (buf[0] | (buf[1] << 8)) >>> 0;
+      obj["Ver"] = String(ver);
+
+      // CMCD_KEYS / _cmcdSlotForKey / _sjisDecode are declared elsewhere in this file
+      if(typeof CMCD_KEYS !== "undefined" && typeof _cmcdSlotForKey === "function"){
+        for(const key of CMCD_KEYS){
+          if(key === "Ver") continue;
+          const sl = _cmcdSlotForKey(key);
+          if(!sl) continue;
+          const s = sl[0], len = sl[1];
+          const raw = buf.slice(s, s + len);
+          const end = raw.indexOf(0);
+          const cut = (end >= 0) ? raw.slice(0, end) : raw;
+          let txt = "";
+          try{
+            if(typeof _sjisDecode === "function") txt = _sjisDecode(cut);
+            else txt = new TextDecoder("utf-8").decode(cut);
+          }catch(_e){
+            try{ txt = new TextDecoder("utf-8").decode(cut); }catch(_e2){ txt = ""; }
+          }
+          obj[key] = String(txt || "").replace(/\s+$/g, "");
+        }
+      }
+
+      // decide whether it's "real" CMCD (ignore Ver-only)
+      let hasReal = false;
+      for(const k of Object.keys(obj)){
+        if(k === "Ver") continue;
+        const v = obj[k];
+        if(typeof v === "string" && v.trim() !== ""){
+          hasReal = true;
+          break;
+        }
+      }
+      if(!hasReal){
+        return { obj:null, rawText:"" };
+      }
+
+      // rawText (debug)
+      let rawText = "";
+      try{
+        if(typeof CMCD_KEYS_UI !== "undefined" && Array.isArray(CMCD_KEYS_UI)){
+          rawText = CMCD_KEYS_UI.map(k => `${k}: ${obj[k] || ""}`).join("\n");
+        }
+      }catch(_){ rawText = ""; }
+
+      return { obj, rawText };
+    }catch(e){
+      try{ console.warn("[CMCD] cmcdParseFromPayload failed", e); }catch(_){}
+      return { obj:null, rawText:"" };
+    }
+  }
+  function scanArtifactsFromFile(fileBuf, chunks, fileId){
+    try{
+      const chunkIdsSample = Array.isArray(chunks) ? chunks.map(c=>c?.id).filter(Boolean).slice(0, 60) : [];
+      try{
+        if(Array.isArray(chunks)){
+          const sample = chunks.slice(0, 60).map((c)=>{
+            const id = c?.id || "";
+            const size = c?.size || 0;
+            let headAscii = "";
+            try{
+              if(fileBuf && c?.dataOff != null && size){
+                const u8 = new Uint8Array(fileBuf, c.dataOff, Math.min(size, 64));
+                headAscii = asciiPreview(u8, 64);
+              }
+            }catch(_){ }
+            return { id, size, headAscii };
+          });
+          console.log("[ARTIFACT][CHUNKS]", { fileId, count: chunks.length, sample });
+          let previewed = 0;
+          for(const c of chunks){
+            if(previewed >= 10) break;
+            const id = String(c?.id || "");
+            if(!id) continue;
+            const off = c?.dataOff;
+            const size = c?.size;
+            if(!off || !size) continue;
+            const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+            const headAscii = asciiPreview(u8, 64);
+            const idLower = id.toLowerCase();
+            const candidate = ["ixml","axml","list","info","bext","junk","id3 ","icmt","isft"].some(k=>idLower.includes(k))
+              || headAscii.includes("{") || headAscii.includes("Ver") || headAscii.includes("cmcd") || headAscii.includes("素材");
+            if(candidate){
+              const headText = tryDecodeUtf8(u8, 300).slice(0, 300);
+              console.log("[ARTIFACT][PREVIEW]", { fileId, id, headText });
+              previewed += 1;
+            }
+          }
+        }
+      }catch(_){ }
+      let cmcdInputs = null;
+      let cmcdText = "";
+      try{
+        if(Array.isArray(chunks)){
+          const cmcdChunk = chunks.find(c=>c && c.id==="cmcd");
+          if(cmcdChunk && fileBuf){
+            const u8 = new Uint8Array(fileBuf, cmcdChunk.dataOff, Math.min(cmcdChunk.size, 2048));
+            if(typeof cmcdParseFromPayload === "function"){
+              const parsed = cmcdParseFromPayload(u8);
+              cmcdInputs = parsed?.obj || null;
+              cmcdText = parsed?.rawText || "";
+            }
+          }
+        }
+      }catch(_){ }
+      if(!cmcdInputs){
+        try{
+          const textChunks = [];
+          if(Array.isArray(chunks)){
+            for(const ch of chunks.slice(0, 60)){
+              const id = String(ch?.id || "");
+              const off = ch?.dataOff;
+              const size = ch?.size;
+              if(!id || !off || !size) continue;
+              const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+              const fullText = tryDecodeUtf8(u8, 65536);
+              const headText = fullText.slice(0, 300);
+              textChunks.push({ id, text: fullText, headText });
+              if(id === "LIST"){
+                const listType = tryDecodeUtf8(new Uint8Array(fileBuf, off, Math.min(size, 4)), 4);
+                if(listType === "INFO"){
+                  const info = parseInfoSubchunks(u8);
+                  const text = Object.values(info).join("\n");
+                  textChunks.push({ id: "LIST:INFO", text });
+                }
+              }
+            }
+          }
+          if(typeof window.findCmcdInTextChunks === "function"){
+            cmcdInputs = window.findCmcdInTextChunks(textChunks, fileId);
+          }else{
+            console.warn("[ARTIFACT][CMCD] findCmcdInTextChunks missing (scan)");
+          }
+        }catch(_){ }
+      }
+      const attachments = findPdfChunks(chunks, fileBuf);
+      const cmcdLen = (()=>{ try{ return cmcdInputs ? JSON.stringify(cmcdInputs).length : 0; }catch(_){ return 0; } })();
+      console.log("[ARTIFACT]", "scan", { fileId, pdfFound: attachments.length, cmcdFound: !!cmcdInputs, cmcdLen, chunkIdsSample });
+      return { cmcdInputs, cmcdText, attachments };
+    }catch(_){
+      return { cmcdInputs: null, cmcdText: "", attachments: [] };
+    }
+  }
+  window._artifactScan = window._artifactScan || scanArtifactsFromFile;
+
+  window.normalizeRecArtifacts = function(rec, stateLike){
+    try{
+      if (!rec || typeof rec !== "object") return rec;
+
+      // cmcd: normalize to string
+      if (typeof rec.cmcd !== "string") {
+        const cand =
+          (rec.cmcd != null) ? rec.cmcd :
+          rec.cmcdText ?? rec.cmcdValue ??
+          rec.meta?.cmcd ?? rec.bwfj?.cmcd ??
+          stateLike?.cmcd ?? stateLike?.meta?.cmcd ?? "";
+        if(cand){
+          rec.cmcd = (typeof cand === "string") ? cand : String(cand);
+        }else if(rec.cmcd == null){
+          rec.cmcd = "";
+        }
+      }
+
+      // attachments: normalize to array
+      if (!Array.isArray(rec.attachments)) {
+        const ac =
+          rec.attachments ??
+          rec.pdfs ?? rec.pdfAttachments ?? rec.attachedPdfs ??
+          rec.meta?.attachments ?? rec.meta?.pdfs ??
+          rec.bwfj?.attachments ?? rec.bwfj?.pdfs ??
+          stateLike?.attachments ?? stateLike?.pdfs ?? [];
+        rec.attachments = Array.isArray(ac) ? ac : (ac ? [ac] : []);
+      }
+
+      console.log("[MIGRATE]", "normalizeRecArtifacts", {
+        fileId: rec.fileId || rec.id || null,
+        cmcdLen: rec.cmcd ? rec.cmcd.length : 0,
+        pdfCount: rec.attachments ? rec.attachments.length : 0
+      });
+      return rec;
+    }catch(e){
+      console.error("[MIGRATE]", "normalizeRecArtifacts:error", e);
+      return rec;
+    }
+  };
+})();
+
 /*
 [REGRESSION CHECKLIST - DO NOT BREAK]
 1) Multi D&D: drop 4 files -> logs show fullLoad done for all -> then all done.
@@ -6677,13 +7272,232 @@ function _cmcdNewId(){
 }
 
 function _cmcdCaptureInputs(){
-  const values = {};
-  for(const k of CMCD_KEYS_UI){
-    const v = document.querySelector(`[data-cmcd="${k}"]`)?.value ?? "";
-    values[k] = String(v);
-  }
-  return values;
+      const values = {};
+      for(const k of CMCD_KEYS_UI){
+        const v = document.querySelector(`[data-cmcd="${k}"]`)?.value ?? "";
+        values[k] = String(v);
+      }
+      return values;
 }
+function _cmcdSerializeInputs(){
+  try{ return JSON.stringify(_cmcdCaptureInputs()); }catch(_){ return ""; }
+}
+function _cmcdApplySerializedToInputs(value){
+  if(!value){ _cmcdClearInputs(); return; }
+  let obj = null;
+  try{
+    obj = JSON.parse(String(value));
+  }catch(_){
+    obj = null;
+  }
+  if(obj && typeof obj === "object"){
+    _cmcdApplyValuesToInputs(obj);
+    return;
+  }
+  _cmcdClearInputs();
+}
+function _cmcdClearInputs(){
+  document.querySelectorAll('[data-cmcd]').forEach(inp=>{ inp.value = ""; });
+  try{ cmcdBuildBytesFromInputs(); }catch(_){ }
+  try{ refreshCmcdView(); }catch(_){ }
+}
+function _cmcdHasValues(values){
+  if(!values) return false;
+  if(typeof values === "string"){
+    let obj = null;
+    try{ obj = JSON.parse(values); }catch(_){ obj = null; }
+    if(obj && typeof obj === "object"){
+      return CMCD_KEYS_UI.some(k=> String(obj[k] ?? "").trim());
+    }
+    return values.trim().length > 0;
+  }
+  if(typeof values !== "object") return false;
+  return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
+}
+function _cmcdApplyValuesToInputs(values){
+  renderCmcdForm();
+  for(const k of CMCD_KEYS_UI){
+    const inp = document.querySelector(`[data-cmcd="${k}"]`);
+    if(!inp) continue;
+    inp.value = (values && (k in values)) ? String(values[k] ?? "") : "";
+  }
+  try{ cmcdBuildBytesFromInputs(); }catch(_){ }
+  try{ refreshCmcdView(); }catch(_){ }
+}
+function _cmcdGetInputProxy(){
+  return {
+    get value(){ return _cmcdSerializeInputs(); },
+    set value(v){
+      if(!v || v === ""){ _cmcdClearInputs(); return; }
+      if(typeof v === "object"){ _cmcdApplyValuesToInputs(v); return; }
+      _cmcdApplySerializedToInputs(v);
+    },
+  };
+}
+
+try{
+  window._cmcdCaptureInputs = window._cmcdCaptureInputs || _cmcdCaptureInputs;
+  window._cmcdApplyValuesToInputs = window._cmcdApplyValuesToInputs || _cmcdApplyValuesToInputs;
+  window._cmcdSerializeInputs = window._cmcdSerializeInputs || _cmcdSerializeInputs;
+  window._cmcdApplySerializedToInputs = window._cmcdApplySerializedToInputs || _cmcdApplySerializedToInputs;
+  window._cmcdInput = window._cmcdInput || _cmcdGetInputProxy();
+}catch(_){ }
+
+function _proGetActiveFileId(){
+  return (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+}
+function _proGetRecById(id){
+  return (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(id) : null;
+}
+function _proGetActiveRec(){
+  const id = _proGetActiveFileId();
+  if(!id) return null;
+  return _proGetRecById(id);
+}
+function _syncActiveRecAttachments(){
+  const rec = _proGetActiveRec();
+  if(!rec) return null;
+  const list = Array.isArray(state.attachments) ? state.attachments.slice() : [];
+  rec.attachments = list;
+  rec.attachCount = list.length;
+  return rec;
+}
+function _normalizeAttachmentList(list){
+  if(!Array.isArray(list)) return [];
+  return list.slice(0, 9).map((item)=>{
+    if(!item) return null;
+    if(typeof item === "string") return _attEnsureId({ name: item });
+    if(typeof item === "object"){
+      const name = item.name || item.fileName || item.filename || item.title || "";
+      return _attEnsureId({ ...item, name });
+    }
+    return null;
+  }).filter(Boolean);
+}
+function _isEmptyCmcdTemplateString(value){
+  try{
+    if(typeof value !== "string") return false;
+    const obj = JSON.parse(value);
+    if(!obj || typeof obj !== "object") return false;
+    for(const key of Object.keys(obj)){
+      const v = obj[key];
+      if(v != null && String(v).trim().length > 0) return false;
+    }
+    return true;
+  }catch(_){
+    return false;
+  }
+}
+function normalizeRecArtifacts(rec, stateLike){
+  if(!rec) return;
+  let imported = false;
+  const src = stateLike || rec?._stateSnap || null;
+  try{
+    const cmcdCandidates = [
+      rec.cmcd,
+      rec.cmcdText,
+      rec.cmcdValue,
+      rec.cmcdInputs,
+      rec.meta?.cmcd,
+      rec.bwfj?.cmcd,
+      src?.cmcd,
+      src?.cmcdValue,
+      src?.cmcdText,
+      src?.cmcdInputs,
+      src?.meta?.cmcd,
+      src?.bwfj?.cmcd,
+    ];
+    if(!rec.cmcd){
+      for(const c of cmcdCandidates){
+        if(!c) continue;
+        if(typeof c === "string"){ rec.cmcd = c; break; }
+        if(typeof c === "object"){ try{ rec.cmcd = JSON.stringify(c); }catch(_){ rec.cmcd = ""; } break; }
+      }
+      if(rec.cmcd) imported = true;
+    }
+    if(typeof rec.cmcd !== "string") rec.cmcd = (rec.cmcd ? String(rec.cmcd) : "");
+    const hasInputs = rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs);
+    const hasStr = typeof rec.cmcd === "string" && rec.cmcd.trim().length > 0;
+    const emptyTemplate = hasStr && _isEmptyCmcdTemplateString(rec.cmcd);
+    if(hasInputs && (!hasStr || emptyTemplate)){
+      try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
+      if(emptyTemplate){
+        console.log("[CMCD] prefer inputs over empty template", {
+          fileId: rec.fileId || rec.id,
+          cmcdLen: rec.cmcd.length,
+        });
+      }
+    }
+  }catch(err){
+    console.error("[MIGRATE] cmcd normalize error", err);
+    rec.cmcd = typeof rec.cmcd === "string" ? rec.cmcd : "";
+  }
+  try{
+    const attCandidates = [
+      rec.attachments,
+      rec.pdfs,
+      rec.pdfAttachments,
+      rec.attachedPdfs,
+      rec.meta?.pdf,
+      rec.bwfj?.pdf,
+      src?.attachments,
+      src?.pdfs,
+      src?.pdfAttachments,
+      src?.attachedPdfs,
+      src?.meta?.attachments,
+      src?.meta?.pdfs,
+      src?.bwfj?.attachments,
+      src?.bwfj?.pdfs,
+    ];
+    if(!Array.isArray(rec.attachments) || !rec.attachments.length){
+      for(const list of attCandidates){
+        if(Array.isArray(list) && list.length){
+          rec.attachments = _normalizeAttachmentList(list);
+          break;
+        }
+      }
+      if(Array.isArray(rec.attachments) && rec.attachments.length) imported = true;
+    }
+    if(!Array.isArray(rec.attachments)) rec.attachments = [];
+  }catch(err){
+    console.error("[MIGRATE] pdf normalize error", err);
+    rec.attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
+  }
+  try{
+    console.log("[MIGRATE]", "normalizeRecArtifacts", {
+      fileId: rec.fileId || rec.id,
+      cmcdLen: rec.cmcd.length,
+      pdfCount: rec.attachments.length,
+    });
+    if(imported){
+      console.log("[MIGRATE]", "imported", {
+        fileId: rec.fileId || rec.id,
+        cmcdLen: rec.cmcd.length,
+        pdfCount: rec.attachments.length,
+      });
+    }else if(src){
+      console.warn("[MIGRATE]", "no artifacts found", { fileId: rec.fileId || rec.id });
+      if(typeof window.deepFindByKey === "function"){
+        console.log("[MIGRATE][FIND]", "cmcd", window.deepFindByKey(src, (k)=> String(k).toLowerCase().includes("cmcd"), 20));
+        console.log("[MIGRATE][FIND]", "pdf/attach", window.deepFindByKey(src, (k)=> {
+          const key = String(k).toLowerCase();
+          return key.includes("pdf") || key.includes("attach");
+        }, 20));
+        console.log("[MIGRATE][FIND]", "pdf arrays", window.deepFindByKey(src, (_k,v)=> {
+          return Array.isArray(v) && v.length && (v[0]?.name || v[0]?.fileName || v[0]?.mime);
+        }, 20));
+      }
+      if(typeof window.summarizeKeys === "function"){
+        window.summarizeKeys(src, "stateLike");
+      }
+    }
+  }catch(_){ }
+}
+try{
+  if(typeof window.normalizeRecArtifacts !== "function"){
+    window.normalizeRecArtifacts = normalizeRecArtifacts;
+  }
+}catch(_){ }
 
 
 function _cmcdCapturePmInputs(){
@@ -6801,6 +7615,7 @@ function setupCmcdDialog(){
   const dlg = $("cmcdDialog");
   if(!dlg) return;
 
+  const cmcdInput = window._cmcdInput;
   let editId = "";
 
   const open = ()=>{
@@ -6838,13 +7653,40 @@ function setupCmcdDialog(){
 
   $("btnCmcdClear")?.addEventListener("click", ()=>{
     undoCheckpoint();
-    document.querySelectorAll('[data-cmcd]').forEach(inp=> inp.value = "");
-    sync();
+    if(cmcdInput) cmcdInput.value = "";
+    else{
+      document.querySelectorAll('[data-cmcd]').forEach(inp=> inp.value = "");
+      sync();
+    }
+    const rec = _proGetActiveRec();
+    if(rec){
+      rec.cmcd = "";
+      rec.cmcdInputs = null;
+      console.log("[CMCD]", "clear", { fileId: rec.id, value: rec.cmcd });
+      if(typeof window.commitAll === "function"){
+        window.commitAll("cmcd:clear", { fileId: rec.id });
+      }
+    }
   });
 
   $("btnCmcdApply")?.addEventListener("click", ()=>{
     undoCheckpoint();
     sync();
+    const rec = _proGetActiveRec();
+    if(rec){
+      const inputs = (typeof _cmcdCaptureInputs === "function") ? _cmcdCaptureInputs() : null;
+      if(inputs && window._cmcdInputsHasValues(inputs)){
+        rec.cmcdInputs = inputs;
+        rec.cmcd = JSON.stringify(inputs);
+      }else{
+        rec.cmcdInputs = null;
+        rec.cmcd = "";
+      }
+      console.log("[CMCD]", "apply", { fileId: rec.id, value: rec.cmcd });
+      if(typeof window.commitAll === "function"){
+        window.commitAll("cmcd:apply", { fileId: rec.id });
+      }
+    }
     log("OK: cmcd入力を反映しました");
     close();
   });
@@ -11823,6 +12665,13 @@ function attachSetAll(list){
   attachRenderList();
   _pdfUI_set(state.pdfAttach);
 }
+
+try{
+  window.attachSetAll = window.attachSetAll || attachSetAll;
+  window.attachRenderList = window.attachRenderList || attachRenderList;
+  window.attachSyncLegacy = window.attachSyncLegacy || attachSyncLegacy;
+  window._pdfUI_set = window._pdfUI_set || _pdfUI_set;
+}catch(_){ }
 function attachSelectById(id){
   const atts = Array.isArray(state.attachments) ? state.attachments : [];
   const idx = atts.findIndex(a=>a && a.id===id);
@@ -11861,6 +12710,13 @@ function attachAdd(att){
   attachSyncLegacy();
   attachRenderList();
   _pdfUI_set(state.pdfAttach);
+  const rec = _syncActiveRecAttachments();
+  if(rec){
+    console.log("[PDF]", "add", { fileId: rec.id, count: rec.attachments.length });
+    if(typeof window.commitAll === "function"){
+      window.commitAll("pdf:add", { fileId: rec.id });
+    }
+  }
 }
 function attachRemoveSelected(confirmMsg){
   const atts = Array.isArray(state.attachments) ? state.attachments : [];
@@ -11877,6 +12733,13 @@ function attachRemoveSelected(confirmMsg){
   attachRenderList();
   _pdfUI_set(state.pdfAttach);
   log(`OK: 添付を解除しました: ${name}`);
+  const rec = _syncActiveRecAttachments();
+  if(rec){
+    console.log("[PDF]", "remove", { fileId: rec.id, count: rec.attachments.length });
+    if(typeof window.commitAll === "function"){
+      window.commitAll("pdf:remove", { fileId: rec.id });
+    }
+  }
 }
 
 function _pdfUI_set(obj){
@@ -12309,6 +13172,13 @@ function setupPdfDialog(){
       attachSyncLegacy();
       attachRenderList();
       _pdfUI_set(state.pdfAttach);
+      const rec = _syncActiveRecAttachments();
+      if(rec){
+        console.log("[PDF]", "reorder", { fileId: rec.id, count: rec.attachments.length });
+        if(typeof window.commitAll === "function"){
+          window.commitAll("pdf:reorder", { fileId: rec.id });
+        }
+      }
       dragId = null;
     });
   }
@@ -12957,6 +13827,7 @@ try{
   window.commitEdits = window.commitEdits || proCommitEdits;
   window.updateBadges = window.updateBadges || proUpdateBadges;
   window.__wavcueProGetActiveId = window.__wavcueProGetActiveId || (()=> project.activeId);
+  window.__wavcueProGetRecById = window.__wavcueProGetRecById || ((id)=> project.files.find(f=>f.id===id) || null);
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
     try{ if(typeof window.resizeAll === "function") window.resizeAll(); }catch(_){}
@@ -13013,6 +13884,7 @@ try{
           name:file.name,
           status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
           cues:[],
+          cmcd: null,
           attachments:[],
           attachCount:null,
           qcResult:null,
@@ -13030,6 +13902,78 @@ try{
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad start", window.diagState({ name: rec.name, fileId: rec.id }));
             await loadSingleWav(rec.file);
             project.lastLoadedId = rec.id;
+            let stateLike = null;
+            try{
+              const raw = window.WavCue?.state || null;
+              stateLike = (typeof window.safeCloneLite === "function") ? window.safeCloneLite(raw) : raw;
+              rec._stateSnap = stateLike || null;
+            }catch(e){
+              console.warn("[MIGRATE] state snapshot failed", e);
+            }
+            let artifacts = null;
+            try{
+              const fileBuf = window.WavCue?.state?.srcAb || null;
+              const chunks = window.WavCue?.state?.srcChunks || null;
+              if(fileBuf && typeof window._artifactScan === "function"){
+                artifacts = window._artifactScan(fileBuf, chunks, rec.id);
+              }else{
+                console.warn("[ARTIFACT] scan skipped", { fileId: rec.id });
+              }
+            }catch(e){
+              console.warn("[ARTIFACT] scan failed", e);
+            }
+            try{
+              if(artifacts){
+                if((!rec.cmcdInputs || !window._cmcdInputsHasValues(rec.cmcdInputs)) && artifacts.cmcdInputs && window._cmcdInputsHasValues(artifacts.cmcdInputs)){
+                  rec.cmcdInputs = artifacts.cmcdInputs;
+                }
+                if((!rec.cmcd || !rec.cmcd.trim()) && artifacts.cmcdText){
+                  rec.cmcd = artifacts.cmcdText;
+                }else if((!rec.cmcd || !rec.cmcd.trim()) && rec.cmcdInputs){
+                  try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
+                }
+                if((!rec.attachments || !rec.attachments.length) && Array.isArray(artifacts.attachments)){
+                  rec.attachments = artifacts.attachments;
+                }
+                if(typeof window.normalizeRecArtifacts === "function"){
+                  window.normalizeRecArtifacts(rec, null);
+                }
+                console.log("[ARTIFACT]", "import", {
+                  fileId: rec.id,
+                  cmcdFilled: !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)),
+                  pdfCount: rec.attachments?.length || 0,
+                });
+              }else if(rec.cmcd && rec.cmcd.trim()){
+                console.warn("[CMCD]", "notfound", { fileId: rec.id, checked: ["chunk","ixml","list","bext"], note: "preserve existing" });
+              }
+            }catch(e){
+              if(artifacts){
+                if((!rec.cmcdInputs || !window._cmcdInputsHasValues(rec.cmcdInputs)) && artifacts.cmcdInputs && window._cmcdInputsHasValues(artifacts.cmcdInputs)){
+                  rec.cmcdInputs = artifacts.cmcdInputs;
+                }
+                if((!rec.cmcd || !rec.cmcd.trim()) && artifacts.cmcdText){
+                  rec.cmcd = artifacts.cmcdText;
+                }else if((!rec.cmcd || !rec.cmcd.trim()) && rec.cmcdInputs){
+                  try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
+                }
+                if((!rec.attachments || !rec.attachments.length) && Array.isArray(artifacts.attachments)){
+                  rec.attachments = artifacts.attachments;
+                }
+                console.log("[ARTIFACT]", "import fallback", {
+                  fileId: rec.id,
+                  cmcdFilled: !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)),
+                  pdfCount: rec.attachments?.length || 0,
+                });
+              }
+              console.warn("[ARTIFACT] import failed", e);
+            }
+            try{
+              if(typeof window.normalizeRecArtifacts === "function"){
+                window.normalizeRecArtifacts(rec, stateLike);
+              }else{
+                console.warn("[MIGRATE] normalizeRecArtifacts missing (fullLoad)");
+              }
+            }catch(err){ console.error("[MIGRATE] fullLoad normalize error", err); }
             proSyncRecFromState(rec, "dnd:fullLoad", {markEdited:false});
             console.log("[DND] fullLoad done", rec.name);
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad done", window.diagState({ name: rec.name, fileId: rec.id }));
@@ -13052,7 +13996,7 @@ try{
       if (typeof window.diagLog === "function") window.diagLog("[DND]", "all done", window.diagState({ expected: dndGuard?.expected || files.length, seen: dndGuard?.seen || files.length }));
       console.log(`[DND] all done ${addedRecs.length}`);
       if(targetActiveId){
-        await setActiveFile(targetActiveId, {force:true});
+        await setActiveFile(targetActiveId, {force:true, skipSave:true});
       }else{
         render();
       }
@@ -13073,7 +14017,11 @@ try{
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "start", window.diagState({ fileId: id, hasGetState: (typeof window.getState === "function") }));
       console.log("[Pro] setActiveFile start", { id, name: rec.name, force: !!opts?.force });
 
-      proSaveActiveEdits("before-switch", true);
+      if(!opts?.skipSave){
+        proSaveActiveEdits("before-switch", true);
+      }else{
+        console.log("[ACTIVE]", "skipSave", { fileId: id });
+      }
 
       project.activeId = id;
       render();
@@ -13106,6 +14054,67 @@ try{
         }));
       }else{
         rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
+      }
+
+      // cmcd / attachments: restore per-file values after cache-restore
+      try{
+        try{
+          if(typeof window.normalizeRecArtifacts === "function"){
+            const snap = rec._stateSnap || (typeof window.safeCloneLite === "function"
+              ? window.safeCloneLite(window.WavCue?.state || null)
+              : (window.WavCue?.state || null));
+            window.normalizeRecArtifacts(rec, snap);
+          }else{
+            console.warn("[MIGRATE] normalizeRecArtifacts missing (active)");
+          }
+        }catch(err){ console.error("[MIGRATE] active normalize error", err); }
+        const cmcdInput = window._cmcdInput;
+        if(cmcdInput){
+        if(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)){
+          cmcdInput.value = rec.cmcdInputs;
+        }else{
+          cmcdInput.value = rec.cmcd || "";
+        }
+          console.log("[CMCD]", "restore", { fileId: rec.id, value: cmcdInput.value });
+        }else if(typeof window._cmcdApplyValuesToInputs === "function"){
+          window._cmcdApplyValuesToInputs(rec.cmcd || null);
+          console.log("[CMCD]", "restore", { fileId: rec.id, value: rec.cmcd || "" });
+        }else if(typeof window._cmcdCaptureInputs === "function"){
+          rec.cmcd = window._cmcdCaptureInputs();
+        }
+      }catch(err){
+        console.error("[ACTIVE] cmcd restore error", err);
+      }
+      try{
+        if(Array.isArray(rec.attachments) && typeof window.attachSetAll === "function"){
+          window.attachSetAll(rec.attachments);
+        }else{
+          const list = Array.isArray(rec.attachments) ? rec.attachments : [];
+          if(Array.isArray(state.attachments)) state.attachments = list.slice();
+          if(typeof window.attachSyncLegacy === "function") window.attachSyncLegacy();
+          if(typeof window.attachRenderList === "function") window.attachRenderList();
+          if(typeof window._pdfUI_set === "function") window._pdfUI_set(state.pdfAttach);
+          rec.attachments = list;
+        }
+        rec.attachCount = Array.isArray(rec.attachments) ? rec.attachments.length : 0;
+      }catch(err){
+        console.error("[ACTIVE] pdf restore error", err);
+      }
+      try{
+        console.log("[PDF]", "restore", {
+          fileId: rec.id,
+          count: rec.attachments?.length || 0,
+          names: (rec.attachments || []).map(a=>a?.name || a?.fileName || a?.filename || "").filter(Boolean).slice(0,3),
+        });
+        console.log("[ACTIVE]", "restore", {
+          fileId: rec.id,
+          hasCmcd: _cmcdHasValues(rec.cmcd),
+          pdfCount: rec.attachments?.length || 0,
+        });
+      }catch(_){ }
+      if(typeof window.requestFullRefresh === "function"){
+        window.requestFullRefresh("active:restore:cmcd");
+        window.requestFullRefresh("active:restore:pdf");
       }
 
       // クリップ(添付)数は「確実に取れる手段」があれば同期。
