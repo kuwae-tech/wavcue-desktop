@@ -6684,6 +6684,40 @@ function _cmcdCaptureInputs(){
   }
   return values;
 }
+function _cmcdHasValues(values){
+  if(!values || typeof values !== "object") return false;
+  return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
+}
+function _cmcdApplyValuesToInputs(values){
+  renderCmcdForm();
+  for(const k of CMCD_KEYS_UI){
+    const inp = document.querySelector(`[data-cmcd="${k}"]`);
+    if(!inp) continue;
+    inp.value = (values && (k in values)) ? String(values[k] ?? "") : "";
+  }
+  try{ cmcdBuildBytesFromInputs(); }catch(_){ }
+  try{ refreshCmcdView(); }catch(_){ }
+}
+
+function _proGetActiveFileId(){
+  return (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+}
+function _proGetRecById(id){
+  return (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(id) : null;
+}
+function _proGetActiveRec(){
+  const id = _proGetActiveFileId();
+  if(!id) return null;
+  return _proGetRecById(id);
+}
+function _syncActiveRecAttachments(){
+  const rec = _proGetActiveRec();
+  if(!rec) return null;
+  const list = Array.isArray(state.attachments) ? state.attachments.slice() : [];
+  rec.attachments = list;
+  rec.attachCount = list.length;
+  return rec;
+}
 
 
 function _cmcdCapturePmInputs(){
@@ -6840,11 +6874,27 @@ function setupCmcdDialog(){
     undoCheckpoint();
     document.querySelectorAll('[data-cmcd]').forEach(inp=> inp.value = "");
     sync();
+    const rec = _proGetActiveRec();
+    if(rec){
+      rec.cmcd = "";
+      console.log("[CMCD]", "clear", { fileId: rec.id, value: rec.cmcd });
+      if(typeof window.commitAll === "function"){
+        window.commitAll("cmcd:clear", { fileId: rec.id });
+      }
+    }
   });
 
   $("btnCmcdApply")?.addEventListener("click", ()=>{
     undoCheckpoint();
     sync();
+    const rec = _proGetActiveRec();
+    if(rec){
+      rec.cmcd = _cmcdCaptureInputs();
+      console.log("[CMCD]", "apply", { fileId: rec.id, value: rec.cmcd });
+      if(typeof window.commitAll === "function"){
+        window.commitAll("cmcd:apply", { fileId: rec.id });
+      }
+    }
     log("OK: cmcd入力を反映しました");
     close();
   });
@@ -11861,6 +11911,13 @@ function attachAdd(att){
   attachSyncLegacy();
   attachRenderList();
   _pdfUI_set(state.pdfAttach);
+  const rec = _syncActiveRecAttachments();
+  if(rec){
+    console.log("[PDF]", "add", { fileId: rec.id, count: rec.attachments.length });
+    if(typeof window.commitAll === "function"){
+      window.commitAll("pdf:add", { fileId: rec.id });
+    }
+  }
 }
 function attachRemoveSelected(confirmMsg){
   const atts = Array.isArray(state.attachments) ? state.attachments : [];
@@ -11877,6 +11934,13 @@ function attachRemoveSelected(confirmMsg){
   attachRenderList();
   _pdfUI_set(state.pdfAttach);
   log(`OK: 添付を解除しました: ${name}`);
+  const rec = _syncActiveRecAttachments();
+  if(rec){
+    console.log("[PDF]", "remove", { fileId: rec.id, count: rec.attachments.length });
+    if(typeof window.commitAll === "function"){
+      window.commitAll("pdf:remove", { fileId: rec.id });
+    }
+  }
 }
 
 function _pdfUI_set(obj){
@@ -12309,6 +12373,13 @@ function setupPdfDialog(){
       attachSyncLegacy();
       attachRenderList();
       _pdfUI_set(state.pdfAttach);
+      const rec = _syncActiveRecAttachments();
+      if(rec){
+        console.log("[PDF]", "reorder", { fileId: rec.id, count: rec.attachments.length });
+        if(typeof window.commitAll === "function"){
+          window.commitAll("pdf:reorder", { fileId: rec.id });
+        }
+      }
       dragId = null;
     });
   }
@@ -12957,6 +13028,7 @@ try{
   window.commitEdits = window.commitEdits || proCommitEdits;
   window.updateBadges = window.updateBadges || proUpdateBadges;
   window.__wavcueProGetActiveId = window.__wavcueProGetActiveId || (()=> project.activeId);
+  window.__wavcueProGetRecById = window.__wavcueProGetRecById || ((id)=> project.files.find(f=>f.id===id) || null);
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
     try{ if(typeof window.resizeAll === "function") window.resizeAll(); }catch(_){}
@@ -13013,6 +13085,7 @@ try{
           name:file.name,
           status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
           cues:[],
+          cmcd: null,
           attachments:[],
           attachCount:null,
           qcResult:null,
@@ -13106,6 +13179,40 @@ try{
         }));
       }else{
         rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
+      }
+
+      // cmcd / attachments: restore per-file values after cache-restore
+      try{
+        if(rec.cmcd && typeof rec.cmcd === "object"){
+          _cmcdApplyValuesToInputs(rec.cmcd);
+        }else if(rec.cmcd === ""){
+          _cmcdApplyValuesToInputs(null);
+        }else{
+          rec.cmcd = _cmcdCaptureInputs();
+        }
+      }catch(err){
+        console.error("[ACTIVE] cmcd restore error", err);
+      }
+      try{
+        if(Array.isArray(rec.attachments)){
+          attachSetAll(rec.attachments);
+        }else{
+          rec.attachments = Array.isArray(state.attachments) ? state.attachments.slice() : [];
+        }
+        rec.attachCount = Array.isArray(rec.attachments) ? rec.attachments.length : 0;
+      }catch(err){
+        console.error("[ACTIVE] pdf restore error", err);
+      }
+      try{
+        console.log("[ACTIVE]", "restore", {
+          fileId: rec.id,
+          hasCmcd: _cmcdHasValues(rec.cmcd),
+          pdfCount: rec.attachments?.length || 0,
+        });
+      }catch(_){ }
+      if(typeof window.requestFullRefresh === "function"){
+        window.requestFullRefresh("active:restore:cmcd");
+        window.requestFullRefresh("active:restore:pdf");
       }
 
       // クリップ(添付)数は「確実に取れる手段」があれば同期。
