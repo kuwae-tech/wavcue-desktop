@@ -4403,6 +4403,98 @@ if (typeof window.diagState !== "function") {
   }
 })();
 
+/* --- CMCD extractor (real implementation; must not throw) --- */
+(function(){
+  window.findCmcdInTextChunks = function(textChunks, fileId){
+    try{
+      if (!Array.isArray(textChunks) || textChunks.length === 0) return null;
+
+      const tryParseJSON = (s)=>{
+        try{
+          const obj = JSON.parse(s);
+          if(obj && typeof obj === "object") return obj;
+        }catch(_){}
+        return null;
+      };
+      const KEY_HINTS = (window.CMCD_KEYS_UI || []).concat([
+        "共通コード","局内コード","素材秒数","素材タイトル","素材略号","素材コード",
+        "ポスプロコメント","放送局コメント","COMMENT","NOTE","CLIENT"
+      ]);
+      const hasHint = (txt)=> KEY_HINTS.some(k=>txt.includes(k));
+
+      const normalizeChunks = textChunks.map((c)=>{
+        if(typeof c === "string") return { id: "text", text: c };
+        if(c && typeof c === "object"){
+          const id = String(c.id || c.chunkId || c.name || "chunk");
+          const text = String(c.text || c.headText || c.preview || "");
+          return { id, text };
+        }
+        return { id: "chunk", text: String(c) };
+      });
+
+      // marker scan (future-proof placeholders; best-effort)
+      const MARKERS = ["WAVCUE_CMCD:", "WAVCUE:CMCD=", "WVCMCD:"];
+      for(const {id, text} of normalizeChunks){
+        if(!text) continue;
+        for(const m of MARKERS){
+          const p = text.indexOf(m);
+          if(p >= 0){
+            let cand = text.slice(p + m.length).trim();
+            const b1 = cand.indexOf("{");
+            const b2 = cand.lastIndexOf("}");
+            if(b1 >= 0 && b2 > b1) cand = cand.slice(b1, b2 + 1);
+            const obj = tryParseJSON(cand);
+            if(obj){
+              console.log("[ARTIFACT][CMCD] found by marker", { fileId, src: `chunk:${id}`, len: cand.length });
+              return obj;
+            }
+          }
+        }
+      }
+
+      // JSON/key-hint scan
+      for(const {id, text} of normalizeChunks){
+        if(!text || !hasHint(text)) continue;
+        const b1 = text.indexOf("{");
+        const b2 = text.lastIndexOf("}");
+        if(b1 >= 0 && b2 > b1){
+          const cand = text.slice(b1, b2 + 1);
+          const obj = tryParseJSON(cand);
+          if(obj){
+            console.log("[ARTIFACT][CMCD] found by key-hints", { fileId, src: `chunk:${id}`, len: cand.length });
+            return obj;
+          }
+        }
+      }
+
+      // XML fallback
+      for(const {id, text} of normalizeChunks){
+        if(!text) continue;
+        const idLower = id.toLowerCase();
+        if(!(idLower.includes("ixml") || idLower.includes("axml") || text.includes("<"))){
+          continue;
+        }
+        const m = text.match(/<WAVCUE_CMCD>([\s\S]*?)<\/WAVCUE_CMCD>/i)
+          || text.match(/<cmcd>([\s\S]*?)<\/cmcd>/i);
+        if(m && m[1]){
+          const cand = m[1].trim();
+          const obj = tryParseJSON(cand);
+          if(obj){
+            console.log("[ARTIFACT][CMCD] found in XML tag", { fileId, src: `chunk:${id}`, len: cand.length });
+            return obj;
+          }
+        }
+      }
+
+      console.warn("[ARTIFACT][CMCD] not found in textChunks", { fileId });
+      return null;
+    }catch(e){
+      console.error("[ARTIFACT][CMCD] extractor failed (non-fatal)", e);
+      return null;
+    }
+  };
+})();
+
 /* --- normalize rec artifacts (cmcd/pdf) : prevent undefined crash --- */
 (function(){
   if (typeof window.normalizeRecArtifacts === "function") return;
@@ -4635,9 +4727,6 @@ if (typeof window.diagState !== "function") {
     try{ console.warn("[ARTIFACT][CMCD]", "not found", { fileId }); }catch(_){ }
     return null;
   }
-  if(typeof window.findCmcdInTextChunks !== "function"){
-    window.findCmcdInTextChunks = findCmcdInTextChunks;
-  }
   function scanArtifactsFromFile(fileBuf, chunks, fileId){
     try{
       const chunkIdsSample = Array.isArray(chunks) ? chunks.map(c=>c?.id).filter(Boolean).slice(0, 60) : [];
@@ -4693,14 +4782,37 @@ if (typeof window.diagState !== "function") {
         }
       }catch(_){ }
       if(!cmcdInputs){
-        if(typeof window.findCmcdInTextChunks === "function"){
-          cmcdInputs = window.findCmcdInTextChunks(chunks, fileBuf, fileId);
-        }else{
-          console.warn("[ARTIFACT][CMCD] findCmcdInTextChunks missing (scan)");
-        }
+        try{
+          const textChunks = [];
+          if(Array.isArray(chunks)){
+            for(const ch of chunks.slice(0, 60)){
+              const id = String(ch?.id || "");
+              const off = ch?.dataOff;
+              const size = ch?.size;
+              if(!id || !off || !size) continue;
+              const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+              const headText = tryDecodeUtf8(u8, 300).slice(0, 300);
+              textChunks.push({ id, text: headText });
+              if(id === "LIST"){
+                const listType = tryDecodeUtf8(new Uint8Array(fileBuf, off, Math.min(size, 4)), 4);
+                if(listType === "INFO"){
+                  const info = parseInfoSubchunks(u8);
+                  const text = Object.values(info).join("\n");
+                  textChunks.push({ id: "LIST:INFO", text });
+                }
+              }
+            }
+          }
+          if(typeof window.findCmcdInTextChunks === "function"){
+            cmcdInputs = window.findCmcdInTextChunks(textChunks, fileId);
+          }else{
+            console.warn("[ARTIFACT][CMCD] findCmcdInTextChunks missing (scan)");
+          }
+        }catch(_){ }
       }
       const attachments = findPdfChunks(chunks, fileBuf);
-      console.log("[ARTIFACT]", "scan", { fileId, pdfFound: attachments.length, cmcdFound: !!cmcdInputs, chunkIdsSample });
+      const cmcdLen = (()=>{ try{ return cmcdInputs ? JSON.stringify(cmcdInputs).length : 0; }catch(_){ return 0; } })();
+      console.log("[ARTIFACT]", "scan", { fileId, pdfFound: attachments.length, cmcdFound: !!cmcdInputs, cmcdLen, chunkIdsSample });
       return { cmcdInputs, cmcdText, attachments };
     }catch(_){
       return { cmcdInputs: null, cmcdText: "", attachments: [] };
