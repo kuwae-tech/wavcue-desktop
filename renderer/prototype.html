@@ -4445,7 +4445,9 @@ if (typeof window.diagState !== "function") {
             if(b1 >= 0 && b2 > b1) cand = cand.slice(b1, b2 + 1);
             const obj = tryParseJSON(cand);
             if(obj){
+              const keysPreview = Object.keys(obj).slice(0, 12);
               console.log("[ARTIFACT][CMCD] found by marker", { fileId, src: `chunk:${id}`, len: cand.length });
+              console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
               return obj;
             }
           }
@@ -4461,9 +4463,25 @@ if (typeof window.diagState !== "function") {
           const cand = text.slice(b1, b2 + 1);
           const obj = tryParseJSON(cand);
           if(obj){
+            const keysPreview = Object.keys(obj).slice(0, 12);
             console.log("[ARTIFACT][CMCD] found by key-hints", { fileId, src: `chunk:${id}`, len: cand.length });
+            console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
             return obj;
           }
+        }
+        const kvObj = {};
+        text.split(/\r?\n/).forEach(line=>{
+          const idx = line.indexOf(":");
+          if(idx>0){
+            const k = line.slice(0, idx).trim();
+            const v = line.slice(idx+1).trim();
+            if(k && v) kvObj[k] = v;
+          }
+        });
+        if(Object.keys(kvObj).length){
+          const keysPreview = Object.keys(kvObj).slice(0, 12);
+          console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+          return kvObj;
         }
       }
 
@@ -4480,12 +4498,15 @@ if (typeof window.diagState !== "function") {
           const cand = m[1].trim();
           const obj = tryParseJSON(cand);
           if(obj){
+            const keysPreview = Object.keys(obj).slice(0, 12);
             console.log("[ARTIFACT][CMCD] found in XML tag", { fileId, src: `chunk:${id}`, len: cand.length });
+            console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
             return obj;
           }
         }
       }
 
+      console.warn("[CMCD]", "notfound", { fileId, checked: ["chunk","ixml","list","bext"], note: "preserve existing" });
       console.warn("[ARTIFACT][CMCD] not found in textChunks", { fileId });
       return null;
     }catch(e){
@@ -4791,8 +4812,9 @@ if (typeof window.diagState !== "function") {
               const size = ch?.size;
               if(!id || !off || !size) continue;
               const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
-              const headText = tryDecodeUtf8(u8, 300).slice(0, 300);
-              textChunks.push({ id, text: headText });
+              const fullText = tryDecodeUtf8(u8, 65536);
+              const headText = fullText.slice(0, 300);
+              textChunks.push({ id, text: fullText, headText });
               if(id === "LIST"){
                 const listType = tryDecodeUtf8(new Uint8Array(fileBuf, off, Math.min(size, 4)), 4);
                 if(listType === "INFO"){
@@ -4831,7 +4853,11 @@ if (typeof window.diagState !== "function") {
           rec.cmcdText ?? rec.cmcdValue ??
           rec.meta?.cmcd ?? rec.bwfj?.cmcd ??
           stateLike?.cmcd ?? stateLike?.meta?.cmcd ?? "";
-        rec.cmcd = (typeof cand === "string") ? cand : (cand ? String(cand) : "");
+        if(cand){
+          rec.cmcd = (typeof cand === "string") ? cand : String(cand);
+        }else if(rec.cmcd == null){
+          rec.cmcd = "";
+        }
       }
 
       // attachments: normalize to array
@@ -13788,15 +13814,19 @@ try{
                 if((!rec.attachments || !rec.attachments.length) && Array.isArray(artifacts.attachments)){
                   rec.attachments = artifacts.attachments;
                 }
-                if(typeof window.normalizeRecArtifacts === "function"){
-                  window.normalizeRecArtifacts(rec, null);
-                }
-                console.log("[ARTIFACT]", "import", {
-                  fileId: rec.id,
-                  cmcdFilled: !!(rec.cmcdInputs && _cmcdInputsHasValues(rec.cmcdInputs)),
-                  pdfCount: rec.attachments?.length || 0,
-                });
+              if(typeof window.normalizeRecArtifacts === "function"){
+                window.normalizeRecArtifacts(rec, null);
               }
+              console.log("[ARTIFACT]", "import", {
+                fileId: rec.id,
+                cmcdFilled: !!(rec.cmcdInputs && _cmcdInputsHasValues(rec.cmcdInputs)),
+                pdfCount: rec.attachments?.length || 0,
+              });
+            }else{
+              if(rec.cmcd && rec.cmcd.trim()){
+                console.warn("[CMCD]", "notfound", { fileId: rec.id, checked: ["chunk","ixml","list","bext"], note: "preserve existing" });
+              }
+            }
             }catch(e){
               console.warn("[ARTIFACT] import failed", e);
             }
