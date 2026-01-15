@@ -4391,6 +4391,48 @@ if (typeof window.diagState !== "function") {
   };
 }
 
+/* --- normalize rec artifacts (cmcd/pdf) : prevent undefined crash --- */
+(function(){
+  if (typeof window.normalizeRecArtifacts === "function") return;
+
+  window.normalizeRecArtifacts = function(rec, stateLike){
+    try{
+      if (!rec || typeof rec !== "object") return rec;
+
+      // cmcd: normalize to string
+      if (typeof rec.cmcd !== "string") {
+        const cand =
+          (rec.cmcd != null) ? rec.cmcd :
+          rec.cmcdText ?? rec.cmcdValue ??
+          rec.meta?.cmcd ?? rec.bwfj?.cmcd ??
+          stateLike?.cmcd ?? stateLike?.meta?.cmcd ?? "";
+        rec.cmcd = (typeof cand === "string") ? cand : (cand ? String(cand) : "");
+      }
+
+      // attachments: normalize to array
+      if (!Array.isArray(rec.attachments)) {
+        const ac =
+          rec.attachments ??
+          rec.pdfs ?? rec.pdfAttachments ?? rec.attachedPdfs ??
+          rec.meta?.attachments ?? rec.meta?.pdfs ??
+          rec.bwfj?.attachments ?? rec.bwfj?.pdfs ??
+          stateLike?.attachments ?? stateLike?.pdfs ?? [];
+        rec.attachments = Array.isArray(ac) ? ac : (ac ? [ac] : []);
+      }
+
+      console.log("[MIGRATE]", "normalizeRecArtifacts", {
+        fileId: rec.fileId || rec.id || null,
+        cmcdLen: rec.cmcd ? rec.cmcd.length : 0,
+        pdfCount: rec.attachments ? rec.attachments.length : 0
+      });
+      return rec;
+    }catch(e){
+      console.error("[MIGRATE]", "normalizeRecArtifacts:error", e);
+      return rec;
+    }
+  };
+})();
+
 /*
 [REGRESSION CHECKLIST - DO NOT BREAK]
 1) Multi D&D: drop 4 files -> logs show fullLoad done for all -> then all done.
@@ -6841,6 +6883,11 @@ function normalizeRecArtifacts(rec, stateLike){
     });
   }catch(_){ }
 }
+try{
+  if(typeof window.normalizeRecArtifacts !== "function"){
+    window.normalizeRecArtifacts = normalizeRecArtifacts;
+  }
+}catch(_){ }
 
 
 function _cmcdCapturePmInputs(){
@@ -13238,7 +13285,13 @@ try{
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad start", window.diagState({ name: rec.name, fileId: rec.id }));
             await loadSingleWav(rec.file);
             project.lastLoadedId = rec.id;
-            try{ normalizeRecArtifacts(rec, window.WavCue?.state || null); }catch(err){ console.error("[MIGRATE] fullLoad normalize error", err); }
+            try{
+              if(typeof window.normalizeRecArtifacts === "function"){
+                window.normalizeRecArtifacts(rec, window.WavCue?.state || null);
+              }else{
+                console.warn("[MIGRATE] normalizeRecArtifacts missing (fullLoad)");
+              }
+            }catch(err){ console.error("[MIGRATE] fullLoad normalize error", err); }
             proSyncRecFromState(rec, "dnd:fullLoad", {markEdited:false});
             console.log("[DND] fullLoad done", rec.name);
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad done", window.diagState({ name: rec.name, fileId: rec.id }));
@@ -13319,7 +13372,13 @@ try{
 
       // cmcd / attachments: restore per-file values after cache-restore
       try{
-        try{ normalizeRecArtifacts(rec, window.WavCue?.state || null); }catch(err){ console.error("[MIGRATE] active normalize error", err); }
+        try{
+          if(typeof window.normalizeRecArtifacts === "function"){
+            window.normalizeRecArtifacts(rec, window.WavCue?.state || null);
+          }else{
+            console.warn("[MIGRATE] normalizeRecArtifacts missing (active)");
+          }
+        }catch(err){ console.error("[MIGRATE] active normalize error", err); }
         const cmcdInput = window._cmcdInput;
         if(cmcdInput){
           cmcdInput.value = rec.cmcd || "";
