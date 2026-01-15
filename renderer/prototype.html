@@ -4767,6 +4767,8 @@ function moveCueToTime(cueId, targetSec, jumpAfter){
   }
 
   log(`CUE: ${cue.label} を ${fmtTime(cue.sec)} に移動${(state.linkPair && isPair) ? "（連動）" : ""}`);
+  console.log("[CUE] move", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, cueId, label: cue.label, sec: cue.sec});
+  commitAll("cue:move", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null});
 }
 
 function _commitTimeEdit(cueId, inputEl){
@@ -4777,6 +4779,44 @@ function _commitTimeEdit(cueId, inputEl){
     return;
   }
   moveCueToTime(cueId, t, true);
+}
+
+function commitAll(reason, opts){
+  const fileId = opts?.fileId || (typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null);
+  const cuesLen = Array.isArray(state.cues) ? state.cues.length : 0;
+  try{
+    if(typeof window.__wavcueProSaveActiveEdits === "function"){
+      window.__wavcueProSaveActiveEdits(reason, true);
+    }else{
+      console.warn("[commitAll] save handler not found");
+    }
+  }catch(err){
+    console.error("[commitAll] save failed", err);
+  }
+
+  try{
+    if(typeof window.__wavcueProPersistEdits === "function"){
+      window.__wavcueProPersistEdits(reason, opts);
+    }else{
+      console.warn("[commitAll] persist handler not found");
+    }
+  }catch(err){
+    console.error("[commitAll] persist failed", err);
+  }
+
+  try{ if(typeof window.__wavcueProUpdateBadges === "function") window.__wavcueProUpdateBadges(); }catch(err){ console.error("[commitAll] update badges failed", err); }
+  try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
+  try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+
+  try{
+    requestAnimationFrame(()=>{
+      try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
+      try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+      try{ if(typeof window.__wavcueProUpdateBadges === "function") window.__wavcueProUpdateBadges(); }catch(_){}
+    });
+  }catch(_){}
+
+  console.log("[commitAll]", reason, {fileId, cues:cuesLen});
 }
 
 
@@ -4836,11 +4876,11 @@ function setupDragAndDrop(){
       }
     }
     if(!files.length){ return; }
-    console.log(`[Pro] drop wavs=${files.length}`);
+    console.log("[DND] start", files.length);
     const add = window.__wavcueProAddFiles;
     if(typeof add === "function"){
       await add(files);
-      console.log(`[Pro] drop add completed count=${files.length}`);
+      console.log("[DND] all done");
     }else{
       await loadFile(files[0]);
     }
@@ -5444,10 +5484,13 @@ function addCue(label){
   undoCheckpoint();
   const sec = currentPlayheadSec();
   const id = state.nextCueId++;
+  const before = Array.isArray(state.cues) ? state.cues.length : 0;
   state.cues.push({id, label, sec});
   log(`CUE+: ${label} @ ${sec.toFixed(3)}s`);
   renderCues();
   drawAll();
+  console.log("[CUE] add", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, label, before, after: before + 1});
+  commitAll("cue:add", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null});
 }
 
 
@@ -5477,6 +5520,8 @@ function addStartStopCues(){
   log(`CUE+: BC$STOP @ ${dur.toFixed(3)}s`);
   renderCues();
   drawAll();
+  console.log("[CUE] add", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, label:"BC$START/BC$STOP", before: next.length, after: next.length + 2});
+  commitAll("cue:add:startstop", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null});
 }
 
 function addCuePair(){
@@ -5508,13 +5553,19 @@ function addCuePair(){
   log(`CUE+: BC$END @ ${sec1.toFixed(3)}s (gap ${gap}s)`);
   renderCues();
   drawAll();
+  console.log("[CUE] add", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, label:"BC$STANDBY/BC$END", before: next.length, after: next.length + 2});
+  commitAll("cue:add:pair", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null});
 }
 
 function deleteCue(id){
   undoCheckpoint();
+  const before = Array.isArray(state.cues) ? state.cues.length : 0;
   state.cues = state.cues.filter(c=>c.id!==id);
   renderCues();
   drawAll();
+  const after = Array.isArray(state.cues) ? state.cues.length : 0;
+  console.log("[CUE] delete", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, cueId: id, before, after});
+  commitAll("cue:delete", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null});
 }
 function jumpToCue(id){
   const c = state.cues.find(x=>x.id===id);
@@ -5847,6 +5898,7 @@ window.addEventListener("mousemove",(e)=>{
 });
 window.addEventListener("mouseup",()=>{
   if(state.draggingCueId!==null){
+    const before = Array.isArray(state.cues) ? state.cues.length : 0;
     try{
       const snap = state._undoDragSnap;
       if(snap){
@@ -5862,12 +5914,20 @@ window.addEventListener("mouseup",()=>{
         const en = state.cues.find(x=>x.id===state.dragPair.enId);
         if(st && en){
           log(`CUE MOVE(LINK): ST=${st.sec.toFixed(3)}s / EN=${en.sec.toFixed(3)}s / gap=${(en.sec-st.sec).toFixed(3)}s`);
+          console.log("[CUE] move", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, cueId: c.id, label: c.label, sec: c.sec, link: true});
         }else{
           log(`CUE MOVE: ${c.label} -> ${c.sec.toFixed(3)}s`);
+          console.log("[CUE] move", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, cueId: c.id, label: c.label, sec: c.sec});
         }
       }else{
         log(`CUE MOVE: ${c.label} -> ${c.sec.toFixed(3)}s`);
+        console.log("[CUE] move", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, cueId: c.id, label: c.label, sec: c.sec});
       }
+      commitAll("cue:move:drag", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null});
+    }
+    const afterCount = Array.isArray(state.cues) ? state.cues.length : 0;
+    if(before !== afterCount){
+      console.log("[CUE] drag count changed", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, before, after: afterCount});
     }
   }
   state.draggingCueId = null;
@@ -8308,6 +8368,8 @@ $("btnAddCustom").addEventListener("click", ()=>{
       log(`CUE+: ${label} @ 0.000s`);
       renderCues();
       drawAll();
+      console.log("[CUE] add", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null, label, before: state.cues.length - 1, after: state.cues.length});
+      commitAll("cue:add:note", {fileId: typeof window.__wavcueProGetActiveId === "function" ? window.__wavcueProGetActiveId() : null});
       toast(`${label} を先頭(0秒)に追加しました`, "ok");
       return;
     }
@@ -12667,6 +12729,12 @@ try{
   const W = window.WavCue || {};
   const api = W.api || {};
   const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
+  const CACHE_KEYS = [
+    "file","fileName","audioUrl","buffer","peaks","fileSr","fileBlockAlign","fileTotalSamples",
+    "srcAb","srcChunks","srcFmtPayload","srcIXmlPayload","srcBextPayload","srcCmcdPayload",
+    "cmcdLayout","cmcdBytes","cuePatchMeta","loadedCueSig","attachments","attachSel",
+    "pdfAttach","pdfViewUrl","origBuffer","procApplied","procDataPayload","procInfo","previewUrl"
+  ];
   function proGetAppCues(){
     const st = window.WavCue?.state;
     if(!st || !Array.isArray(st.cues)) return null;
@@ -12679,6 +12747,37 @@ try{
   function proCueSignature(cues){
     if(!Array.isArray(cues)) return "";
     return cues.map(c=>`${c.id >>> 0}:${String(c.label ?? "")}:${Number(c.sec ?? 0)}`).join("|");
+  }
+  function proGetActiveId(){
+    return project.activeId;
+  }
+  function proGetRecCues(rec){
+    const fromSnap = Array.isArray(rec?.cuesSnapshot) ? rec.cuesSnapshot : null;
+    const fromRec = Array.isArray(rec?.cues) ? rec.cues : null;
+    return fromSnap || fromRec || [];
+  }
+  function proUpdateBadges(){
+    render();
+  }
+  function captureStateCache(){
+    const st = window.WavCue?.state;
+    if(!st) return null;
+    const out = {};
+    CACHE_KEYS.forEach(k=>{ if(Object.prototype.hasOwnProperty.call(st, k)) out[k] = st[k]; });
+    return out;
+  }
+  function applyStateCache(cache){
+    const st = window.WavCue?.state;
+    if(!st || !cache) return false;
+    CACHE_KEYS.forEach(k=>{ if(Object.prototype.hasOwnProperty.call(cache, k)) st[k] = cache[k]; });
+    try{
+      if(typeof $("fileName")?.textContent !== "undefined"){
+        $("fileName").textContent = st.fileName || "-";
+      }
+    }catch(_){}
+    st.ui = st.ui || {};
+    st.ui.isLoadingWav = false;
+    return true;
   }
   function proSaveActiveEdits(reason, force){
     const id = project.activeId;
@@ -12697,6 +12796,7 @@ try{
       label: String(c.label ?? ""),
       sec: Number(c.sec ?? 0),
     }));
+    rec.cues = rec.cuesSnapshot.slice();
     rec.cuesSig = sig;
     rec.dirty = true;
 
@@ -12732,6 +12832,35 @@ try{
       try{ if(typeof window.resizeAll === "function") window.resizeAll(); }catch(_){}
       try{ if(typeof window.drawAll === "function") window.drawAll(); }catch(_){}
     }, 120);
+  }
+  function proRefreshActiveUI(reason){
+    if(reason) console.log(`[Pro] refreshUI(${reason})`);
+    try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
+    try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+    try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
+    try{ proUpdateBadges(); }catch(_){}
+    try{
+      requestAnimationFrame(()=>{
+        try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
+        try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+        try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
+        try{ proUpdateBadges(); }catch(_){}
+      });
+    }catch(_){}
+  }
+  function proSyncRecFromState(rec, reason){
+    const st = window.WavCue?.state;
+    if(!rec || !st) return;
+    if(Array.isArray(st.cues)){
+      rec.cues = st.cues.map(c=>({
+        id: c.id >>> 0,
+        label: String(c.label ?? ""),
+        sec: Number(c.sec ?? 0),
+      }));
+      rec.cuesSnapshot = rec.cues.slice();
+      rec.cuesSig = proCueSignature(rec.cuesSnapshot);
+    }
+    if(reason){ console.log(`[Pro] syncRec(${reason}) -> ${rec.name} cues=${rec.cuesSnapshot?.length || 0}`); }
   }
   function isWavFile(file){
     if(!file) return false;
@@ -12776,6 +12905,10 @@ try{
         name:file.name,
         status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
         cues:[],
+        cuesSnapshot:null,
+        cuesSig:"",
+        cache:null,
+        loaded:false,
         attachments:[],
         attachCount:null,
         qcResult:null,
@@ -12783,8 +12916,30 @@ try{
       });
       addedIds.push(id);
     }
-    if(project.activeId==null && project.files.length>0){
-      await setActiveFile(project.files[0].id, {force:true});
+    render();
+    const firstNewId = addedIds[0];
+    for(const id of addedIds){
+      const rec = project.files.find(f=>f.id===id);
+      if(!rec) continue;
+      if(typeof loadSingleWav !== "function"){
+        console.warn("[DND] loadFile unavailable; skip full load");
+        continue;
+      }
+      console.log("[DND] fullLoad start", rec.name);
+      try{
+        await loadSingleWav(rec.file);
+        project.lastLoadedId = id;
+        proForceRedraw("full-load");
+        proSyncRecFromState(rec, "full-load");
+        rec.cache = captureStateCache();
+        rec.loaded = true;
+        console.log("[DND] fullLoad done", rec.name);
+      }catch(err){
+        console.error("[DND] fullLoad failed", err);
+      }
+    }
+    if(firstNewId){
+      await setActiveFile(firstNewId, {force:false});
     }else{
       render();
     }
@@ -12800,9 +12955,25 @@ try{
     project.activeId = id;
     render();
 
+    if(rec.cache && !opts?.force){
+      const applied = applyStateCache(rec.cache);
+      if(applied){
+        project.lastLoadedId = id;
+        proApplyEditsToApp(rec, "cache-restore");
+        proRefreshActiveUI("cache-restore");
+        const cueCount = proGetRecCues(rec).length;
+        const attCount = Number.isFinite(rec.attachCount) ? rec.attachCount : (Array.isArray(rec.attachments) ? rec.attachments.length : 0);
+        console.log("[ACTIVE] set", id, {cues: cueCount, att: attCount, cmcd: !!state.cmcdBytes});
+        return;
+      }
+    }
+
     // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
     if(project.lastLoadedId===id && !opts?.force){
-      // UI更新だけはして終わる
+      proRefreshActiveUI("already-active");
+      const cueCount = proGetRecCues(rec).length;
+      const attCount = Number.isFinite(rec.attachCount) ? rec.attachCount : (Array.isArray(rec.attachments) ? rec.attachments.length : 0);
+      console.log("[ACTIVE] set", id, {cues: cueCount, att: attCount, cmcd: !!state.cmcdBytes});
       return;
     }
 
@@ -12818,6 +12989,8 @@ try{
       project.lastLoadedId = id;
       proForceRedraw("after-load");
       proApplyEditsToApp(rec, "after-load");
+      rec.cache = captureStateCache();
+      rec.loaded = true;
 
       // 読み込み後に、本体stateからキュー情報を同期（表示用）
       const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
@@ -12827,6 +13000,8 @@ try{
           label: String(c.label ?? ""),
           sec: Number(c.sec ?? 0),
         }));
+        rec.cuesSnapshot = rec.cues.slice();
+        rec.cuesSig = proCueSignature(rec.cuesSnapshot);
       }else{
         rec.cues = Array.isArray(rec.cues) ? rec.cues : [];
       }
@@ -12853,6 +13028,10 @@ try{
       console.error("[Pro] setActiveFile: load failed", err);
     }finally{
       render();
+      proRefreshActiveUI("after-load");
+      const cueCount = proGetRecCues(rec).length;
+      const attCount = Number.isFinite(rec.attachCount) ? rec.attachCount : (Array.isArray(rec.attachments) ? rec.attachments.length : 0);
+      console.log("[ACTIVE] set", id, {cues: cueCount, att: attCount, cmcd: !!state.cmcdBytes});
     }
   }
   function filtered(){
@@ -12988,7 +13167,7 @@ try{
       setPopoverContent("ステータス", body);
     }
     if(type==="cues"){
-      const cues = Array.isArray(file.cues) ? file.cues : [];
+      const cues = proGetRecCues(file);
       if(!cues.length){
         const item = document.createElement("div");
         item.className = "proPopItem";
@@ -13054,7 +13233,7 @@ try{
       if(project.selectedIds.has(f.id)) cls.push('selected');
       const statusText = (f.status.qc==='ok') ? 'OK' : (f.status.qc==='ng' ? 'NG' : '未');
       const statusClass = (f.status.qc==='ok') ? 'ok' : (f.status.qc==='ng' ? 'ng' : 'unverified');
-      const cueCount = Array.isArray(f.cues) ? f.cues.length : 0;
+      const cueCount = proGetRecCues(f).length;
       const attCount = Number.isFinite(f.attachCount)
         ? f.attachCount
         : (Array.isArray(f.attachments) ? f.attachments.length : 0);
@@ -13130,6 +13309,9 @@ try{
   }
   function bind(){
     window.__wavcueProAddFiles = addFiles;
+    window.__wavcueProSaveActiveEdits = proSaveActiveEdits;
+    window.__wavcueProUpdateBadges = proUpdateBadges;
+    window.__wavcueProGetActiveId = proGetActiveId;
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
 
