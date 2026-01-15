@@ -6684,6 +6684,11 @@ function _cmcdCaptureInputs(){
   }
   return values;
 }
+function _cmcdClearInputs(){
+  document.querySelectorAll('[data-cmcd]').forEach(inp=>{ inp.value = ""; });
+  try{ cmcdBuildBytesFromInputs(); }catch(_){ }
+  try{ refreshCmcdView(); }catch(_){ }
+}
 function _cmcdHasValues(values){
   if(!values || typeof values !== "object") return false;
   return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
@@ -6698,6 +6703,22 @@ function _cmcdApplyValuesToInputs(values){
   try{ cmcdBuildBytesFromInputs(); }catch(_){ }
   try{ refreshCmcdView(); }catch(_){ }
 }
+function _cmcdGetInputProxy(){
+  return {
+    get value(){ return _cmcdCaptureInputs(); },
+    set value(v){
+      if(!v || v === ""){ _cmcdClearInputs(); return; }
+      if(typeof v === "object"){ _cmcdApplyValuesToInputs(v); return; }
+      _cmcdClearInputs();
+    },
+  };
+}
+
+try{
+  window._cmcdCaptureInputs = window._cmcdCaptureInputs || _cmcdCaptureInputs;
+  window._cmcdApplyValuesToInputs = window._cmcdApplyValuesToInputs || _cmcdApplyValuesToInputs;
+  window._cmcdInput = window._cmcdInput || _cmcdGetInputProxy();
+}catch(_){ }
 
 function _proGetActiveFileId(){
   return (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -6835,6 +6856,7 @@ function setupCmcdDialog(){
   const dlg = $("cmcdDialog");
   if(!dlg) return;
 
+  const cmcdInput = window._cmcdInput;
   let editId = "";
 
   const open = ()=>{
@@ -6872,8 +6894,11 @@ function setupCmcdDialog(){
 
   $("btnCmcdClear")?.addEventListener("click", ()=>{
     undoCheckpoint();
-    document.querySelectorAll('[data-cmcd]').forEach(inp=> inp.value = "");
-    sync();
+    if(cmcdInput) cmcdInput.value = "";
+    else{
+      document.querySelectorAll('[data-cmcd]').forEach(inp=> inp.value = "");
+      sync();
+    }
     const rec = _proGetActiveRec();
     if(rec){
       rec.cmcd = "";
@@ -6889,7 +6914,8 @@ function setupCmcdDialog(){
     sync();
     const rec = _proGetActiveRec();
     if(rec){
-      rec.cmcd = _cmcdCaptureInputs();
+      if(cmcdInput) rec.cmcd = cmcdInput.value;
+      else if(typeof _cmcdCaptureInputs === "function") rec.cmcd = _cmcdCaptureInputs();
       console.log("[CMCD]", "apply", { fileId: rec.id, value: rec.cmcd });
       if(typeof window.commitAll === "function"){
         window.commitAll("cmcd:apply", { fileId: rec.id });
@@ -11873,6 +11899,13 @@ function attachSetAll(list){
   attachRenderList();
   _pdfUI_set(state.pdfAttach);
 }
+
+try{
+  window.attachSetAll = window.attachSetAll || attachSetAll;
+  window.attachRenderList = window.attachRenderList || attachRenderList;
+  window.attachSyncLegacy = window.attachSyncLegacy || attachSyncLegacy;
+  window._pdfUI_set = window._pdfUI_set || _pdfUI_set;
+}catch(_){ }
 function attachSelectById(id){
   const atts = Array.isArray(state.attachments) ? state.attachments : [];
   const idx = atts.findIndex(a=>a && a.id===id);
@@ -13183,21 +13216,29 @@ try{
 
       // cmcd / attachments: restore per-file values after cache-restore
       try{
-        if(rec.cmcd && typeof rec.cmcd === "object"){
-          _cmcdApplyValuesToInputs(rec.cmcd);
-        }else if(rec.cmcd === ""){
-          _cmcdApplyValuesToInputs(null);
-        }else{
-          rec.cmcd = _cmcdCaptureInputs();
+        const cmcdInput = window._cmcdInput;
+        if(cmcdInput){
+          cmcdInput.value = rec.cmcd || "";
+          console.log("[CMCD]", "restore", { fileId: rec.id, value: cmcdInput.value });
+        }else if(typeof window._cmcdApplyValuesToInputs === "function"){
+          window._cmcdApplyValuesToInputs(rec.cmcd || null);
+          console.log("[CMCD]", "restore", { fileId: rec.id, value: rec.cmcd || "" });
+        }else if(typeof window._cmcdCaptureInputs === "function"){
+          rec.cmcd = window._cmcdCaptureInputs();
         }
       }catch(err){
         console.error("[ACTIVE] cmcd restore error", err);
       }
       try{
-        if(Array.isArray(rec.attachments)){
-          attachSetAll(rec.attachments);
+        if(Array.isArray(rec.attachments) && typeof window.attachSetAll === "function"){
+          window.attachSetAll(rec.attachments);
         }else{
-          rec.attachments = Array.isArray(state.attachments) ? state.attachments.slice() : [];
+          const list = Array.isArray(rec.attachments) ? rec.attachments : [];
+          if(Array.isArray(state.attachments)) state.attachments = list.slice();
+          if(typeof window.attachSyncLegacy === "function") window.attachSyncLegacy();
+          if(typeof window.attachRenderList === "function") window.attachRenderList();
+          if(typeof window._pdfUI_set === "function") window._pdfUI_set(state.pdfAttach);
+          rec.attachments = list;
         }
         rec.attachCount = Array.isArray(rec.attachments) ? rec.attachments.length : 0;
       }catch(err){
