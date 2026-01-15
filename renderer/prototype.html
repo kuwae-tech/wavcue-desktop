@@ -4391,6 +4391,18 @@ if (typeof window.diagState !== "function") {
   };
 }
 
+/* --- compat: prevent ReferenceError for cmcd scan helpers --- */
+(function(){
+  if (typeof window.findCmcdInTextChunks !== "function") {
+    window.findCmcdInTextChunks = function(){
+      try{
+        console.warn("[ARTIFACT][CMCD] findCmcdInTextChunks missing -> skip");
+        return null;
+      }catch(_){ return null; }
+    };
+  }
+})();
+
 /* --- normalize rec artifacts (cmcd/pdf) : prevent undefined crash --- */
 (function(){
   if (typeof window.normalizeRecArtifacts === "function") return;
@@ -4623,6 +4635,9 @@ if (typeof window.diagState !== "function") {
     try{ console.warn("[ARTIFACT][CMCD]", "not found", { fileId }); }catch(_){ }
     return null;
   }
+  if(typeof window.findCmcdInTextChunks !== "function"){
+    window.findCmcdInTextChunks = findCmcdInTextChunks;
+  }
   function scanArtifactsFromFile(fileBuf, chunks, fileId){
     try{
       const chunkIdsSample = Array.isArray(chunks) ? chunks.map(c=>c?.id).filter(Boolean).slice(0, 60) : [];
@@ -4678,7 +4693,11 @@ if (typeof window.diagState !== "function") {
         }
       }catch(_){ }
       if(!cmcdInputs){
-        cmcdInputs = findCmcdInTextChunks(chunks, fileBuf, fileId);
+        if(typeof window.findCmcdInTextChunks === "function"){
+          cmcdInputs = window.findCmcdInTextChunks(chunks, fileBuf, fileId);
+        }else{
+          console.warn("[ARTIFACT][CMCD] findCmcdInTextChunks missing (scan)");
+        }
       }
       const attachments = findPdfChunks(chunks, fileBuf);
       console.log("[ARTIFACT]", "scan", { fileId, pdfFound: attachments.length, cmcdFound: !!cmcdInputs, chunkIdsSample });
