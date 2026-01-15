@@ -4482,6 +4482,47 @@ if (typeof window.diagState !== "function") {
       return new TextDecoder("utf-8", {fatal:false}).decode(u8.slice(0, lim));
     }catch(_){ return ""; }
   }
+  function decodeLatin1(u8, maxLen){
+    try{
+      const lim = Math.max(0, Math.min(u8.length, maxLen || 65536));
+      let out = "";
+      for(let i=0;i<lim;i++){
+        out += String.fromCharCode(u8[i]);
+      }
+      return out;
+    }catch(_){ return ""; }
+  }
+  function asciiPreview(u8, maxLen){
+    try{
+      const lim = Math.max(0, Math.min(u8.length, maxLen || 64));
+      let out = "";
+      for(let i=0;i<lim;i++){
+        const ch = u8[i];
+        out += (ch >= 0x20 && ch <= 0x7e) ? String.fromCharCode(ch) : ".";
+      }
+      return out;
+    }catch(_){ return ""; }
+  }
+  function parseInfoSubchunks(u8){
+    try{
+      const out = {};
+      const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+      const u32 = (o)=>dv.getUint32(o,true);
+      const str4 = (o)=>String.fromCharCode(u8[o],u8[o+1],u8[o+2],u8[o+3]);
+      if(u8.length < 4 || str4(0) !== "INFO") return out;
+      let off = 4;
+      while(off + 8 <= u8.length){
+        const id = str4(off);
+        const size = u32(off+4);
+        const dataOff = off + 8;
+        const end = Math.min(u8.length, dataOff + size);
+        const txt = tryDecodeUtf8(u8.slice(dataOff, end), 65536).replace(/\0/g,"").trim();
+        if(txt) out[id] = txt;
+        off = end + (size % 2);
+      }
+      return out;
+    }catch(_){ return {}; }
+  }
   function findPdfChunks(chunks, fileBuf){
     try{
       if(typeof pdfFindAllInWav === "function"){
@@ -4506,25 +4547,23 @@ if (typeof window.diagState !== "function") {
       return out.slice(0,9);
     }catch(_){ return []; }
   }
-  function findCmcdInTextChunks(chunks, fileBuf){
+  function findCmcdInTextChunks(chunks, fileBuf, fileId){
     try{
       if(!Array.isArray(chunks)) return null;
-      const targets = new Set(["axml","iXML","INFO","bext","JUNK","LIST"]);
-      const keys = ["Ver4","共通コード","素材秒数","素材タイトル","素材略号","素材コード"];
-      for(const ch of chunks){
-        const id = String(ch?.id || "");
-        if(!targets.has(id)) continue;
-        const off = ch?.dataOff;
-        const size = ch?.size;
-        if(!off || !size) continue;
-        const txt = tryDecodeUtf8(new Uint8Array(fileBuf, off, Math.min(size, 65536)), 65536);
-        if(!txt) continue;
-        if(!keys.some(k=>txt.includes(k))) continue;
+      const targets = new Set(["axml","iXML","INFO","bext","JUNK","LIST","ID3 ","ICMT","ISFT"]);
+      const keys = ["Ver4","Ver","共通コード","素材秒数","素材タイトル","素材略号","素材コード","局内コード","ポスプロコメント","放送局コメント","COMMENT","NOTE","CLIENT"];
+      const keyHit = (txt)=> keys.some(k=>txt.includes(k));
+      const parseText = (txt, mode, chunkId)=>{
+        if(!txt) return null;
+        if(!keyHit(txt)) return null;
         try{
           const m = txt.match(/\{[\s\S]*?\}/);
           if(m){
             const obj = JSON.parse(m[0]);
-            if(obj && typeof obj === "object") return obj;
+            if(obj && typeof obj === "object"){
+              console.log("[ARTIFACT][CMCD]", "found", { fileId, chunkId, mode, keys: Object.keys(obj).slice(0, 12) });
+              return obj;
+            }
           }
         }catch(_){ }
         const obj = {};
@@ -4536,14 +4575,93 @@ if (typeof window.diagState !== "function") {
             if(k && v) obj[k] = v;
           }
         });
-        if(Object.keys(obj).length) return obj;
+        if(Object.keys(obj).length){
+          console.log("[ARTIFACT][CMCD]", "found", { fileId, chunkId, mode, keys: Object.keys(obj).slice(0, 12) });
+          return obj;
+        }
+        return null;
+      };
+      for(const ch of chunks){
+        const id = String(ch?.id || "");
+        if(!targets.has(id)) continue;
+        const off = ch?.dataOff;
+        const size = ch?.size;
+        if(!off || !size) continue;
+        if(id === "LIST"){
+          const listType = tryDecodeUtf8(new Uint8Array(fileBuf, off, Math.min(size, 4)), 4);
+          if(listType === "INFO"){
+            const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+            const info = parseInfoSubchunks(u8);
+            const text = Object.values(info).join("\n");
+            const parsed = parseText(text, "info", "LIST:INFO");
+            if(parsed) return parsed;
+          }
+        }
+        const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+        const txt = tryDecodeUtf8(u8, 65536);
+        const parsedUtf8 = parseText(txt, "utf8", id);
+        if(parsedUtf8) return parsedUtf8;
+        const latin = decodeLatin1(u8, 65536);
+        const parsedLatin = parseText(latin, "latin1", id);
+        if(parsedLatin) return parsedLatin;
+      }
+      // fallback: scan all chunks quickly
+      for(const ch of chunks){
+        const id = String(ch?.id || "");
+        const off = ch?.dataOff;
+        const size = ch?.size;
+        if(!off || !size) continue;
+        const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+        const txt = tryDecodeUtf8(u8, 65536);
+        const parsedUtf8 = parseText(txt, "utf8", id);
+        if(parsedUtf8) return parsedUtf8;
+        const latin = decodeLatin1(u8, 65536);
+        const parsedLatin = parseText(latin, "latin1", id);
+        if(parsedLatin) return parsedLatin;
       }
     }catch(_){ }
+    try{ console.warn("[ARTIFACT][CMCD]", "not found", { fileId }); }catch(_){ }
     return null;
   }
   function scanArtifactsFromFile(fileBuf, chunks, fileId){
     try{
-      const chunkIdsSample = Array.isArray(chunks) ? chunks.map(c=>c?.id).filter(Boolean).slice(0, 12) : [];
+      const chunkIdsSample = Array.isArray(chunks) ? chunks.map(c=>c?.id).filter(Boolean).slice(0, 60) : [];
+      try{
+        if(Array.isArray(chunks)){
+          const sample = chunks.slice(0, 60).map((c)=>{
+            const id = c?.id || "";
+            const size = c?.size || 0;
+            let headAscii = "";
+            try{
+              if(fileBuf && c?.dataOff != null && size){
+                const u8 = new Uint8Array(fileBuf, c.dataOff, Math.min(size, 64));
+                headAscii = asciiPreview(u8, 64);
+              }
+            }catch(_){ }
+            return { id, size, headAscii };
+          });
+          console.log("[ARTIFACT][CHUNKS]", { fileId, count: chunks.length, sample });
+          let previewed = 0;
+          for(const c of chunks){
+            if(previewed >= 10) break;
+            const id = String(c?.id || "");
+            if(!id) continue;
+            const off = c?.dataOff;
+            const size = c?.size;
+            if(!off || !size) continue;
+            const u8 = new Uint8Array(fileBuf, off, Math.min(size, 65536));
+            const headAscii = asciiPreview(u8, 64);
+            const idLower = id.toLowerCase();
+            const candidate = ["ixml","axml","list","info","bext","junk","id3 ","icmt","isft"].some(k=>idLower.includes(k))
+              || headAscii.includes("{") || headAscii.includes("Ver") || headAscii.includes("cmcd") || headAscii.includes("素材");
+            if(candidate){
+              const headText = tryDecodeUtf8(u8, 300).slice(0, 300);
+              console.log("[ARTIFACT][PREVIEW]", { fileId, id, headText });
+              previewed += 1;
+            }
+          }
+        }
+      }catch(_){ }
       let cmcdInputs = null;
       let cmcdText = "";
       try{
@@ -4560,7 +4678,7 @@ if (typeof window.diagState !== "function") {
         }
       }catch(_){ }
       if(!cmcdInputs){
-        cmcdInputs = findCmcdInTextChunks(chunks, fileBuf);
+        cmcdInputs = findCmcdInTextChunks(chunks, fileBuf, fileId);
       }
       const attachments = findPdfChunks(chunks, fileBuf);
       console.log("[ARTIFACT]", "scan", { fileId, pdfFound: attachments.length, cmcdFound: !!cmcdInputs, chunkIdsSample });
@@ -13528,7 +13646,7 @@ try{
             }
             try{
               if(artifacts){
-                if((!rec.cmcdInputs || !_cmcdInputsHasValues(rec.cmcdInputs)) && artifacts.cmcdInputs){
+                if((!rec.cmcdInputs || !_cmcdInputsHasValues(rec.cmcdInputs)) && artifacts.cmcdInputs && _cmcdInputsHasValues(artifacts.cmcdInputs)){
                   rec.cmcdInputs = artifacts.cmcdInputs;
                 }
                 if((!rec.cmcd || !rec.cmcd.trim()) && artifacts.cmcdText){
