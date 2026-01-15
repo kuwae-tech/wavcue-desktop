@@ -6684,13 +6684,39 @@ function _cmcdCaptureInputs(){
   }
   return values;
 }
+function _cmcdSerializeInputs(){
+  try{ return JSON.stringify(_cmcdCaptureInputs()); }catch(_){ return ""; }
+}
+function _cmcdApplySerializedToInputs(value){
+  if(!value){ _cmcdClearInputs(); return; }
+  let obj = null;
+  try{
+    obj = JSON.parse(String(value));
+  }catch(_){
+    obj = null;
+  }
+  if(obj && typeof obj === "object"){
+    _cmcdApplyValuesToInputs(obj);
+    return;
+  }
+  _cmcdClearInputs();
+}
 function _cmcdClearInputs(){
   document.querySelectorAll('[data-cmcd]').forEach(inp=>{ inp.value = ""; });
   try{ cmcdBuildBytesFromInputs(); }catch(_){ }
   try{ refreshCmcdView(); }catch(_){ }
 }
 function _cmcdHasValues(values){
-  if(!values || typeof values !== "object") return false;
+  if(!values) return false;
+  if(typeof values === "string"){
+    let obj = null;
+    try{ obj = JSON.parse(values); }catch(_){ obj = null; }
+    if(obj && typeof obj === "object"){
+      return CMCD_KEYS_UI.some(k=> String(obj[k] ?? "").trim());
+    }
+    return values.trim().length > 0;
+  }
+  if(typeof values !== "object") return false;
   return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
 }
 function _cmcdApplyValuesToInputs(values){
@@ -6705,11 +6731,11 @@ function _cmcdApplyValuesToInputs(values){
 }
 function _cmcdGetInputProxy(){
   return {
-    get value(){ return _cmcdCaptureInputs(); },
+    get value(){ return _cmcdSerializeInputs(); },
     set value(v){
       if(!v || v === ""){ _cmcdClearInputs(); return; }
       if(typeof v === "object"){ _cmcdApplyValuesToInputs(v); return; }
-      _cmcdClearInputs();
+      _cmcdApplySerializedToInputs(v);
     },
   };
 }
@@ -6717,6 +6743,8 @@ function _cmcdGetInputProxy(){
 try{
   window._cmcdCaptureInputs = window._cmcdCaptureInputs || _cmcdCaptureInputs;
   window._cmcdApplyValuesToInputs = window._cmcdApplyValuesToInputs || _cmcdApplyValuesToInputs;
+  window._cmcdSerializeInputs = window._cmcdSerializeInputs || _cmcdSerializeInputs;
+  window._cmcdApplySerializedToInputs = window._cmcdApplySerializedToInputs || _cmcdApplySerializedToInputs;
   window._cmcdInput = window._cmcdInput || _cmcdGetInputProxy();
 }catch(_){ }
 
@@ -6738,6 +6766,80 @@ function _syncActiveRecAttachments(){
   rec.attachments = list;
   rec.attachCount = list.length;
   return rec;
+}
+function _normalizeAttachmentList(list){
+  if(!Array.isArray(list)) return [];
+  return list.slice(0, 9).map((item)=>{
+    if(!item) return null;
+    if(typeof item === "string") return _attEnsureId({ name: item });
+    if(typeof item === "object"){
+      const name = item.name || item.fileName || item.filename || item.title || "";
+      return _attEnsureId({ ...item, name });
+    }
+    return null;
+  }).filter(Boolean);
+}
+function normalizeRecArtifacts(rec, stateLike){
+  if(!rec) return;
+  try{
+    const cmcdCandidates = [
+      rec.cmcd,
+      rec.cmcdText,
+      rec.cmcdValue,
+      rec.cmcdInputs,
+      rec.meta?.cmcd,
+      rec.bwfj?.cmcd,
+      stateLike?.cmcd,
+      stateLike?.cmcdValue,
+      stateLike?.cmcdText,
+    ];
+    if(!rec.cmcd){
+      for(const c of cmcdCandidates){
+        if(!c) continue;
+        if(typeof c === "string"){ rec.cmcd = c; break; }
+        if(typeof c === "object"){ try{ rec.cmcd = JSON.stringify(c); }catch(_){ rec.cmcd = ""; } break; }
+      }
+    }
+    if(!rec.cmcd && typeof window._cmcdSerializeInputs === "function"){
+      rec.cmcd = window._cmcdSerializeInputs();
+    }
+    if(typeof rec.cmcd !== "string") rec.cmcd = (rec.cmcd ? String(rec.cmcd) : "");
+  }catch(err){
+    console.error("[MIGRATE] cmcd normalize error", err);
+    rec.cmcd = typeof rec.cmcd === "string" ? rec.cmcd : "";
+  }
+  try{
+    const attCandidates = [
+      rec.attachments,
+      rec.pdfs,
+      rec.pdfAttachments,
+      rec.attachedPdfs,
+      rec.meta?.pdf,
+      rec.bwfj?.pdf,
+      stateLike?.attachments,
+      stateLike?.pdfs,
+      stateLike?.pdfAttachments,
+    ];
+    if(!Array.isArray(rec.attachments) || !rec.attachments.length){
+      for(const list of attCandidates){
+        if(Array.isArray(list) && list.length){
+          rec.attachments = _normalizeAttachmentList(list);
+          break;
+        }
+      }
+    }
+    if(!Array.isArray(rec.attachments)) rec.attachments = [];
+  }catch(err){
+    console.error("[MIGRATE] pdf normalize error", err);
+    rec.attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
+  }
+  try{
+    console.log("[MIGRATE]", "normalizeRecArtifacts", {
+      fileId: rec.fileId || rec.id,
+      cmcdLen: rec.cmcd.length,
+      pdfCount: rec.attachments.length,
+    });
+  }catch(_){ }
 }
 
 
@@ -6915,7 +7017,7 @@ function setupCmcdDialog(){
     const rec = _proGetActiveRec();
     if(rec){
       if(cmcdInput) rec.cmcd = cmcdInput.value;
-      else if(typeof _cmcdCaptureInputs === "function") rec.cmcd = _cmcdCaptureInputs();
+      else if(typeof window._cmcdSerializeInputs === "function") rec.cmcd = window._cmcdSerializeInputs();
       console.log("[CMCD]", "apply", { fileId: rec.id, value: rec.cmcd });
       if(typeof window.commitAll === "function"){
         window.commitAll("cmcd:apply", { fileId: rec.id });
@@ -13136,6 +13238,7 @@ try{
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad start", window.diagState({ name: rec.name, fileId: rec.id }));
             await loadSingleWav(rec.file);
             project.lastLoadedId = rec.id;
+            try{ normalizeRecArtifacts(rec, window.WavCue?.state || null); }catch(err){ console.error("[MIGRATE] fullLoad normalize error", err); }
             proSyncRecFromState(rec, "dnd:fullLoad", {markEdited:false});
             console.log("[DND] fullLoad done", rec.name);
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad done", window.diagState({ name: rec.name, fileId: rec.id }));
@@ -13216,6 +13319,7 @@ try{
 
       // cmcd / attachments: restore per-file values after cache-restore
       try{
+        try{ normalizeRecArtifacts(rec, window.WavCue?.state || null); }catch(err){ console.error("[MIGRATE] active normalize error", err); }
         const cmcdInput = window._cmcdInput;
         if(cmcdInput){
           cmcdInput.value = rec.cmcd || "";
@@ -13245,6 +13349,11 @@ try{
         console.error("[ACTIVE] pdf restore error", err);
       }
       try{
+        console.log("[PDF]", "restore", {
+          fileId: rec.id,
+          count: rec.attachments?.length || 0,
+          names: (rec.attachments || []).map(a=>a?.name || a?.fileName || a?.filename || "").filter(Boolean).slice(0,3),
+        });
         console.log("[ACTIVE]", "restore", {
           fileId: rec.id,
           hasCmcd: _cmcdHasValues(rec.cmcd),
