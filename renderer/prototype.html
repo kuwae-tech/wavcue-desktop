@@ -4440,6 +4440,17 @@ function fourccToU32(s){
   return ((b0) | (b1<<8) | (b2<<16) | (b3<<24)) >>> 0;
 }
 
+/* --- WavCue diagnostics state (prevent ReferenceError: diagState) --- */
+(function(){
+  if (!window.diagState || typeof window.diagState !== "object") {
+    window.diagState = {
+      dndExpected: 0,
+      dndSeen: 0,
+      dndStartedAt: 0
+    };
+  }
+})();
+
 
 // ----- Diagnostics helpers -----
 function _errMsg(err){
@@ -4924,11 +4935,19 @@ function setupDragAndDrop(){
     if(!files.length){ return; }
     console.log(`[Pro] drop wavs=${files.length}`);
     const add = window.__wavcueProAddFiles;
-    if(typeof add === "function"){
-      await add(files);
-      console.log(`[Pro] drop add completed count=${files.length}`);
-    }else{
-      await loadFile(files[0]);
+    try{
+      if(typeof add === "function"){
+        await add(files);
+        console.log(`[Pro] drop add completed count=${files.length}`);
+      }else{
+        await loadFile(files[0]);
+      }
+    }catch(err){
+      if(typeof window.diagErr === "function"){
+        window.diagErr("[DND] drop error", err);
+      }else{
+        console.error("[DND] drop error", err);
+      }
     }
   };
 
@@ -12941,45 +12960,53 @@ try{
     console.log(`[DND] start ${files.length}`);
     const addedIds = [];
     const addedRecs = [];
-    for(const file of files){
-      const id = uid();
-      const rec = {
-        id,
-        file,
-        name:file.name,
-        status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
-        cues:[],
-        attachments:[],
-        attachCount:null,
-        qcResult:null,
-        snapshot:false,
-      };
-      project.files.push(rec);
-      addedIds.push(id);
-      addedRecs.push(rec);
-    }
-    const targetActiveId = project.activeId || project.files[0]?.id || null;
-    if(typeof loadSingleWav === "function"){
-      for(const rec of addedRecs){
-        try{
-          console.log("[DND] fullLoad start", rec.name);
-          await loadSingleWav(rec.file);
-          project.lastLoadedId = rec.id;
-          proSyncRecFromState(rec, "dnd:fullLoad", {markEdited:false});
-          console.log("[DND] fullLoad done", rec.name);
-        }catch(err){
-          console.error("[DND] fullLoad error", rec.name, err);
+    try{
+      for(const file of files){
+        const id = uid();
+        const rec = {
+          id,
+          file,
+          name:file.name,
+          status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
+          cues:[],
+          attachments:[],
+          attachCount:null,
+          qcResult:null,
+          snapshot:false,
+        };
+        project.files.push(rec);
+        addedIds.push(id);
+        addedRecs.push(rec);
+      }
+      const targetActiveId = project.activeId || project.files[0]?.id || null;
+      if(typeof loadSingleWav === "function"){
+        for(const rec of addedRecs){
+          try{
+            console.log("[DND] fullLoad start", rec.name);
+            await loadSingleWav(rec.file);
+            project.lastLoadedId = rec.id;
+            proSyncRecFromState(rec, "dnd:fullLoad", {markEdited:false});
+            console.log("[DND] fullLoad done", rec.name);
+          }catch(err){
+            console.error("[DND] fullLoad error", rec.name, err);
+          }
         }
       }
+      console.log(`[DND] all done ${addedRecs.length}`);
+      if(targetActiveId){
+        await setActiveFile(targetActiveId, {force:true});
+      }else{
+        render();
+      }
+      if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("dnd:done");
+      console.log(`[Pro] addFiles done total=${project.files.length}`);
+    }catch(err){
+      if(typeof window.diagErr === "function"){
+        window.diagErr("[DND] addFiles error", err);
+      }else{
+        console.error("[DND] addFiles error", err);
+      }
     }
-    console.log(`[DND] all done ${addedRecs.length}`);
-    if(targetActiveId){
-      await setActiveFile(targetActiveId, {force:true});
-    }else{
-      render();
-    }
-    if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("dnd:done");
-    console.log(`[Pro] addFiles done total=${project.files.length}`);
     return addedIds;
   }
   async function setActiveFile(id, opts){
