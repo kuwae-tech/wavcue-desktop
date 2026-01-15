@@ -7303,8 +7303,8 @@ function normalizeRecArtifacts(rec, stateLike){
       }
       if(rec.cmcd) imported = true;
     }
-    if(!rec.cmcd && typeof window._cmcdSerializeInputs === "function"){
-      rec.cmcd = window._cmcdSerializeInputs();
+    if(!rec.cmcd && rec.cmcdInputs && _cmcdInputsHasValues(rec.cmcdInputs)){
+      try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
     }
     if(typeof rec.cmcd !== "string") rec.cmcd = (rec.cmcd ? String(rec.cmcd) : "");
   }catch(err){
@@ -13859,7 +13859,7 @@ try{
       if (typeof window.diagLog === "function") window.diagLog("[DND]", "all done", window.diagState({ expected: dndGuard?.expected || files.length, seen: dndGuard?.seen || files.length }));
       console.log(`[DND] all done ${addedRecs.length}`);
       if(targetActiveId){
-        await setActiveFile(targetActiveId, {force:true});
+        await setActiveFile(targetActiveId, {force:true, skipSave:true});
       }else{
         render();
       }
@@ -13880,7 +13880,11 @@ try{
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "start", window.diagState({ fileId: id, hasGetState: (typeof window.getState === "function") }));
       console.log("[Pro] setActiveFile start", { id, name: rec.name, force: !!opts?.force });
 
-      proSaveActiveEdits("before-switch", true);
+      if(!opts?.skipSave){
+        proSaveActiveEdits("before-switch", true);
+      }else{
+        console.log("[ACTIVE]", "skipSave", { fileId: id });
+      }
 
       project.activeId = id;
       render();
