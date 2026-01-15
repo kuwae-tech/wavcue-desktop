@@ -4460,6 +4460,117 @@ if (typeof window.diagState !== "function") {
     };
   }
 
+  function sliceBytes(buf, start, len){
+    try{
+      if(!buf) return new Uint8Array();
+      const u8 = (buf instanceof Uint8Array) ? buf : new Uint8Array(buf);
+      return u8.slice(start, start + len);
+    }catch(_){ return new Uint8Array(); }
+  }
+  function u8StartsWith(u8, asciiString){
+    try{
+      if(!u8 || !asciiString) return false;
+      for(let i=0;i<asciiString.length;i++){
+        if(u8[i] !== asciiString.charCodeAt(i)) return false;
+      }
+      return true;
+    }catch(_){ return false; }
+  }
+  function tryDecodeUtf8(u8, maxLen){
+    try{
+      const lim = Math.max(0, Math.min(u8.length, maxLen || 65536));
+      return new TextDecoder("utf-8", {fatal:false}).decode(u8.slice(0, lim));
+    }catch(_){ return ""; }
+  }
+  function findPdfChunks(chunks, fileBuf){
+    try{
+      if(typeof pdfFindAllInWav === "function"){
+        const list = pdfFindAllInWav(fileBuf) || [];
+        return Array.isArray(list) ? list.slice(0,9) : [];
+      }
+    }catch(_){ }
+    try{
+      if(!Array.isArray(chunks)) return [];
+      const out = [];
+      for(const ch of chunks){
+        const id = ch?.id || "";
+        const off = ch?.dataOff;
+        const size = ch?.size;
+        if(!off || !size) continue;
+        const u8 = new Uint8Array(fileBuf, off, Math.min(size, 8));
+        if(u8StartsWith(u8, "%PDF-")){
+          const bytes = new Uint8Array(fileBuf, off, size);
+          out.push({ name: "attached.pdf", bytes, kind: "PDF", mime: "application/pdf" });
+        }
+      }
+      return out.slice(0,9);
+    }catch(_){ return []; }
+  }
+  function findCmcdInTextChunks(chunks, fileBuf){
+    try{
+      if(!Array.isArray(chunks)) return null;
+      const targets = new Set(["axml","iXML","INFO","bext","JUNK","LIST"]);
+      const keys = ["Ver4","共通コード","素材秒数","素材タイトル","素材略号","素材コード"];
+      for(const ch of chunks){
+        const id = String(ch?.id || "");
+        if(!targets.has(id)) continue;
+        const off = ch?.dataOff;
+        const size = ch?.size;
+        if(!off || !size) continue;
+        const txt = tryDecodeUtf8(new Uint8Array(fileBuf, off, Math.min(size, 65536)), 65536);
+        if(!txt) continue;
+        if(!keys.some(k=>txt.includes(k))) continue;
+        try{
+          const m = txt.match(/\{[\s\S]*?\}/);
+          if(m){
+            const obj = JSON.parse(m[0]);
+            if(obj && typeof obj === "object") return obj;
+          }
+        }catch(_){ }
+        const obj = {};
+        txt.split(/\r?\n/).forEach(line=>{
+          const idx = line.indexOf(":");
+          if(idx>0){
+            const k = line.slice(0, idx).trim();
+            const v = line.slice(idx+1).trim();
+            if(k && v) obj[k] = v;
+          }
+        });
+        if(Object.keys(obj).length) return obj;
+      }
+    }catch(_){ }
+    return null;
+  }
+  function scanArtifactsFromFile(fileBuf, chunks, fileId){
+    try{
+      const chunkIdsSample = Array.isArray(chunks) ? chunks.map(c=>c?.id).filter(Boolean).slice(0, 12) : [];
+      let cmcdInputs = null;
+      let cmcdText = "";
+      try{
+        if(Array.isArray(chunks)){
+          const cmcdChunk = chunks.find(c=>c && c.id==="cmcd");
+          if(cmcdChunk && fileBuf){
+            const u8 = new Uint8Array(fileBuf, cmcdChunk.dataOff, Math.min(cmcdChunk.size, 2048));
+            if(typeof cmcdParseFromPayload === "function"){
+              const parsed = cmcdParseFromPayload(u8);
+              cmcdInputs = parsed?.obj || null;
+              cmcdText = parsed?.rawText || "";
+            }
+          }
+        }
+      }catch(_){ }
+      if(!cmcdInputs){
+        cmcdInputs = findCmcdInTextChunks(chunks, fileBuf);
+      }
+      const attachments = findPdfChunks(chunks, fileBuf);
+      console.log("[ARTIFACT]", "scan", { fileId, pdfFound: attachments.length, cmcdFound: !!cmcdInputs, chunkIdsSample });
+      return { cmcdInputs, cmcdText, attachments };
+    }catch(_){
+      return { cmcdInputs: null, cmcdText: "", attachments: [] };
+    }
+  }
+  window._artifactScan = window._artifactScan || scanArtifactsFromFile;
+
   window.normalizeRecArtifacts = function(rec, stateLike){
     try{
       if (!rec || typeof rec !== "object") return rec;
@@ -6826,6 +6937,10 @@ function _cmcdHasValues(values){
   if(typeof values !== "object") return false;
   return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
 }
+function _cmcdInputsHasValues(values){
+  if(!values || typeof values !== "object") return false;
+  return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
+}
 function _cmcdApplyValuesToInputs(values){
   renderCmcdForm();
   for(const k of CMCD_KEYS_UI){
@@ -7150,6 +7265,7 @@ function setupCmcdDialog(){
     const rec = _proGetActiveRec();
     if(rec){
       rec.cmcd = "";
+      rec.cmcdInputs = null;
       console.log("[CMCD]", "clear", { fileId: rec.id, value: rec.cmcd });
       if(typeof window.commitAll === "function"){
         window.commitAll("cmcd:clear", { fileId: rec.id });
@@ -7162,8 +7278,14 @@ function setupCmcdDialog(){
     sync();
     const rec = _proGetActiveRec();
     if(rec){
-      if(cmcdInput) rec.cmcd = cmcdInput.value;
-      else if(typeof window._cmcdSerializeInputs === "function") rec.cmcd = window._cmcdSerializeInputs();
+      const inputs = (typeof _cmcdCaptureInputs === "function") ? _cmcdCaptureInputs() : null;
+      if(inputs && _cmcdInputsHasValues(inputs)){
+        rec.cmcdInputs = inputs;
+        rec.cmcd = JSON.stringify(inputs);
+      }else{
+        rec.cmcdInputs = null;
+        rec.cmcd = "";
+      }
       console.log("[CMCD]", "apply", { fileId: rec.id, value: rec.cmcd });
       if(typeof window.commitAll === "function"){
         window.commitAll("cmcd:apply", { fileId: rec.id });
@@ -13392,6 +13514,43 @@ try{
             }catch(e){
               console.warn("[MIGRATE] state snapshot failed", e);
             }
+            let artifacts = null;
+            try{
+              const fileBuf = window.WavCue?.state?.srcAb || null;
+              const chunks = window.WavCue?.state?.srcChunks || null;
+              if(fileBuf && typeof window._artifactScan === "function"){
+                artifacts = window._artifactScan(fileBuf, chunks, rec.id);
+              }else{
+                console.warn("[ARTIFACT] scan skipped", { fileId: rec.id });
+              }
+            }catch(e){
+              console.warn("[ARTIFACT] scan failed", e);
+            }
+            try{
+              if(artifacts){
+                if((!rec.cmcdInputs || !_cmcdInputsHasValues(rec.cmcdInputs)) && artifacts.cmcdInputs){
+                  rec.cmcdInputs = artifacts.cmcdInputs;
+                }
+                if((!rec.cmcd || !rec.cmcd.trim()) && artifacts.cmcdText){
+                  rec.cmcd = artifacts.cmcdText;
+                }else if((!rec.cmcd || !rec.cmcd.trim()) && rec.cmcdInputs){
+                  try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
+                }
+                if((!rec.attachments || !rec.attachments.length) && Array.isArray(artifacts.attachments)){
+                  rec.attachments = artifacts.attachments;
+                }
+                if(typeof window.normalizeRecArtifacts === "function"){
+                  window.normalizeRecArtifacts(rec, null);
+                }
+                console.log("[ARTIFACT]", "import", {
+                  fileId: rec.id,
+                  cmcdFilled: !!(rec.cmcdInputs && _cmcdInputsHasValues(rec.cmcdInputs)),
+                  pdfCount: rec.attachments?.length || 0,
+                });
+              }
+            }catch(e){
+              console.warn("[ARTIFACT] import failed", e);
+            }
             try{
               if(typeof window.normalizeRecArtifacts === "function"){
                 window.normalizeRecArtifacts(rec, stateLike);
@@ -13491,7 +13650,11 @@ try{
         }catch(err){ console.error("[MIGRATE] active normalize error", err); }
         const cmcdInput = window._cmcdInput;
         if(cmcdInput){
-          cmcdInput.value = rec.cmcd || "";
+          if(rec.cmcdInputs && _cmcdInputsHasValues(rec.cmcdInputs)){
+            cmcdInput.value = rec.cmcdInputs;
+          }else{
+            cmcdInput.value = rec.cmcd || "";
+          }
           console.log("[CMCD]", "restore", { fileId: rec.id, value: cmcdInput.value });
         }else if(typeof window._cmcdApplyValuesToInputs === "function"){
           window._cmcdApplyValuesToInputs(rec.cmcd || null);
