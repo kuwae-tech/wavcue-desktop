@@ -4354,6 +4354,25 @@ function maybeToastFromLog(msg){
   try{ maybeToastFromLog(msg); }catch(_){ }
 }
 
+/* --- state helper: prevent crash when code calls getState() --- */
+(function(){
+  if (typeof window.getState === "function") return;
+
+  window.getState = function(){
+    try{
+      if (!window.state || typeof window.state !== "object") window.state = {};
+      return window.state;
+    }catch(e){
+      console.error("[Compat] getState() failed, fallback to {}", e);
+      window.state = {};
+      return window.state;
+    }
+  };
+
+  // ensure state exists early
+  try{ window.getState(); }catch(_){}
+})();
+
 /* Utils */
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
@@ -4839,10 +4858,18 @@ function setupDragAndDrop(){
     console.log(`[Pro] drop wavs=${files.length}`);
     const add = window.__wavcueProAddFiles;
     if(typeof add === "function"){
-      await add(files);
-      console.log(`[Pro] drop add completed count=${files.length}`);
+      try{
+        await add(files);
+        console.log(`[Pro] drop add completed count=${files.length}`);
+      }catch(err){
+        console.error("[Pro] drop add failed", err);
+      }
     }else{
-      await loadFile(files[0]);
+      try{
+        await loadFile(files[0]);
+      }catch(err){
+        console.error("[Pro] drop load failed", err);
+      }
     }
   };
 
@@ -12784,7 +12811,11 @@ try{
       addedIds.push(id);
     }
     if(project.activeId==null && project.files.length>0){
-      await setActiveFile(project.files[0].id, {force:true});
+      try{
+        await setActiveFile(project.files[0].id, {force:true});
+      }catch(err){
+        console.error("[Pro] addFiles: setActiveFile failed", err);
+      }
     }else{
       render();
     }
@@ -12792,6 +12823,8 @@ try{
     return addedIds;
   }
   async function setActiveFile(id, opts){
+    console.log("[ACTIVE] setActiveFile:start", id, "hasGetState=", (typeof window.getState==="function"));
+    const state = (typeof window.getState === "function") ? window.getState() : (window.state || (window.state = {}));
     const rec = project.files.find(f=>f.id===id);
     if(!rec) return;
 
@@ -12850,6 +12883,7 @@ try{
       }
 
     }catch(err){
+      console.error("[ACTIVE] setActiveFile:error", err);
       console.error("[Pro] setActiveFile: load failed", err);
     }finally{
       render();
@@ -13022,10 +13056,14 @@ try{
         btn.disabled = !a;
         if(a){
           btn.addEventListener("click", async ()=>{
-            await setActiveFile(file.id, {force:true});
-            attachSelectIndex(i);
-            pdfOpenViewer();
-            closePopover();
+            try{
+              await setActiveFile(file.id, {force:true});
+              attachSelectIndex(i);
+              pdfOpenViewer();
+              closePopover();
+            }catch(err){
+              console.error("[Pro] attachment open failed", err);
+            }
           });
         }
         row.appendChild(btn);
