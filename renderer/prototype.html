@@ -4403,6 +4403,39 @@ if (typeof window.diagState !== "function") {
   }
 })();
 
+/* --- CMCD: compat + hard guard (do not break import) --- */
+(function(){
+  if (typeof window._cmcdInputsHasValues === "function") return;
+
+  // if legacy function exists, alias it
+  if (typeof window.cmcdInputsHasValues === "function") {
+    window._cmcdInputsHasValues = window.cmcdInputsHasValues;
+    return;
+  }
+
+  // fallback: detect any non-empty value in object
+  window._cmcdInputsHasValues = function(obj){
+    try{
+      if(!obj || typeof obj !== "object") return false;
+      for(const k of Object.keys(obj)){
+        const v = obj[k];
+        if(v == null) continue;
+        if(typeof v === "string" && v.trim() !== "") return true;
+        if(typeof v === "number" && Number.isFinite(v)) return true;
+        if(typeof v === "boolean" && v) return true;
+        if(typeof v === "object"){
+          if(Array.isArray(v) && v.length) return true;
+          const s = JSON.stringify(v);
+          if(s && s !== "{}" && s !== "[]") return true;
+        }
+      }
+      return false;
+    }catch(_){
+      return false;
+    }
+  };
+})();
+
 /* --- CMCD extractor (real implementation; must not throw) --- */
 (function(){
   window.findCmcdInTextChunks = function(textChunks, fileId){
@@ -7170,12 +7203,12 @@ function _cmcdNewId(){
 }
 
 function _cmcdCaptureInputs(){
-  const values = {};
-  for(const k of CMCD_KEYS_UI){
-    const v = document.querySelector(`[data-cmcd="${k}"]`)?.value ?? "";
-    values[k] = String(v);
-  }
-  return values;
+      const values = {};
+      for(const k of CMCD_KEYS_UI){
+        const v = document.querySelector(`[data-cmcd="${k}"]`)?.value ?? "";
+        values[k] = String(v);
+      }
+      return values;
 }
 function _cmcdSerializeInputs(){
   try{ return JSON.stringify(_cmcdCaptureInputs()); }catch(_){ return ""; }
@@ -7213,9 +7246,9 @@ function _cmcdHasValues(values){
   return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
 }
 function _cmcdInputsHasValues(values){
-  if(!values || typeof values !== "object") return false;
-  return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
-}
+    if(!values || typeof values !== "object") return false;
+    return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
+  }
 function _cmcdApplyValuesToInputs(values){
   renderCmcdForm();
   for(const k of CMCD_KEYS_UI){
@@ -7303,7 +7336,7 @@ function normalizeRecArtifacts(rec, stateLike){
       }
       if(rec.cmcd) imported = true;
     }
-    if(!rec.cmcd && rec.cmcdInputs && _cmcdInputsHasValues(rec.cmcdInputs)){
+    if(!rec.cmcd && rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)){
       try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
     }
     if(typeof rec.cmcd !== "string") rec.cmcd = (rec.cmcd ? String(rec.cmcd) : "");
@@ -7554,7 +7587,7 @@ function setupCmcdDialog(){
     const rec = _proGetActiveRec();
     if(rec){
       const inputs = (typeof _cmcdCaptureInputs === "function") ? _cmcdCaptureInputs() : null;
-      if(inputs && _cmcdInputsHasValues(inputs)){
+      if(inputs && window._cmcdInputsHasValues(inputs)){
         rec.cmcdInputs = inputs;
         rec.cmcd = JSON.stringify(inputs);
       }else{
@@ -13803,7 +13836,7 @@ try{
             }
             try{
               if(artifacts){
-                if((!rec.cmcdInputs || !_cmcdInputsHasValues(rec.cmcdInputs)) && artifacts.cmcdInputs && _cmcdInputsHasValues(artifacts.cmcdInputs)){
+                if((!rec.cmcdInputs || !window._cmcdInputsHasValues(rec.cmcdInputs)) && artifacts.cmcdInputs && window._cmcdInputsHasValues(artifacts.cmcdInputs)){
                   rec.cmcdInputs = artifacts.cmcdInputs;
                 }
                 if((!rec.cmcd || !rec.cmcd.trim()) && artifacts.cmcdText){
@@ -13814,20 +13847,36 @@ try{
                 if((!rec.attachments || !rec.attachments.length) && Array.isArray(artifacts.attachments)){
                   rec.attachments = artifacts.attachments;
                 }
-              if(typeof window.normalizeRecArtifacts === "function"){
-                window.normalizeRecArtifacts(rec, null);
-              }
-              console.log("[ARTIFACT]", "import", {
-                fileId: rec.id,
-                cmcdFilled: !!(rec.cmcdInputs && _cmcdInputsHasValues(rec.cmcdInputs)),
-                pdfCount: rec.attachments?.length || 0,
-              });
-            }else{
-              if(rec.cmcd && rec.cmcd.trim()){
+                if(typeof window.normalizeRecArtifacts === "function"){
+                  window.normalizeRecArtifacts(rec, null);
+                }
+                console.log("[ARTIFACT]", "import", {
+                  fileId: rec.id,
+                  cmcdFilled: !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)),
+                  pdfCount: rec.attachments?.length || 0,
+                });
+              }else if(rec.cmcd && rec.cmcd.trim()){
                 console.warn("[CMCD]", "notfound", { fileId: rec.id, checked: ["chunk","ixml","list","bext"], note: "preserve existing" });
               }
-            }
             }catch(e){
+              if(artifacts){
+                if((!rec.cmcdInputs || !window._cmcdInputsHasValues(rec.cmcdInputs)) && artifacts.cmcdInputs && window._cmcdInputsHasValues(artifacts.cmcdInputs)){
+                  rec.cmcdInputs = artifacts.cmcdInputs;
+                }
+                if((!rec.cmcd || !rec.cmcd.trim()) && artifacts.cmcdText){
+                  rec.cmcd = artifacts.cmcdText;
+                }else if((!rec.cmcd || !rec.cmcd.trim()) && rec.cmcdInputs){
+                  try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
+                }
+                if((!rec.attachments || !rec.attachments.length) && Array.isArray(artifacts.attachments)){
+                  rec.attachments = artifacts.attachments;
+                }
+                console.log("[ARTIFACT]", "import fallback", {
+                  fileId: rec.id,
+                  cmcdFilled: !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)),
+                  pdfCount: rec.attachments?.length || 0,
+                });
+              }
               console.warn("[ARTIFACT] import failed", e);
             }
             try{
@@ -13933,11 +13982,11 @@ try{
         }catch(err){ console.error("[MIGRATE] active normalize error", err); }
         const cmcdInput = window._cmcdInput;
         if(cmcdInput){
-          if(rec.cmcdInputs && _cmcdInputsHasValues(rec.cmcdInputs)){
-            cmcdInput.value = rec.cmcdInputs;
-          }else{
-            cmcdInput.value = rec.cmcd || "";
-          }
+        if(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)){
+          cmcdInput.value = rec.cmcdInputs;
+        }else{
+          cmcdInput.value = rec.cmcd || "";
+        }
           console.log("[CMCD]", "restore", { fileId: rec.id, value: cmcdInput.value });
         }else if(typeof window._cmcdApplyValuesToInputs === "function"){
           window._cmcdApplyValuesToInputs(rec.cmcd || null);
