@@ -4354,6 +4354,52 @@ function maybeToastFromLog(msg){
   try{ maybeToastFromLog(msg); }catch(_){ }
 }
 
+/* --- WavCue diagnostics (no behavior change) --- */
+(function(){
+  if (typeof window.WAVCUE_DIAG !== "boolean") window.WAVCUE_DIAG = true;
+
+  if (typeof window.diagLog !== "function") {
+    window.diagLog = function(tag, msg, obj){
+      try{
+        if (!window.WAVCUE_DIAG) return;
+        if (obj !== undefined) console.log(tag, msg, obj);
+        else console.log(tag, msg);
+      }catch(_){}
+    };
+  }
+
+  if (typeof window.diagErr !== "function") {
+    window.diagErr = function(tag, msg, err){
+      try{
+        console.error(tag, msg, err || "");
+      }catch(_){}
+    };
+  }
+})();
+
+if (typeof window.diagState !== "function") {
+  window.diagState = function(extra){
+    try{
+      const st = (typeof window.getState === "function") ? window.getState() : window.state;
+      const cueCount = Array.isArray(st?.cues) ? st.cues.length : 0;
+      const activeFileId = window.activeFileId || window.activeId
+        || ((typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null);
+      return Object.assign({ activeFileId, cueCount }, extra || {});
+    }catch(_){
+      return extra || {};
+    }
+  };
+}
+
+/*
+[REGRESSION CHECKLIST - DO NOT BREAK]
+1) Multi D&D: drop 4 files -> logs show fullLoad done for all -> then all done.
+2) Switch active file: waveform + cue list + cue badge update WITHOUT any click.
+3) Cue edit on waveform: move/add/delete -> cue list + badge update immediately.
+4) Cue edit on list: time edit/delete -> waveform + badge update immediately.
+5) No console red errors (ReferenceError / Uncaught(in promise)).
+*/
+
 /* --- WavCue: UI hard refresh + safe helpers (do not throw) --- */
 (function(){
   if (typeof window.safeCall !== "function") {
@@ -4398,10 +4444,12 @@ function maybeToastFromLog(msg){
           window.safeCall(window.renderCueList);
           window.safeCall(window.updateBadges);
         };
+        if (typeof window.diagLog === "function") window.diagLog("[UI]", "requestFullRefresh", window.diagState({ reason }));
         console.log("[UI] requestFullRefresh", reason);
         requestAnimationFrame(()=>{ r1(); requestAnimationFrame(r2); });
       }catch(e){
         console.error("[UI] requestFullRefresh failed", e);
+        if (typeof window.diagErr === "function") window.diagErr("[UI]", "requestFullRefresh failed", e);
       }
     };
   }
@@ -4425,8 +4473,10 @@ function maybeToastFromLog(msg){
       window.safeCall(window.updateBadges);
       if (typeof window.requestFullRefresh === "function") window.requestFullRefresh("commitAll:" + (reason||""));
       console.log("[commitAll]", reason, opts || {});
+      if (typeof window.diagLog === "function") window.diagLog("[commitAll]", reason || "", window.diagState(opts || {}));
     }catch(e){
       console.error("[commitAll] failed", e);
+      if (typeof window.diagErr === "function") window.diagErr("[commitAll]", "failed", e);
       try{ if (typeof window.requestFullRefresh==="function") window.requestFullRefresh("commitAll:error"); }catch(_){}
     }
   };
@@ -4848,6 +4898,7 @@ function moveCueToTime(cueId, targetSec, jumpAfter, commitReason="cue:move"){
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
     console.log("[CUE] move", { id: cue.id, label: cue.label, sec: cue.sec, fileId: activeId });
+    if (typeof window.diagLog === "function") window.diagLog("[CUE]", "move", window.diagState({ id: cue.id, label: cue.label, sec: cue.sec, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -4907,28 +4958,33 @@ function setupDragAndDrop(){
   }, {passive:true});
 
   const onDrop = async (e)=>{
-    e.preventDefault();
-    hide();
-    const dt = e.dataTransfer;
-    const files = [];
-    if(dt?.files && dt.files.length){
-      for(const f of dt.files) if(isWav(f)) files.push(f);
-    }else if(dt?.items && dt.items.length){
-      for(const item of dt.items){
-        if(item.kind==="file"){
-          const f = item.getAsFile();
-          if(f && isWav(f)) files.push(f);
+    try{
+      e.preventDefault();
+      hide();
+      const dt = e.dataTransfer;
+      const files = [];
+      if(dt?.files && dt.files.length){
+        for(const f of dt.files) if(isWav(f)) files.push(f);
+      }else if(dt?.items && dt.items.length){
+        for(const item of dt.items){
+          if(item.kind==="file"){
+            const f = item.getAsFile();
+            if(f && isWav(f)) files.push(f);
+          }
         }
       }
-    }
-    if(!files.length){ return; }
-    console.log(`[Pro] drop wavs=${files.length}`);
-    const add = window.__wavcueProAddFiles;
-    if(typeof add === "function"){
-      await add(files);
-      console.log(`[Pro] drop add completed count=${files.length}`);
-    }else{
-      await loadFile(files[0]);
+      if(!files.length){ return; }
+      console.log(`[Pro] drop wavs=${files.length}`);
+      const add = window.__wavcueProAddFiles;
+      if(typeof add === "function"){
+        await add(files);
+        console.log(`[Pro] drop add completed count=${files.length}`);
+      }else{
+        await loadFile(files[0]);
+      }
+    }catch(err){
+      console.error("[DND] drop failed", err);
+      if (typeof window.diagErr === "function") window.diagErr("[DND]", "drop failed", err);
     }
   };
 
@@ -5538,6 +5594,7 @@ function addCue(label){
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
     console.log("[CUE] add", { id, label, sec, beforeCount, afterCount: state.cues.length, fileId: activeId });
+    if (typeof window.diagLog === "function") window.diagLog("[CUE]", "add", window.diagState({ id, label, sec, beforeCount, afterCount: state.cues.length, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -5576,6 +5633,7 @@ function addStartStopCues(){
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
     console.log("[CUE] addStartStop", { beforeCount, afterCount: state.cues.length, fileId: activeId });
+    if (typeof window.diagLog === "function") window.diagLog("[CUE]", "add", window.diagState({ type: "startStop", beforeCount, afterCount: state.cues.length, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -5616,6 +5674,7 @@ function addCuePair(){
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
     console.log("[CUE] addPair", { beforeCount, afterCount: state.cues.length, fileId: activeId });
+    if (typeof window.diagLog === "function") window.diagLog("[CUE]", "add", window.diagState({ type: "pair", beforeCount, afterCount: state.cues.length, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -5633,6 +5692,7 @@ function deleteCue(id){
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
     console.log("[CUE] delete", { id, label: target?.label, beforeCount, afterCount: state.cues.length, fileId: activeId });
+    if (typeof window.diagLog === "function") window.diagLog("[CUE]", "delete", window.diagState({ id, label: target?.label, beforeCount, afterCount: state.cues.length, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -5716,6 +5776,7 @@ function renderCues(){
       try{
         const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
         console.log("[CUE] list edit", { id: c.id, from: oldSec, to: cc ? cc.sec : c.sec, fileId: activeId });
+        if (typeof window.diagLog === "function") window.diagLog("[CUE]", "edit", window.diagState({ id: c.id, from: oldSec, to: cc ? cc.sec : c.sec, fileId: activeId }));
       }catch(_){}
     });
     tdT.appendChild(inp);
@@ -12936,56 +12997,80 @@ try{
     file.qcResult = qcResult;
   }
   async function addFiles(fileList){
-    const files = Array.from(fileList || []).filter(isWavFile);
-    if(!files.length) return;
-    console.log(`[DND] start ${files.length}`);
-    const addedIds = [];
-    const addedRecs = [];
-    for(const file of files){
-      const id = uid();
-      const rec = {
-        id,
-        file,
-        name:file.name,
-        status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
-        cues:[],
-        attachments:[],
-        attachCount:null,
-        qcResult:null,
-        snapshot:false,
-      };
-      project.files.push(rec);
-      addedIds.push(id);
-      addedRecs.push(rec);
-    }
-    const targetActiveId = project.activeId || project.files[0]?.id || null;
-    if(typeof loadSingleWav === "function"){
-      for(const rec of addedRecs){
-        try{
-          console.log("[DND] fullLoad start", rec.name);
-          await loadSingleWav(rec.file);
-          project.lastLoadedId = rec.id;
-          proSyncRecFromState(rec, "dnd:fullLoad", {markEdited:false});
-          console.log("[DND] fullLoad done", rec.name);
-        }catch(err){
-          console.error("[DND] fullLoad error", rec.name, err);
+    try{
+      const files = Array.from(fileList || []).filter(isWavFile);
+      if(!files.length) return;
+      const dndGuard = (files.length > 1) ? { expected: files.length, seen: 0, startedAt: Date.now() } : null;
+      if (typeof window.diagLog === "function") window.diagLog("[DND]", "start", window.diagState({ count: files.length, startedAt: dndGuard?.startedAt || null }));
+      console.log(`[DND] start ${files.length}`);
+      const addedIds = [];
+      const addedRecs = [];
+      for(const file of files){
+        const id = uid();
+        const rec = {
+          id,
+          file,
+          name:file.name,
+          status:{ qc:'unverified', edited:false, exported:false, qcReason:null },
+          cues:[],
+          attachments:[],
+          attachCount:null,
+          qcResult:null,
+          snapshot:false,
+        };
+        project.files.push(rec);
+        addedIds.push(id);
+        addedRecs.push(rec);
+      }
+      const targetActiveId = project.activeId || project.files[0]?.id || null;
+      if(typeof loadSingleWav === "function"){
+        for(const rec of addedRecs){
+          try{
+            console.log("[DND] fullLoad start", rec.name);
+            if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad start", window.diagState({ name: rec.name, fileId: rec.id }));
+            await loadSingleWav(rec.file);
+            project.lastLoadedId = rec.id;
+            proSyncRecFromState(rec, "dnd:fullLoad", {markEdited:false});
+            console.log("[DND] fullLoad done", rec.name);
+            if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad done", window.diagState({ name: rec.name, fileId: rec.id }));
+          }catch(err){
+            console.error("[DND] fullLoad error", rec.name, err);
+            if (typeof window.diagErr === "function") window.diagErr("[DND]", "fullLoad error", err);
+          }finally{
+            if(dndGuard){
+              dndGuard.seen += 1;
+              if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad seen", window.diagState({ seen: dndGuard.seen, expected: dndGuard.expected }));
+            }
+          }
         }
       }
+      if(dndGuard && dndGuard.seen !== dndGuard.expected){
+        const warnPayload = { expected: dndGuard.expected, seen: dndGuard.seen, elapsedMs: Date.now() - dndGuard.startedAt };
+        console.warn("[GUARD] DND fullLoad mismatch", warnPayload);
+        if (typeof window.diagLog === "function") window.diagLog("[GUARD]", "dnd:seen-mismatch", warnPayload);
+      }
+      if (typeof window.diagLog === "function") window.diagLog("[DND]", "all done", window.diagState({ expected: dndGuard?.expected || files.length, seen: dndGuard?.seen || files.length }));
+      console.log(`[DND] all done ${addedRecs.length}`);
+      if(targetActiveId){
+        await setActiveFile(targetActiveId, {force:true});
+      }else{
+        render();
+      }
+      if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("dnd:done");
+      console.log(`[Pro] addFiles done total=${project.files.length}`);
+      if (typeof window.diagLog === "function") window.diagLog("[DND]", "addFiles done", window.diagState({ total: project.files.length }));
+      return addedIds;
+    }catch(err){
+      console.error("[DND] addFiles failed", err);
+      if (typeof window.diagErr === "function") window.diagErr("[DND]", "addFiles failed", err);
+      return [];
     }
-    console.log(`[DND] all done ${addedRecs.length}`);
-    if(targetActiveId){
-      await setActiveFile(targetActiveId, {force:true});
-    }else{
-      render();
-    }
-    if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("dnd:done");
-    console.log(`[Pro] addFiles done total=${project.files.length}`);
-    return addedIds;
   }
   async function setActiveFile(id, opts){
     try{
       const rec = project.files.find(f=>f.id===id);
       if(!rec) return;
+      if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "start", window.diagState({ fileId: id, hasGetState: (typeof window.getState === "function") }));
       console.log("[Pro] setActiveFile start", { id, name: rec.name, force: !!opts?.force });
 
       proSaveActiveEdits("before-switch", true);
@@ -13043,10 +13128,12 @@ try{
 
     }catch(err){
       console.error("[Pro] setActiveFile error", err);
+      if (typeof window.diagErr === "function") window.diagErr("[ACTIVE]", "error", err);
     }finally{
       render();
       if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch");
       console.log("[Pro] setActiveFile done", id);
+      if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id }));
     }
   }
   function filtered(){
