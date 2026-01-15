@@ -4781,6 +4781,75 @@ if (typeof window.diagState !== "function") {
     try{ console.warn("[ARTIFACT][CMCD]", "not found", { fileId }); }catch(_){ }
     return null;
   }
+  // --- CMCD parser for artifact scan (D&D full-load) ---
+  // NOTE: scanArtifactsFromFile() expects this to exist.
+  function cmcdParseFromPayload(u8){
+    try{
+      if(!u8) return { obj:null, rawText:"" };
+      // normalize to exactly 2048 bytes
+      const buf = new Uint8Array(2048);
+      buf.fill(0);
+      if(u8 instanceof Uint8Array){
+        buf.set(u8.slice(0, 2048), 0);
+      }else{
+        // allow ArrayBuffer etc
+        const tmp = new Uint8Array(u8);
+        buf.set(tmp.slice(0, 2048), 0);
+      }
+
+      const obj = {};
+      const ver = (buf[0] | (buf[1] << 8)) >>> 0;
+      obj["Ver"] = String(ver);
+
+      // CMCD_KEYS / _cmcdSlotForKey / _sjisDecode are declared elsewhere in this file
+      if(typeof CMCD_KEYS !== "undefined" && typeof _cmcdSlotForKey === "function"){
+        for(const key of CMCD_KEYS){
+          if(key === "Ver") continue;
+          const sl = _cmcdSlotForKey(key);
+          if(!sl) continue;
+          const s = sl[0], len = sl[1];
+          const raw = buf.slice(s, s + len);
+          const end = raw.indexOf(0);
+          const cut = (end >= 0) ? raw.slice(0, end) : raw;
+          let txt = "";
+          try{
+            if(typeof _sjisDecode === "function") txt = _sjisDecode(cut);
+            else txt = new TextDecoder("utf-8").decode(cut);
+          }catch(_e){
+            try{ txt = new TextDecoder("utf-8").decode(cut); }catch(_e2){ txt = ""; }
+          }
+          obj[key] = String(txt || "").replace(/\s+$/g, "");
+        }
+      }
+
+      // decide whether it's "real" CMCD (ignore Ver-only)
+      let hasReal = false;
+      for(const k of Object.keys(obj)){
+        if(k === "Ver") continue;
+        const v = obj[k];
+        if(typeof v === "string" && v.trim() !== ""){
+          hasReal = true;
+          break;
+        }
+      }
+      if(!hasReal){
+        return { obj:null, rawText:"" };
+      }
+
+      // rawText (debug)
+      let rawText = "";
+      try{
+        if(typeof CMCD_KEYS_UI !== "undefined" && Array.isArray(CMCD_KEYS_UI)){
+          rawText = CMCD_KEYS_UI.map(k => `${k}: ${obj[k] || ""}`).join("\n");
+        }
+      }catch(_){ rawText = ""; }
+
+      return { obj, rawText };
+    }catch(e){
+      try{ console.warn("[CMCD] cmcdParseFromPayload failed", e); }catch(_){}
+      return { obj:null, rawText:"" };
+    }
+  }
   function scanArtifactsFromFile(fileBuf, chunks, fileId){
     try{
       const chunkIdsSample = Array.isArray(chunks) ? chunks.map(c=>c?.id).filter(Boolean).slice(0, 60) : [];
