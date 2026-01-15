@@ -4354,6 +4354,32 @@ function maybeToastFromLog(msg){
   try{ maybeToastFromLog(msg); }catch(_){ }
 }
 
+/* --- compat shim: prevent crash when legacy commit() is called --- */
+(function(){
+  if (typeof window.commit === "function") return;
+
+  window.commit = function(...args){
+    try{
+      // prefer "all edits" commit if exists
+      if (typeof window.commitEdits === "function") return window.commitEdits(...args);
+      if (typeof window.commitEdit === "function")  return window.commitEdit(...args);
+
+      // cue-only variants
+      if (typeof window.commitCues === "function")     return window.commitCues(...args);
+      if (typeof window.commitCueEdits === "function") return window.commitCueEdits(...args);
+
+      // snapshots / savepoints (if used)
+      if (typeof window.saveEdits === "function") return window.saveEdits(...args);
+
+      console.warn("[Compat] commit() called but no commit* function exists", args);
+      return;
+    }catch(e){
+      console.error("[Compat] commit() failed", e);
+      return;
+    }
+  };
+})();
+
 /* Utils */
 function clamp(v,a,b){ return Math.max(a, Math.min(b, v)); }
 
