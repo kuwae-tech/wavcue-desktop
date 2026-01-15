@@ -7245,10 +7245,6 @@ function _cmcdHasValues(values){
   if(typeof values !== "object") return false;
   return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
 }
-function _cmcdInputsHasValues(values){
-    if(!values || typeof values !== "object") return false;
-    return CMCD_KEYS_UI.some(k=> String(values[k] ?? "").trim());
-  }
 function _cmcdApplyValuesToInputs(values){
   renderCmcdForm();
   for(const k of CMCD_KEYS_UI){
@@ -7309,6 +7305,20 @@ function _normalizeAttachmentList(list){
     return null;
   }).filter(Boolean);
 }
+function _isEmptyCmcdTemplateString(value){
+  try{
+    if(typeof value !== "string") return false;
+    const obj = JSON.parse(value);
+    if(!obj || typeof obj !== "object") return false;
+    for(const key of Object.keys(obj)){
+      const v = obj[key];
+      if(v != null && String(v).trim().length > 0) return false;
+    }
+    return true;
+  }catch(_){
+    return false;
+  }
+}
 function normalizeRecArtifacts(rec, stateLike){
   if(!rec) return;
   let imported = false;
@@ -7336,10 +7346,19 @@ function normalizeRecArtifacts(rec, stateLike){
       }
       if(rec.cmcd) imported = true;
     }
-    if(!rec.cmcd && rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)){
-      try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
-    }
     if(typeof rec.cmcd !== "string") rec.cmcd = (rec.cmcd ? String(rec.cmcd) : "");
+    const hasInputs = rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs);
+    const hasStr = typeof rec.cmcd === "string" && rec.cmcd.trim().length > 0;
+    const emptyTemplate = hasStr && _isEmptyCmcdTemplateString(rec.cmcd);
+    if(hasInputs && (!hasStr || emptyTemplate)){
+      try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
+      if(emptyTemplate){
+        console.log("[CMCD] prefer inputs over empty template", {
+          fileId: rec.fileId || rec.id,
+          cmcdLen: rec.cmcd.length,
+        });
+      }
+    }
   }catch(err){
     console.error("[MIGRATE] cmcd normalize error", err);
     rec.cmcd = typeof rec.cmcd === "string" ? rec.cmcd : "";
