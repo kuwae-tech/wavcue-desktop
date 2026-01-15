@@ -4395,6 +4395,71 @@ if (typeof window.diagState !== "function") {
 (function(){
   if (typeof window.normalizeRecArtifacts === "function") return;
 
+  /* --- safe summarize + deep find helpers (no behavior change) --- */
+  if (typeof window.safeCloneLite !== "function") {
+    window.safeCloneLite = function(obj){
+      try{
+        if (!obj || typeof obj !== "object") return obj;
+        // shallow clone only + drop huge binary-like fields
+        const out = Array.isArray(obj) ? obj.slice(0, 50) : {};
+        const keys = Object.keys(obj).slice(0, 120);
+        for (const k of keys){
+          const v = obj[k];
+          if (v instanceof ArrayBuffer) continue;
+          if (typeof Buffer !== "undefined" && v && v.constructor && v.constructor.name === "Buffer") continue;
+          if (Array.isArray(v) && v.length > 2000) { out[k] = v.slice(0, 50); continue; }
+          out[k] = v;
+        }
+        return out;
+      }catch(e){ return null; }
+    };
+  }
+
+  if (typeof window.summarizeKeys !== "function") {
+    window.summarizeKeys = function(obj, label){
+      try{
+        if (!obj || typeof obj !== "object") return;
+        const keys = Object.keys(obj);
+        console.log("[MIGRATE][KEYS]", label || "", {keyCount: keys.length, keys: keys.slice(0, 60)});
+      }catch(e){}
+    };
+  }
+
+  if (typeof window.deepFindByKey !== "function") {
+    window.deepFindByKey = function(root, matcher, maxHits){
+      const hits = [];
+      const seen = new Set();
+      const limit = maxHits || 20;
+
+      function walk(node, path, depth){
+        if (!node || typeof node !== "object") return;
+        if (seen.has(node)) return;
+        seen.add(node);
+        if (depth > 5) return;
+
+        const keys = Object.keys(node);
+        for (const k of keys){
+          const v = node[k];
+          const p = path ? (path + "." + k) : k;
+
+          try{
+            if (matcher(k, v, p)) {
+              hits.push({path: p, key: k, type: Array.isArray(v) ? "array" : typeof v});
+              if (hits.length >= limit) return;
+            }
+          }catch(_){}
+
+          if (v && typeof v === "object"){
+            walk(v, p, depth + 1);
+            if (hits.length >= limit) return;
+          }
+        }
+      }
+      walk(root, "", 0);
+      return hits;
+    };
+  }
+
   window.normalizeRecArtifacts = function(rec, stateLike){
     try{
       if (!rec || typeof rec !== "object") return rec;
@@ -6823,6 +6888,8 @@ function _normalizeAttachmentList(list){
 }
 function normalizeRecArtifacts(rec, stateLike){
   if(!rec) return;
+  let imported = false;
+  const src = stateLike || rec?._stateSnap || null;
   try{
     const cmcdCandidates = [
       rec.cmcd,
@@ -6831,9 +6898,12 @@ function normalizeRecArtifacts(rec, stateLike){
       rec.cmcdInputs,
       rec.meta?.cmcd,
       rec.bwfj?.cmcd,
-      stateLike?.cmcd,
-      stateLike?.cmcdValue,
-      stateLike?.cmcdText,
+      src?.cmcd,
+      src?.cmcdValue,
+      src?.cmcdText,
+      src?.cmcdInputs,
+      src?.meta?.cmcd,
+      src?.bwfj?.cmcd,
     ];
     if(!rec.cmcd){
       for(const c of cmcdCandidates){
@@ -6841,6 +6911,7 @@ function normalizeRecArtifacts(rec, stateLike){
         if(typeof c === "string"){ rec.cmcd = c; break; }
         if(typeof c === "object"){ try{ rec.cmcd = JSON.stringify(c); }catch(_){ rec.cmcd = ""; } break; }
       }
+      if(rec.cmcd) imported = true;
     }
     if(!rec.cmcd && typeof window._cmcdSerializeInputs === "function"){
       rec.cmcd = window._cmcdSerializeInputs();
@@ -6858,9 +6929,14 @@ function normalizeRecArtifacts(rec, stateLike){
       rec.attachedPdfs,
       rec.meta?.pdf,
       rec.bwfj?.pdf,
-      stateLike?.attachments,
-      stateLike?.pdfs,
-      stateLike?.pdfAttachments,
+      src?.attachments,
+      src?.pdfs,
+      src?.pdfAttachments,
+      src?.attachedPdfs,
+      src?.meta?.attachments,
+      src?.meta?.pdfs,
+      src?.bwfj?.attachments,
+      src?.bwfj?.pdfs,
     ];
     if(!Array.isArray(rec.attachments) || !rec.attachments.length){
       for(const list of attCandidates){
@@ -6869,6 +6945,7 @@ function normalizeRecArtifacts(rec, stateLike){
           break;
         }
       }
+      if(Array.isArray(rec.attachments) && rec.attachments.length) imported = true;
     }
     if(!Array.isArray(rec.attachments)) rec.attachments = [];
   }catch(err){
@@ -6881,6 +6958,28 @@ function normalizeRecArtifacts(rec, stateLike){
       cmcdLen: rec.cmcd.length,
       pdfCount: rec.attachments.length,
     });
+    if(imported){
+      console.log("[MIGRATE]", "imported", {
+        fileId: rec.fileId || rec.id,
+        cmcdLen: rec.cmcd.length,
+        pdfCount: rec.attachments.length,
+      });
+    }else if(src){
+      console.warn("[MIGRATE]", "no artifacts found", { fileId: rec.fileId || rec.id });
+      if(typeof window.deepFindByKey === "function"){
+        console.log("[MIGRATE][FIND]", "cmcd", window.deepFindByKey(src, (k)=> String(k).toLowerCase().includes("cmcd"), 20));
+        console.log("[MIGRATE][FIND]", "pdf/attach", window.deepFindByKey(src, (k)=> {
+          const key = String(k).toLowerCase();
+          return key.includes("pdf") || key.includes("attach");
+        }, 20));
+        console.log("[MIGRATE][FIND]", "pdf arrays", window.deepFindByKey(src, (_k,v)=> {
+          return Array.isArray(v) && v.length && (v[0]?.name || v[0]?.fileName || v[0]?.mime);
+        }, 20));
+      }
+      if(typeof window.summarizeKeys === "function"){
+        window.summarizeKeys(src, "stateLike");
+      }
+    }
   }catch(_){ }
 }
 try{
@@ -13285,9 +13384,17 @@ try{
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad start", window.diagState({ name: rec.name, fileId: rec.id }));
             await loadSingleWav(rec.file);
             project.lastLoadedId = rec.id;
+            let stateLike = null;
+            try{
+              const raw = window.WavCue?.state || null;
+              stateLike = (typeof window.safeCloneLite === "function") ? window.safeCloneLite(raw) : raw;
+              rec._stateSnap = stateLike || null;
+            }catch(e){
+              console.warn("[MIGRATE] state snapshot failed", e);
+            }
             try{
               if(typeof window.normalizeRecArtifacts === "function"){
-                window.normalizeRecArtifacts(rec, window.WavCue?.state || null);
+                window.normalizeRecArtifacts(rec, stateLike);
               }else{
                 console.warn("[MIGRATE] normalizeRecArtifacts missing (fullLoad)");
               }
@@ -13374,7 +13481,10 @@ try{
       try{
         try{
           if(typeof window.normalizeRecArtifacts === "function"){
-            window.normalizeRecArtifacts(rec, window.WavCue?.state || null);
+            const snap = rec._stateSnap || (typeof window.safeCloneLite === "function"
+              ? window.safeCloneLite(window.WavCue?.state || null)
+              : (window.WavCue?.state || null));
+            window.normalizeRecArtifacts(rec, snap);
           }else{
             console.warn("[MIGRATE] normalizeRecArtifacts missing (active)");
           }
