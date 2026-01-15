@@ -3777,7 +3777,14 @@ const APP_VERSION = "v5_10_28";
    STATE (single source of truth)
 ================================ */
 
-const state = {
+function getState(){
+  if(window.state && typeof window.state === "object") return window.state;
+  window.state = {};
+  return window.state;
+}
+
+const state = getState();
+Object.assign(state, {
   file: null,
   audioUrl: null,
   audioEl: null,
@@ -3832,7 +3839,7 @@ const state = {
   pdfAttach: null,        // legacy alias: selected attachment (auto-maintained)
   pdfViewUrl: null,
   ui: { isLoadingWav: false },
-};
+});
 
 // Alias for future refactors (no functional impact)
 const APP_STATE = state;
@@ -12784,7 +12791,11 @@ try{
       addedIds.push(id);
     }
     if(project.activeId==null && project.files.length>0){
-      await setActiveFile(project.files[0].id, {force:true});
+      try{
+        await setActiveFile(project.files[0].id, {force:true});
+      }catch(e){
+        console.error("[Pro] addFiles:setActiveFile failed", e);
+      }
     }else{
       render();
     }
@@ -12792,27 +12803,30 @@ try{
     return addedIds;
   }
   async function setActiveFile(id, opts){
-    const rec = project.files.find(f=>f.id===id);
-    if(!rec) return;
-
-    proSaveActiveEdits("before-switch", true);
-
-    project.activeId = id;
-    render();
-
-    // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
-    if(project.lastLoadedId===id && !opts?.force){
-      // UI更新だけはして終わる
-      return;
-    }
-
-    // 本体APIが無いならここで止める（波形が出ない原因を明示）
-    if(typeof loadSingleWav !== "function"){
-      console.warn("[Pro] window.WavCue.api.loadFile が見つかりません。Pro側からWAVを読み込めません。");
-      return;
-    }
-
+    const state = getState();
+    console.log("[ACTIVE] setActiveFile:start", id);
+    let rec = null;
     try{
+      rec = project.files.find(f=>f.id===id);
+      if(!rec) return;
+
+      proSaveActiveEdits("before-switch", true);
+
+      project.activeId = id;
+      render();
+
+      // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
+      if(project.lastLoadedId===id && !opts?.force){
+        // UI更新だけはして終わる
+        return;
+      }
+
+      // 本体APIが無いならここで止める（波形が出ない原因を明示）
+      if(typeof loadSingleWav !== "function"){
+        console.warn("[Pro] window.WavCue.api.loadFile が見つかりません。Pro側からWAVを読み込めません。");
+        return;
+      }
+
       console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
       await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
       project.lastLoadedId = id;
@@ -12848,11 +12862,13 @@ try{
       }catch(_){
         // attachCount は null のままでOK
       }
-
     }catch(err){
-      console.error("[Pro] setActiveFile: load failed", err);
+      console.error("[ACTIVE] setActiveFile:error", err);
     }finally{
       render();
+      try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
+      try{ proForceRedraw("setActiveFile:finally"); }catch(_){}
+      console.log("[ACTIVE] setActiveFile:done", id);
     }
   }
   function filtered(){
@@ -13022,7 +13038,11 @@ try{
         btn.disabled = !a;
         if(a){
           btn.addEventListener("click", async ()=>{
-            await setActiveFile(file.id, {force:true});
+            try{
+              await setActiveFile(file.id, {force:true});
+            }catch(e){
+              console.error("[Pro] attachments:setActiveFile failed", e);
+            }
             attachSelectIndex(i);
             pdfOpenViewer();
             closePopover();
