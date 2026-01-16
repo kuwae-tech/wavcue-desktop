@@ -36,13 +36,15 @@
     --r:16px;
     --app-pad: 10px;
     --app-gap: 10px;
-    --brand-logo-h: 22px;
+    --brand-logo-h: 28px;
     --fileList-min-h: 235px;
     --wave-min-h: 240px;
-    --stereo-box-h: 190px;
+    --stereo-box-h: 230px;
+    --titlebar-drag-h: 34px;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none}
+  body{padding-top: var(--titlebar-drag-h)}
   .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
   .appHeader{
     display:flex;
@@ -2330,7 +2332,7 @@ header.wc-titlebar,
   --mac-logo-gap: 10px;
 }
 .is-win body{
-  padding-top: max(env(titlebar-area-height, 0px), var(--win-title-safe));
+  padding-top: max(env(titlebar-area-height, 0px), var(--win-title-safe), var(--titlebar-drag-h));
 }
 .is-win .appRoot, .is-win #app{
   padding-top: 0;
@@ -2341,7 +2343,7 @@ header.wc-titlebar,
 }
 
 .is-mac body{
-  padding-top: 0 !important;
+  padding-top: var(--titlebar-drag-h) !important;
 }
 .is-mac .app,
 .is-mac #app,
@@ -2350,7 +2352,7 @@ header.wc-titlebar,
   margin-top: 0 !important;
 }
 .is-mac .appHeader{
-  margin-top: calc(var(--mac-titlebar-safe) + var(--mac-logo-gap));
+  margin-top: var(--mac-logo-gap);
   padding-top: 0;
   padding-left: 0;
 }
@@ -3191,6 +3193,25 @@ body, #appRoot, .appRoot, .mainLayout{
     display: none !important;
     height: 0 !important;
   }
+  #titlebarDrag{
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--titlebar-drag-h);
+    -webkit-app-region: drag;
+    z-index: 9999;
+    background: transparent;
+  }
+  #titlebarDrag::before{
+    content:"";
+    position:absolute;
+    top:0;
+    left:0;
+    width: 88px;
+    height: var(--titlebar-drag-h);
+    -webkit-app-region: no-drag;
+  }
   .appHeader,
   #appHeader,
   .headerBar,
@@ -3253,6 +3274,7 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   /* ===== /UI adjustments ===== */
 </style></head><body>
+<div id="titlebarDrag"></div>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
 <symbol id="ico-folder" viewbox="0 0 24 24">
