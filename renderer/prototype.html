@@ -186,7 +186,7 @@
   }
   #waveBox{flex:1;min-height:0}
   #wave{
-    width:100%;height:100%;
+    width:100% !important;height:100% !important;
     display:block;
     touch-action:none;
     cursor:crosshair;
@@ -253,7 +253,7 @@
     width:100%;
     display:flex;
   }
-  #meterCanvas{width:100%;height:100%;display:block}
+  #meterCanvas{width:100% !important;height:100% !important;display:block}
   #imagerCanvas{width:100% !important;height:100% !important;display:block}
   .right{display:flex;flex-direction:column;min-height:0}
   .cueSide{
@@ -6537,17 +6537,35 @@ const wave = $("wave");
 const wctx = wave.getContext("2d");
 
 function resizeCanvas(canvas){
+  if(!canvas) return false;
   const dpr = Math.max(1, window.devicePixelRatio||1);
   const r = canvas.getBoundingClientRect();
+  if(r.width <= 2 || r.height <= 2){
+    const id = canvas.id || canvas.getAttribute("data-id") || "canvas";
+    console.log(`[UI][resizeCanvas] skipped (rect small) id=${id} w=${r.width.toFixed(2)} h=${r.height.toFixed(2)}`);
+    return false;
+  }
   canvas.width = Math.floor(r.width * dpr);
   canvas.height = Math.floor(r.height * dpr);
   const ctx = canvas.getContext("2d");
   ctx.setTransform(dpr,0,0,dpr,0,0);
+  return true;
 }
 function resizeAll(){
-  resizeCanvas(wave);
-  resizeCanvas($("meterCanvas"));
-  resizeCanvas($("imagerCanvas"));
+  const okWave = resizeCanvas(wave);
+  const okMeter = resizeCanvas($("meterCanvas"));
+  const okImager = resizeCanvas($("imagerCanvas"));
+  if(!(okWave && okMeter && okImager)){
+    resizeAll._retryCount = (resizeAll._retryCount || 0) + 1;
+    if(resizeAll._retryCount <= 2){
+      console.log(`[UI][resizeAll] retry=${resizeAll._retryCount}/2`);
+      requestAnimationFrame(()=>{ resizeAll(); });
+    }else{
+      resizeAll._retryCount = 0;
+    }
+    return;
+  }
+  resizeAll._retryCount = 0;
 }
 
 function drawWaveform(){
