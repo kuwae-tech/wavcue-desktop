@@ -6540,10 +6540,8 @@ function resizeCanvas(elOrId){
   const el = (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId;
   if(!el) return;
 
-  // NOTE:
   // 縮小時に canvas.width/height(属性) が小さくなると、canvas自身の rect が小さい値で固定され、
-  // 拡大後も getBoundingClientRect が更新されず “小さいまま” になるケースがある。
-  // そのため、親コンテナの rect を測って属性サイズを更新する。
+  // 拡大後も rect が追従しない/追従が遅いケースがあるため、親コンテナの rect を測る。
   const measureEl = (el.parentElement && el.parentElement.getBoundingClientRect) ? el.parentElement : el;
   const r = measureEl.getBoundingClientRect();
 
@@ -6553,7 +6551,6 @@ function resizeCanvas(elOrId){
 
   const changed = (el.width !== w) || (el.height !== h);
 
-  // width/height を入れるとコンテキスト状態がリセットされるので、サイズが同じでも transform は必ず再設定する
   if(el.width !== w) el.width = w;
   if(el.height !== h) el.height = h;
 
@@ -6564,7 +6561,7 @@ function resizeCanvas(elOrId){
     }
   }catch(_){}
 
-  // 追加ログ（必要最小限）
+  // 既存ログに合わせ、必要最小限（変更があった時だけ）
   if(changed){
     try{
       const id = el.id || "(no-id)";
@@ -6576,6 +6573,29 @@ function resizeAll(){
   resizeCanvas($("wave"));
   resizeCanvas($("meterCanvas"));
   resizeCanvas($("imagerCanvas"));
+}
+
+function _uiLogWaveLayout(tag){
+  try{
+    const wave = document.getElementById("wave");
+    const waveBox = document.getElementById("waveBox");
+    const waveWrap = document.querySelector(".waveWrap");
+    const workTop = document.querySelector(".workTop");
+    const analyzersRow = document.getElementById("analyzersRow");
+
+    const rect = (el)=> el?.getBoundingClientRect?.() || {width:0,height:0,top:0,left:0};
+    const cs = (el)=> el ? window.getComputedStyle(el) : null;
+    const pick = (s)=> s ? ({ h:s.height, minH:s.minHeight, maxH:s.maxHeight, flex:s.flex, flexGrow:s.flexGrow, flexBasis:s.flexBasis, overflow:s.overflow }) : null;
+
+    console.log("[UI][layout]", tag, {
+      vw: window.innerWidth, vh: window.innerHeight,
+      wave: { rect: rect(wave), attr: { w: wave?.width, h: wave?.height }, style: pick(cs(wave)) },
+      waveBox: { rect: rect(waveBox), style: pick(cs(waveBox)) },
+      waveWrap: { rect: rect(waveWrap), style: pick(cs(waveWrap)) },
+      workTop: { rect: rect(workTop), style: pick(cs(workTop)) },
+      analyzersRow: { rect: rect(analyzersRow), style: pick(cs(analyzersRow)) },
+    });
+  }catch(_){}
 }
 
 function drawWaveform(){
@@ -12610,6 +12630,7 @@ function installViewportWatch(){
         console.log(`[UI][resizeKick] ${phase} w=${w} h=${h}`);
         resizeAll();
         drawAll();
+        _uiLogWaveLayout(`resizeKick:${phase}`);
       }catch(e){
         console.warn("[UI][resizeKick] failed", phase, e);
       }
@@ -12677,6 +12698,7 @@ window.addEventListener("resize", ()=>{
       imager: { rectW: imagerRect.width, rectH: imagerRect.height, w: imagerEl?.width, h: imagerEl?.height },
     });
   }catch(_){}
+  _uiLogWaveLayout("window:resize:end");
 });
 
 function init(){
