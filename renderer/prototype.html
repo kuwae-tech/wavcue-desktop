@@ -36,9 +36,16 @@
     --r:16px;
     --app-pad: 10px;
     --app-gap: 10px;
+    --brand-logo-h: 44px;
+    --bottom-line-h: 240px;
+    --fileList-min-h: var(--bottom-line-h);
+    --wave-min-h: 210px;
+    --stereo-box-h: var(--bottom-line-h);
+    --titlebar-drag-h: 34px;
   }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none}
+  body{padding-top: var(--titlebar-drag-h)}
   .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
   .appHeader{
     display:flex;
@@ -48,22 +55,41 @@
     flex: 0 0 auto;
     overflow: visible;
     padding-bottom: 2px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
   }
   .hdrLeft{
-    flex:1 1 auto;
+    flex:0 0 auto;
     display:flex;
     align-items:center;
     gap:12px;
     min-width:0;
-    flex-wrap:wrap;
+    flex-wrap:nowrap;
+    min-width:max-content;
+  }
+  .hdrMid{
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .hdrRight{
-    flex:0 0 auto;
+    flex:0 1 auto;
     display:flex;
     align-items:center;
     gap:10px;
     margin-left:auto;
+    min-width: 0;
+    max-width: 55vw;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-app-region: no-drag;
   }
+  .hdrRight > *{
+    flex: 0 0 auto;
+  }
+  .hdrRight::-webkit-scrollbar{ height: 6px; }
+  .hdrRight::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.18); border-radius: 8px; }
+  .hdrRight{ scrollbar-width: thin; }
   .appHeader button,
   .appHeader a,
   .appHeader input,
@@ -97,9 +123,12 @@
   .brandMark img{
     display:block;
   }
-  .brandLogo{
-    height: 22px;
+  .brandLogo,
+  .brandLogo img,
+  .brandLogo svg{
+    height: var(--brand-logo-h);
     width: auto;
+    max-height: var(--brand-logo-h);
     display:block;
   }
   .btnRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -157,7 +186,7 @@
   }
   #waveBox{flex:1;min-height:0}
   #wave{
-    width:100%;height:100%;
+    width:100% !important;height:100% !important;
     display:block;
     touch-action:none;
     cursor:crosshair;
@@ -224,7 +253,7 @@
     width:100%;
     display:flex;
   }
-  #meterCanvas{width:100%;height:100%;display:block}
+  #meterCanvas{width:100% !important;height:100% !important;display:block}
   #imagerCanvas{width:100% !important;height:100% !important;display:block}
   .right{display:flex;flex-direction:column;min-height:0}
   .cueSide{
@@ -256,6 +285,13 @@
     width:100%;padding:10px;border-radius:12px;
     border:1px solid var(--line);background:rgba(0,0,0,.15);color:var(--text);outline:none;
     font-size:12px
+  }
+  input,
+  textarea,
+  [contenteditable="true"],
+  .allowSelect{
+    -webkit-user-select:text;
+    user-select:text;
   }
   .cueTableWrap{flex:1;min-height:0;border:1px solid var(--line);border-radius:14px;overflow:auto;background:rgba(0,0,0,.10)}
   .cueTableWrap thead th{
@@ -2316,7 +2352,7 @@ header.wc-titlebar,
   --mac-logo-gap: 10px;
 }
 .is-win body{
-  padding-top: max(env(titlebar-area-height, 0px), var(--win-title-safe));
+  padding-top: max(env(titlebar-area-height, 0px), var(--win-title-safe), var(--titlebar-drag-h));
 }
 .is-win .appRoot, .is-win #app{
   padding-top: 0;
@@ -2327,7 +2363,7 @@ header.wc-titlebar,
 }
 
 .is-mac body{
-  padding-top: 0 !important;
+  padding-top: var(--titlebar-drag-h) !important;
 }
 .is-mac .app,
 .is-mac #app,
@@ -2336,7 +2372,7 @@ header.wc-titlebar,
   margin-top: 0 !important;
 }
 .is-mac .appHeader{
-  margin-top: calc(var(--mac-titlebar-safe) + var(--mac-logo-gap));
+  margin-top: var(--mac-logo-gap);
   padding-top: 0;
   padding-left: 0;
 }
@@ -2604,98 +2640,136 @@ body, #appRoot, .appRoot, .mainLayout{
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
 
 
-/* ===== Layout lock (Pro multi-file) ===== */
+/* ===== Layout lock (Pro multi-file) - resize safe (FIX) ===== */
 
-/* main: 左可変 / 右固定 */
-.main{
-  display:grid !important;
-  grid-template-columns: minmax(0,1fr) 340px !important;
-  gap: 12px !important;
-  height: calc(100vh - var(--topbar-h, 0px)) !important; /* 既存があればそれ優先でもOK */
-  min-height: 0 !important;
+/* 右サイド幅・下段高さをここに統一 */
+:root{
+  --cueW: 340px;
+  --bottomH: 190px;     /* 下段(メーター/イメージャ/ファイルリスト)固定高さ */
+  --meterW: 140px;
+  --imagerS: 190px;
+  --gap: 12px;
 }
 
-/* 左カラム：縦flexで「上可変 + 下固定」を成立させる */
+/* main は “flexで伸びる” を最優先（height固定しない） */
+.main{
+  display:grid !important;
+  grid-template-columns: minmax(0,1fr) var(--cueW) !important;
+  gap: var(--gap) !important;
+
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;        /* ★重要：calc(vh...)で固定しない */
+}
+
+/* 左カラム */
 .left{
   min-width: 0 !important;
   min-height: 0 !important;
   overflow: hidden !important;
+
+  display:flex !important;
+  flex-direction: column !important;
 }
-.waveWrap{
+
+/* 左カラム内：上可変 + 下固定 を “flex” で作る（grid固定と競合させない） */
+.workCol{
   display:flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
-  height: 100% !important;
+  height: auto !important;
+  overflow: hidden !important;
 }
-.waveBox{
+.workTop{
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display:flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* sectionHead の下を波形+トランスポートで使い切る */
+.waveWrap{
+  flex: 1 1 auto !important;      /* ★重要：height:100%は禁止 */
+  min-height: 0 !important;
+  height: auto !important;
+  display:flex !important;
+  flex-direction: column !important;
+}
+
+/* 波形枠は残りを占有 */
+.waveBox, #waveBox{
   flex: 1 1 auto !important;
   min-height: 0 !important;
   overflow: hidden !important;
 }
 
-/* ★下段 analyzers を“固定高さ”にする（他を押し出さない） */
-.analyzers, #analyzersRow{
-  flex: 0 0 190px !important;     /* 固定 */
-  height: 190px !important;
-  min-height: 190px !important;
+/* 下段（analyzersRow）は高さを var(--bottomH) に統一 */
+.workBottom,
+.analyzers,
+#analyzersRow{
+  flex: 0 0 var(--bottomH) !important;
+  height: var(--bottomH) !important;
+  min-height: var(--bottomH) !important;
+  max-height: var(--bottomH) !important;
+
   display:flex !important;
-  gap: 12px !important;
+  gap: var(--gap) !important;
   align-items: stretch !important;
   overflow: hidden !important;
   position: relative !important;
-  z-index: 1 !important;
 }
 
-/* メーター：固定幅 */
-.meterBlock{
-  width: 140px !important;
-  min-width: 140px !important;
+/* メーター・イメージャの枠 */
+.meterBox, .meterBlock{
+  width: var(--meterW) !important;
+  min-width: var(--meterW) !important;
   height: 100% !important;
   overflow: hidden !important;
   border-radius: 12px !important;
 }
-
-/* イメージャ：正方形固定（ユーザー要望） */
-.imagerBlock{
-  width: 190px !important;
-  min-width: 190px !important;
+.imagerBox, .imagerBlock{
+  width: var(--imagerS) !important;
+  min-width: var(--imagerS) !important;
   height: 100% !important;
   aspect-ratio: 1 / 1 !important;
   overflow: hidden !important;
   border-radius: 12px !important;
 }
 
-/* ファイルリスト：残り横幅すべて（可変は横だけ。縦は固定枠内スクロール） */
+/* ファイルリストは残り横幅を全て、縦は枠内スクロール */
 #proFileDock, .proFileDock{
   flex: 1 1 auto !important;
   min-width: 0 !important;
   height: 100% !important;
-  overflow: hidden !important;  /* 外枠は隠す */
+  overflow: hidden !important;
   border-radius: 12px !important;
+  display:flex !important;
+  flex-direction: column !important;
 }
 #proFileListWrap{
-  height: 100% !important;
-  overflow: auto !important;    /* 中だけスクロール */
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
 }
 
-/* キャンバスは親のサイズに追従（はみ出し防止） */
+/* canvasは枠に追従 */
 #meterCanvas, #imagerCanvas{
   width: 100% !important;
   height: 100% !important;
   display:block !important;
 }
 
-/* 右サイド（CUE）を grid の2列目に固定 */
+/* 右サイド */
 #cueSide, .cueSide{
   grid-column: 2 / 3 !important;
   min-height: 0 !important;
   height: 100% !important;
   overflow: hidden !important;
+  position: relative !important;
 }
-
-/* CUEメニュー上部ボタンが2列に折れるのを防止 */
-#cueSide .btnRow, 
-#cueSide .row, 
+#cueSide .btnRow,
+#cueSide .row,
 #cueSide .cueTopRow{
   display:flex !important;
   flex-wrap: nowrap !important;
@@ -2705,133 +2779,7 @@ body, #appRoot, .appRoot, .mainLayout{
   white-space: nowrap !important;
 }
 
-/* もし “position:fixed/absolute” でCUEが浮いていたら殺す */
-#cueSide{
-  position: relative !important;
-}
-
 /* ===== end ===== */
-  :root{
-    --cueW: 340px;
-    --bottomH: 170px;
-    --meterW: 140px;
-    --imagerS: 170px;
-    --gap: 12px;
-  }
-
-  /* ===== Work area layout lock ===== */
-  .workCol{
-    display: grid !important;
-    grid-template-rows: 1fr var(--bottomH) !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    overflow: hidden !important;
-  }
-
-  .workTop{
-    min-height: 0 !important;
-    position: relative !important;
-    overflow: hidden !important;
-    z-index: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .workBottom{
-    min-height: var(--bottomH) !important;
-    height: var(--bottomH) !important;
-    position: relative !important;
-    z-index: 2 !important;
-    overflow: hidden !important;
-  }
-
-.proBottomRow{
-    display: flex !important;
-    gap: var(--gap) !important;
-    align-items: stretch !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .proMeterBox{
-    width: var(--meterW) !important;
-    min-width: var(--meterW) !important;
-    height: 100% !important;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .proImagerBox{
-    width: var(--imagerS) !important;
-    min-width: var(--imagerS) !important;
-    height: 100% !important;
-    aspect-ratio: 1 / 1;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .proFileListBox{
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    height: 100% !important;
-    width: 100% !important;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    box-sizing: border-box !important;
-  }
-
-  #proFileListWrap, #proFileDock{
-    height: 100% !important;
-    max-height: 100% !important;
-    overflow: auto !important;
-    position: relative !important;
-    inset: auto !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  #meterCanvas, canvas#meterCanvas{
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-  }
-  #imagerCanvas, canvas#imagerCanvas{
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-  }
-
-  .workTop .overlay,
-  .workTop .dropOverlay,
-  .workTop .dropHint,
-  .workTop .modalOverlay,
-  .workTop .blockingOverlay{
-    max-height: 100% !important;
-  }
-
-  .analyzers{
-    height: var(--bottomH) !important;
-    overflow: hidden !important;
-  }
-
-  .cueRow, .cueRowTop, .cueAddRow, .cueButtonsRow{
-    display: flex !important;
-    gap: 10px !important;
-    align-items: center !important;
-    flex-wrap: nowrap !important;
-  }
-  .cueRow button, .cueRowTop button, .cueAddRow button, .cueButtonsRow button{
-    flex: 0 0 auto !important;
-    white-space: nowrap !important;
-  }
-
   /* ===== Pro layout hard-fix (bottom row) ===== */
 
   /* 下段の行は必ず横幅100%を取る。ここが 180px 固定になっていたのが崩れの主因 */
@@ -3171,7 +3119,103 @@ body, #appRoot, .appRoot, .mainLayout{
     max-width: 84px !important;
   }
   /* ===== /Stability patch ===== */
+
+  /* ===== UI adjustments: logo size, drag strip, bottom layout ===== */
+  #dragStrip{
+    display: none !important;
+    height: 0 !important;
+  }
+  #titlebarDrag{
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--titlebar-drag-h);
+    -webkit-app-region: drag;
+    z-index: 9999;
+    background: transparent;
+    contain: layout paint;
+  }
+  #titlebarDrag::before{
+    content:"";
+    position:absolute;
+    top:0;
+    left:0;
+    width: 88px;
+    height: var(--titlebar-drag-h);
+    -webkit-app-region: no-drag;
+  }
+  .appHeader,
+  #appHeader,
+  .headerBar,
+  .topHeader,
+  .menuBar,
+  .topBar,
+  .toolbarWrap{
+    -webkit-app-region: drag;
+  }
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role="button"],
+  .noDrag{
+    -webkit-app-region: no-drag;
+  }
+
+  .workCol{
+    grid-template-rows: minmax(var(--wave-min-h), 1fr) var(--fileList-min-h) !important;
+  }
+  .workBottom,
+  #analyzersRow,
+  .analyzersRow,
+  .analyzers,
+  .bottomRow,
+  .proBottomRow{
+    height: var(--bottom-line-h) !important;
+    min-height: var(--bottom-line-h) !important;
+    flex: 0 0 var(--bottom-line-h) !important;
+  }
+  .waveWrap{
+    min-height: var(--wave-min-h) !important;
+  }
+
+  .meterBox,
+  .proMeterBox,
+  .imagerBox,
+  .proImagerBox{
+    height: var(--bottom-line-h) !important;
+    min-height: var(--bottom-line-h) !important;
+    box-sizing: border-box;
+  }
+  .meterBox,
+  .proMeterBox{
+    padding-bottom: 10px;
+    overflow: visible;
+  }
+  .imagerBox,
+  .proImagerBox{
+    padding-bottom: 12px;
+    overflow: visible;
+    box-sizing: border-box;
+  }
+  .imagerBox canvas,
+  .proImagerBox canvas{
+    height: 100% !important;
+    width: 100% !important;
+    display: block;
+  }
+
+  .fileListBox,
+  .proFileListBox{
+    min-height: var(--bottom-line-h);
+    height: var(--bottom-line-h);
+    overflow: hidden;
+  }
+  /* ===== /UI adjustments ===== */
 </style></head><body>
+<div id="titlebarDrag"></div>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
 <symbol id="ico-folder" viewbox="0 0 24 24">
@@ -3226,6 +3270,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div>
   </div>
+  <div class="hdrMid"></div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
@@ -6403,18 +6448,66 @@ window.renderCueList = window.renderCueList || renderCues;
 const wave = $("wave");
 const wctx = wave.getContext("2d");
 
-function resizeCanvas(canvas){
-  const dpr = Math.max(1, window.devicePixelRatio||1);
-  const r = canvas.getBoundingClientRect();
-  canvas.width = Math.floor(r.width * dpr);
-  canvas.height = Math.floor(r.height * dpr);
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(dpr,0,0,dpr,0,0);
+function resizeCanvas(elOrId){
+  const el = (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId;
+  if(!el) return;
+
+  // 縮小時に canvas.width/height(属性) が小さくなると、canvas自身の rect が小さい値で固定され、
+  // 拡大後も rect が追従しない/追従が遅いケースがあるため、親コンテナの rect を測る。
+  const measureEl = (el.parentElement && el.parentElement.getBoundingClientRect) ? el.parentElement : el;
+  const r = measureEl.getBoundingClientRect();
+
+  const dpr = window.devicePixelRatio || 1;
+  const w = Math.max(1, Math.floor(r.width * dpr));
+  const h = Math.max(1, Math.floor(r.height * dpr));
+
+  const changed = (el.width !== w) || (el.height !== h);
+
+  if(el.width !== w) el.width = w;
+  if(el.height !== h) el.height = h;
+
+  try{
+    const ctx = el.getContext && el.getContext("2d");
+    if(ctx && ctx.setTransform){
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }catch(_){}
+
+  // 既存ログに合わせ、必要最小限（変更があった時だけ）
+  if(changed){
+    try{
+      const id = el.id || "(no-id)";
+      console.log("[UI][resizeCanvas]", { id, rectW: r.width, rectH: r.height, w, h, dpr });
+    }catch(_){}
+  }
 }
 function resizeAll(){
-  resizeCanvas(wave);
+  resizeCanvas($("wave"));
   resizeCanvas($("meterCanvas"));
   resizeCanvas($("imagerCanvas"));
+}
+
+function _uiLogWaveLayout(tag){
+  try{
+    const wave = document.getElementById("wave");
+    const waveBox = document.getElementById("waveBox");
+    const waveWrap = document.querySelector(".waveWrap");
+    const workTop = document.querySelector(".workTop");
+    const analyzersRow = document.getElementById("analyzersRow");
+
+    const rect = (el)=> el?.getBoundingClientRect?.() || {width:0,height:0,top:0,left:0};
+    const cs = (el)=> el ? window.getComputedStyle(el) : null;
+    const pick = (s)=> s ? ({ h:s.height, minH:s.minHeight, maxH:s.maxHeight, flex:s.flex, flexGrow:s.flexGrow, flexBasis:s.flexBasis, overflow:s.overflow }) : null;
+
+    console.log("[UI][layout]", tag, {
+      vw: window.innerWidth, vh: window.innerHeight,
+      wave: { rect: rect(wave), attr: { w: wave?.width, h: wave?.height }, style: pick(cs(wave)) },
+      waveBox: { rect: rect(waveBox), style: pick(cs(waveBox)) },
+      waveWrap: { rect: rect(waveWrap), style: pick(cs(waveWrap)) },
+      workTop: { rect: rect(workTop), style: pick(cs(workTop)) },
+      analyzersRow: { rect: rect(analyzersRow), style: pick(cs(analyzersRow)) },
+    });
+  }catch(_){}
 }
 
 function drawWaveform(){
@@ -12420,15 +12513,110 @@ window.addEventListener("keydown", (e)=>{
     return;
   }
 });
+function updateViewportVars(){
+  const vh = window.innerHeight * 0.01;
+  const vw = window.innerWidth * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+  document.documentElement.style.setProperty('--vw', `${vw}px`);
+  console.log(`[UI][viewport] w=${window.innerWidth}, h=${window.innerHeight}, vh=${vh.toFixed(2)}, vw=${vw.toFixed(2)}`);
+}
+function installViewportWatch(){
+  if(window.__viewportWatchInstalled) return;
+  window.__viewportWatchInstalled = true;
+  let lastW = window.innerWidth;
+  let lastH = window.innerHeight;
+  let _resizeRaf = 0;
+  let _resizeTimer = 0;
+  const tick = ()=>{
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if(w === lastW && h === lastH) return;
+    lastW = w;
+    lastH = h;
+    console.log(`[UI][watchResize] detected w/h change ${w}x${h}`);
+    updateViewportVars();
+    if (_resizeRaf) cancelAnimationFrame(_resizeRaf);
+    if (_resizeTimer) clearTimeout(_resizeTimer);
+    const kick = (phase)=>{
+      try{
+        console.log(`[UI][resizeKick] ${phase} w=${w} h=${h}`);
+        resizeAll();
+        drawAll();
+        _uiLogWaveLayout(`resizeKick:${phase}`);
+      }catch(e){
+        console.warn("[UI][resizeKick] failed", phase, e);
+      }
+    };
+    _resizeRaf = requestAnimationFrame(()=> kick("raf"));
+    _resizeTimer = setTimeout(()=> kick("timeout"), 60);
+    _recoverProFileDockLayout("watch");
+  };
+  setInterval(tick, 220);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener("resize", updateViewportVars, {passive:true});
+    window.visualViewport.addEventListener("scroll", updateViewportVars, {passive:true});
+  }
+}
+function installWindowResizeRelayout(){
+  if(window.__resizeRelayoutInstalled) return;
+  window.__resizeRelayoutInstalled = true;
+  let lastW = window.innerWidth;
+  let lastH = window.innerHeight;
+  let timer = 0;
+  const safe = window.safeCall || ((fn, ...args)=>{
+    try{ if(typeof fn === "function") return fn(...args); }catch(_){}
+  });
+  const run = ()=>{
+    safe(window.requestFullRefresh, "window:resize");
+    safe(window.forceRedraw, "window:resize");
+    safe(window.drawWaveform);
+    safe(window.drawAnalyzers);
+    safe(window.bootDrawAnalyzers, "resize");
+  };
+  const handler = ()=>{
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if(w === lastW && h === lastH) return;
+    lastW = w;
+    lastH = h;
+    if(timer) clearTimeout(timer);
+    timer = setTimeout(()=>{
+      requestAnimationFrame(run);
+    }, 100);
+  };
+  window.addEventListener("resize", handler, {passive:true});
+}
 /* Resize */
 window.addEventListener("resize", ()=>{
+  updateViewportVars();
   resizeAll();
   drawAll();
-  requestAnimationFrame(()=>{ forceDrawAnalyzersOnBoot(); });
-  _recoverProFileDockLayout("resize");
+  requestAnimationFrame(()=>{
+    try{ resizeAll(); }catch(_){}
+    try{ drawAll(); }catch(_){}
+    try{ forceDrawAnalyzersOnBoot(); }catch(_){}
+  });
+  _recoverProFileDockLayout("window:resize");
+  try{
+    const waveEl = $("wave");
+    const meterEl = $("meterCanvas");
+    const imagerEl = $("imagerCanvas");
+    const waveRect = waveEl?.getBoundingClientRect?.() || {width:0,height:0};
+    const meterRect = meterEl?.getBoundingClientRect?.() || {width:0,height:0};
+    const imagerRect = imagerEl?.getBoundingClientRect?.() || {width:0,height:0};
+    console.log("[UI][canvas]", {
+      wave: { rectW: waveRect.width, rectH: waveRect.height, w: waveEl?.width, h: waveEl?.height },
+      meter: { rectW: meterRect.width, rectH: meterRect.height, w: meterEl?.width, h: meterEl?.height },
+      imager: { rectW: imagerRect.width, rectH: imagerRect.height, w: imagerEl?.width, h: imagerEl?.height },
+    });
+  }catch(_){}
+  _uiLogWaveLayout("window:resize:end");
 });
 
 function init(){
+  updateViewportVars();
+  installViewportWatch();
+  installWindowResizeRelayout();
   setupDragAndDrop();
 
   // 1回目：従来どおり
