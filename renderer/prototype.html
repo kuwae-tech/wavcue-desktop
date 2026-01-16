@@ -2647,7 +2647,7 @@ body, #appRoot, .appRoot, .mainLayout{
   display:grid !important;
   grid-template-columns: minmax(0,1fr) 340px !important;
   gap: 12px !important;
-  height: calc(100vh - var(--topbar-h, 0px)) !important; /* 既存があればそれ優先でもOK */
+  height: calc((var(--vh, 1vh) * 100) - var(--topbar-h, 0px)) !important; /* 既存があればそれ優先でもOK */
   min-height: 0 !important;
 }
 
@@ -12553,6 +12553,36 @@ window.addEventListener("keydown", (e)=>{
     return;
   }
 });
+function updateViewportVars(){
+  const vh = window.innerHeight * 0.01;
+  const vw = window.innerWidth * 0.01;
+  document.documentElement.style.setProperty('--vh', `${vh}px`);
+  document.documentElement.style.setProperty('--vw', `${vw}px`);
+  console.log(`[UI][viewport] w=${window.innerWidth}, h=${window.innerHeight}, vh=${vh.toFixed(2)}, vw=${vw.toFixed(2)}`);
+}
+function installViewportWatch(){
+  if(window.__viewportWatchInstalled) return;
+  window.__viewportWatchInstalled = true;
+  let lastW = window.innerWidth;
+  let lastH = window.innerHeight;
+  const tick = ()=>{
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if(w === lastW && h === lastH) return;
+    lastW = w;
+    lastH = h;
+    console.log(`[UI][watchResize] detected w/h change ${w}x${h}`);
+    updateViewportVars();
+    resizeAll();
+    drawAll();
+    _recoverProFileDockLayout("watch");
+  };
+  setInterval(tick, 220);
+  if(window.visualViewport){
+    window.visualViewport.addEventListener("resize", updateViewportVars, {passive:true});
+    window.visualViewport.addEventListener("scroll", updateViewportVars, {passive:true});
+  }
+}
 function installWindowResizeRelayout(){
   if(window.__resizeRelayoutInstalled) return;
   window.__resizeRelayoutInstalled = true;
@@ -12584,6 +12614,7 @@ function installWindowResizeRelayout(){
 }
 /* Resize */
 window.addEventListener("resize", ()=>{
+  updateViewportVars();
   resizeAll();
   drawAll();
   requestAnimationFrame(()=>{ forceDrawAnalyzersOnBoot(); });
@@ -12591,6 +12622,8 @@ window.addEventListener("resize", ()=>{
 });
 
 function init(){
+  updateViewportVars();
+  installViewportWatch();
   installWindowResizeRelayout();
   setupDragAndDrop();
 
