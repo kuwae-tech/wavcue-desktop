@@ -36,9 +36,12 @@
     --r:16px;
     --app-pad: 10px;
     --app-gap: 10px;
+    --brand-logo-h: 22px;
+    --fileList-min-h: 210px;
+    --wave-min-h: 260px;
   }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif}
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none}
   .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
   .appHeader{
     display:flex;
@@ -97,9 +100,12 @@
   .brandMark img{
     display:block;
   }
-  .brandLogo{
-    height: 22px;
+  .brandLogo,
+  .brandLogo img,
+  .brandLogo svg{
+    height: var(--brand-logo-h);
     width: auto;
+    max-height: var(--brand-logo-h);
     display:block;
   }
   .btnRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
@@ -256,6 +262,13 @@
     width:100%;padding:10px;border-radius:12px;
     border:1px solid var(--line);background:rgba(0,0,0,.15);color:var(--text);outline:none;
     font-size:12px
+  }
+  input,
+  textarea,
+  [contenteditable="true"],
+  .allowSelect{
+    -webkit-user-select:text;
+    user-select:text;
   }
   .cueTableWrap{flex:1;min-height:0;border:1px solid var(--line);border-radius:14px;overflow:auto;background:rgba(0,0,0,.10)}
   .cueTableWrap thead th{
@@ -3171,6 +3184,64 @@ body, #appRoot, .appRoot, .mainLayout{
     max-width: 84px !important;
   }
   /* ===== /Stability patch ===== */
+
+  /* ===== UI adjustments: logo size, drag strip, bottom layout ===== */
+  #dragStrip{
+    height: 12px;
+    width: 100%;
+    -webkit-app-region: drag;
+    cursor: default;
+    flex: 0 0 auto;
+  }
+  .appHeader,
+  #appHeader,
+  .headerBar,
+  .topHeader{
+    -webkit-app-region: no-drag !important;
+  }
+
+  .workCol{
+    grid-template-rows: minmax(var(--wave-min-h), 1fr) var(--fileList-min-h) !important;
+  }
+  .workBottom,
+  #analyzersRow,
+  .analyzersRow,
+  .analyzers,
+  .bottomRow,
+  .proBottomRow{
+    height: var(--fileList-min-h) !important;
+    min-height: var(--fileList-min-h) !important;
+    flex: 0 0 var(--fileList-min-h) !important;
+  }
+  .waveWrap{
+    min-height: var(--wave-min-h) !important;
+  }
+
+  .meterBox,
+  .proMeterBox,
+  .imagerBox,
+  .proImagerBox{
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+  .imagerBox,
+  .proImagerBox{
+    padding-bottom: 12px;
+    overflow: visible;
+    box-sizing: border-box;
+  }
+  .imagerBox canvas,
+  .proImagerBox canvas{
+    height: 100% !important;
+    width: 100% !important;
+    display: block;
+  }
+
+  .fileListBox,
+  .proFileListBox{
+    min-height: var(--fileList-min-h);
+  }
+  /* ===== /UI adjustments ===== */
 </style></head><body>
 <!-- ICON SPRITE (no emoji) -->
 <svg aria-hidden="true" focusable="false" style="position:absolute;width:0;height:0;overflow:hidden" xmlns="http://www.w3.org/2000/svg">
@@ -3207,6 +3278,7 @@ body, #appRoot, .appRoot, .mainLayout{
 </symbol>
 </svg>
 <div aria-hidden="true" id="dropOverlay"><div class="box"><div class="big">WAVをドロップして読み込み</div></div></div><div class="small"></div><div class="app">
+  <div id="dragStrip"></div>
 <div aria-hidden="true" id="progressOverlay">
   <div class="box" role="status" aria-live="polite" aria-atomic="true">
     <div class="meta">
