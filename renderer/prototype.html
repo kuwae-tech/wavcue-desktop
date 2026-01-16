@@ -12577,6 +12577,8 @@ function installViewportWatch(){
   window.__viewportWatchInstalled = true;
   let lastW = window.innerWidth;
   let lastH = window.innerHeight;
+  let _resizeRaf = 0;
+  let _resizeTimer = 0;
   const tick = ()=>{
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -12585,8 +12587,19 @@ function installViewportWatch(){
     lastH = h;
     console.log(`[UI][watchResize] detected w/h change ${w}x${h}`);
     updateViewportVars();
-    resizeAll();
-    drawAll();
+    if (_resizeRaf) cancelAnimationFrame(_resizeRaf);
+    if (_resizeTimer) clearTimeout(_resizeTimer);
+    const kick = (phase)=>{
+      try{
+        console.log(`[UI][resizeKick] ${phase} w=${w} h=${h}`);
+        resizeAll();
+        drawAll();
+      }catch(e){
+        console.warn("[UI][resizeKick] failed", phase, e);
+      }
+    };
+    _resizeRaf = requestAnimationFrame(()=> kick("raf"));
+    _resizeTimer = setTimeout(()=> kick("timeout"), 60);
     _recoverProFileDockLayout("watch");
   };
   setInterval(tick, 220);
