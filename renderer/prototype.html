@@ -4543,7 +4543,7 @@ if (typeof window.diagState !== "function") {
       console.warn("[ARTIFACT][CMCD] not found in textChunks", { fileId });
       return null;
     }catch(e){
-      console.error("[ARTIFACT][CMCD] extractor failed (non-fatal)", e);
+      console.warn("[ARTIFACT][CMCD] extractor failed (non-fatal)", e);
       return null;
     }
   };
@@ -12954,38 +12954,76 @@ function pdfNormalizeNameCp932(name, maxBytes){
   return outName;
 }
 
-function pdfOpenViewer(){
-  const dlg = document.getElementById("pdfViewDialog");
-  const frame = document.getElementById("pdfViewerFrame");
-  const textBox = document.getElementById("fileTextPreview");
-  if(!dlg || !frame) return;
-  if(!state.pdfAttach?.bytes?.length){ log("WARN: ファイルが添付されていません。"); return; }
+function pdfOpenViewerForObject(obj, meta){
+  try{
+    const dlg = document.getElementById("pdfViewDialog");
+    const frame = document.getElementById("pdfViewerFrame");
+    const textBox = document.getElementById("fileTextPreview");
+    if(!dlg || !frame) return;
 
-  const kind = state.pdfAttach.kind || _fileKindFromName(state.pdfAttach.name) || _fileKindFromMime(state.pdfAttach.mime) || "FILE";
-
-  // reset old object URL
-  if(state.pdfViewUrl){ try{ URL.revokeObjectURL(state.pdfViewUrl);}catch(_){ }
-    state.pdfViewUrl=null;
-  }
-
-  if(kind === 'PDF'){
-    if(textBox){ textBox.style.display='none'; textBox.value=''; }
-    frame.style.display='block';
-    const url = URL.createObjectURL(new Blob([state.pdfAttach.bytes], {type:"application/pdf"}));
-    state.pdfViewUrl = url;
-    frame.src = url;
-  }else{
-    // text preview
-    frame.src = 'about:blank';
-    frame.style.display='none';
-    if(textBox){
-      textBox.style.display='block';
-      const txt = _fileDecodeText(state.pdfAttach.bytes);
-      textBox.value = txt ? txt : `（${kind} のプレビューはテキストとして表示します。内容が表示されない場合はエクスポート後に外部で確認してください）`;
+    if(!obj || !obj.bytes || !obj.bytes.length){
+      log("WARN: ファイルが添付されていません。");
+      return;
     }
-  }
 
-  try{ dlg.showModal(); }catch(_){ dlg.open=true; }
+    const kind =
+      obj.kind ||
+      (typeof _fileKindFromName === "function" ? _fileKindFromName(obj.name) : "") ||
+      (typeof _fileKindFromMime === "function" ? _fileKindFromMime(obj.mime) : "") ||
+      "FILE";
+
+    // reset old object URL
+    if(state.pdfViewUrl){
+      try{ URL.revokeObjectURL(state.pdfViewUrl); }catch(_){}
+      state.pdfViewUrl = null;
+    }
+
+    if(kind === "PDF"){
+      if(textBox){ textBox.style.display = "none"; textBox.value = ""; }
+      frame.style.display = "block";
+      const url = URL.createObjectURL(new Blob([obj.bytes], {type: obj.mime || "application/pdf"}));
+      state.pdfViewUrl = url;
+      frame.src = url;
+    }else{
+      frame.src = "about:blank";
+      frame.style.display = "none";
+      if(textBox){
+        textBox.style.display = "block";
+        const txt = (typeof _fileDecodeText === "function") ? _fileDecodeText(obj.bytes) : "";
+        textBox.value = txt ? txt : `（${kind} のプレビューはテキストとして表示します。内容が表示されない場合はエクスポート後に外部で確認してください）`;
+      }
+    }
+
+    if(meta && meta.source === "popover"){
+      try{
+        console.log("[PDF]", "openFromPopover", {
+          fileId: meta.fileId,
+          index: meta.index,
+          name: obj.name || "",
+          kind
+        });
+      }catch(_){}
+    }
+
+    try{ dlg.showModal(); }catch(_){ dlg.open = true; }
+  }catch(e){
+    try{ console.warn("[PDF] pdfOpenViewerForObject failed", e); }catch(_){}
+  }
+}
+try{ window.pdfOpenViewerForObject = pdfOpenViewerForObject; }catch(_){}
+
+function pdfOpenViewer(){
+  if(!state.pdfAttach?.bytes?.length){
+    log("WARN: ファイルが添付されていません。");
+    return;
+  }
+  const fn = (typeof window !== "undefined") ? window.pdfOpenViewerForObject : null;
+  if(typeof fn === "function"){
+    fn(state.pdfAttach, null);
+  }else{
+    try{ console.warn("[PDF] pdfOpenViewerForObject missing"); }catch(_){}
+    log("WARN: ビューアの起動関数が見つかりません。");
+  }
 }
 
 async function pdfDownloadAttach(){
@@ -14311,10 +14349,15 @@ try{
         btn.textContent = a ? `#${i+1} ${a.name || "attached"}` : `#${i+1} —`;
         btn.disabled = !a;
         if(a){
-          btn.addEventListener("click", async ()=>{
-            await setActiveFile(file.id, {force:true});
-            attachSelectIndex(i);
-            pdfOpenViewer();
+          btn.addEventListener("click", ()=>{
+            // Do NOT switch active file here.
+            const fn = (typeof window !== "undefined") ? window.pdfOpenViewerForObject : null;
+            if(typeof fn === "function"){
+              fn(a, {source:"popover", fileId: file.id, index: i});
+            }else{
+              try{ console.warn("[PDF] pdfOpenViewerForObject missing (popover)"); }catch(_){}
+              log("WARN: ビューアの起動関数が見つかりません。");
+            }
             closePopover();
           });
         }
