@@ -37,9 +37,10 @@
     --app-pad: 10px;
     --app-gap: 10px;
     --brand-logo-h: 44px;
-    --fileList-min-h: 235px;
-    --wave-min-h: 240px;
-    --stereo-box-h: 230px;
+    --bottom-line-h: 240px;
+    --fileList-min-h: var(--bottom-line-h);
+    --wave-min-h: 210px;
+    --stereo-box-h: var(--bottom-line-h);
     --titlebar-drag-h: 34px;
   }
   *{box-sizing:border-box}
@@ -3241,9 +3242,9 @@ body, #appRoot, .appRoot, .mainLayout{
   .analyzers,
   .bottomRow,
   .proBottomRow{
-    height: var(--fileList-min-h) !important;
-    min-height: var(--fileList-min-h) !important;
-    flex: 0 0 var(--fileList-min-h) !important;
+    height: var(--bottom-line-h) !important;
+    min-height: var(--bottom-line-h) !important;
+    flex: 0 0 var(--bottom-line-h) !important;
   }
   .waveWrap{
     min-height: var(--wave-min-h) !important;
@@ -3253,8 +3254,14 @@ body, #appRoot, .appRoot, .mainLayout{
   .proMeterBox,
   .imagerBox,
   .proImagerBox{
-    height: var(--stereo-box-h) !important;
-    min-height: var(--stereo-box-h) !important;
+    height: var(--bottom-line-h) !important;
+    min-height: var(--bottom-line-h) !important;
+    box-sizing: border-box;
+  }
+  .meterBox,
+  .proMeterBox{
+    padding-bottom: 10px;
+    overflow: visible;
   }
   .imagerBox,
   .proImagerBox{
@@ -3271,7 +3278,9 @@ body, #appRoot, .appRoot, .mainLayout{
 
   .fileListBox,
   .proFileListBox{
-    min-height: var(--fileList-min-h);
+    min-height: var(--bottom-line-h);
+    height: var(--bottom-line-h);
+    overflow: hidden;
   }
   /* ===== /UI adjustments ===== */
 </style></head><body>
