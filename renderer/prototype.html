@@ -37,8 +37,9 @@
     --app-pad: 10px;
     --app-gap: 10px;
     --brand-logo-h: 22px;
-    --fileList-min-h: 210px;
-    --wave-min-h: 260px;
+    --fileList-min-h: 235px;
+    --wave-min-h: 240px;
+    --stereo-box-h: 190px;
   }
   *{box-sizing:border-box}
   html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none}
@@ -3187,17 +3188,26 @@ body, #appRoot, .appRoot, .mainLayout{
 
   /* ===== UI adjustments: logo size, drag strip, bottom layout ===== */
   #dragStrip{
-    height: 12px;
-    width: 100%;
-    -webkit-app-region: drag;
-    cursor: default;
-    flex: 0 0 auto;
+    display: none !important;
+    height: 0 !important;
   }
   .appHeader,
   #appHeader,
   .headerBar,
-  .topHeader{
-    -webkit-app-region: no-drag !important;
+  .topHeader,
+  .menuBar,
+  .topBar,
+  .toolbarWrap{
+    -webkit-app-region: drag;
+  }
+  button,
+  a,
+  input,
+  textarea,
+  select,
+  [role="button"],
+  .noDrag{
+    -webkit-app-region: no-drag;
   }
 
   .workCol{
@@ -3221,8 +3231,8 @@ body, #appRoot, .appRoot, .mainLayout{
   .proMeterBox,
   .imagerBox,
   .proImagerBox{
-    height: 100% !important;
-    min-height: 0 !important;
+    height: var(--stereo-box-h) !important;
+    min-height: var(--stereo-box-h) !important;
   }
   .imagerBox,
   .proImagerBox{
@@ -3278,7 +3288,6 @@ body, #appRoot, .appRoot, .mainLayout{
 </symbol>
 </svg>
 <div aria-hidden="true" id="dropOverlay"><div class="box"><div class="big">WAVをドロップして読み込み</div></div></div><div class="small"></div><div class="app">
-  <div id="dragStrip"></div>
 <div aria-hidden="true" id="progressOverlay">
   <div class="box" role="status" aria-live="polite" aria-atomic="true">
     <div class="meta">
