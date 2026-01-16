@@ -12954,38 +12954,60 @@ function pdfNormalizeNameCp932(name, maxBytes){
   return outName;
 }
 
-function pdfOpenViewer(){
+function pdfOpenViewerForObject(obj, meta){
   const dlg = document.getElementById("pdfViewDialog");
   const frame = document.getElementById("pdfViewerFrame");
   const textBox = document.getElementById("fileTextPreview");
   if(!dlg || !frame) return;
-  if(!state.pdfAttach?.bytes?.length){ log("WARN: ファイルが添付されていません。"); return; }
+  if(!obj || !obj.bytes || !obj.bytes.length){
+    log("WARN: ファイルが添付されていません。");
+    return;
+  }
 
-  const kind = state.pdfAttach.kind || _fileKindFromName(state.pdfAttach.name) || _fileKindFromMime(state.pdfAttach.mime) || "FILE";
+  const kind = obj.kind || _fileKindFromName(obj.name) || _fileKindFromMime(obj.mime) || "FILE";
 
   // reset old object URL
-  if(state.pdfViewUrl){ try{ URL.revokeObjectURL(state.pdfViewUrl);}catch(_){ }
-    state.pdfViewUrl=null;
+  if(state.pdfViewUrl){
+    try{ URL.revokeObjectURL(state.pdfViewUrl);}catch(_){ }
+    state.pdfViewUrl = null;
   }
 
   if(kind === 'PDF'){
     if(textBox){ textBox.style.display='none'; textBox.value=''; }
     frame.style.display='block';
-    const url = URL.createObjectURL(new Blob([state.pdfAttach.bytes], {type:"application/pdf"}));
+    const url = URL.createObjectURL(new Blob([obj.bytes], {type: obj.mime || "application/pdf"}));
     state.pdfViewUrl = url;
     frame.src = url;
   }else{
-    // text preview
     frame.src = 'about:blank';
     frame.style.display='none';
     if(textBox){
       textBox.style.display='block';
-      const txt = _fileDecodeText(state.pdfAttach.bytes);
+      const txt = _fileDecodeText(obj.bytes);
       textBox.value = txt ? txt : `（${kind} のプレビューはテキストとして表示します。内容が表示されない場合はエクスポート後に外部で確認してください）`;
     }
   }
 
+  if(meta && meta.source === 'popover'){
+    try{
+      console.log("[PDF]", "openFromPopover", {
+        fileId: meta.fileId,
+        index: meta.index,
+        name: obj.name || "",
+        kind
+      });
+    }catch(_){ }
+  }
+
   try{ dlg.showModal(); }catch(_){ dlg.open=true; }
+}
+
+function pdfOpenViewer(){
+  if(!state.pdfAttach?.bytes?.length){
+    log("WARN: ファイルが添付されていません。");
+    return;
+  }
+  pdfOpenViewerForObject(state.pdfAttach, null);
 }
 
 async function pdfDownloadAttach(){
@@ -14311,10 +14333,10 @@ try{
         btn.textContent = a ? `#${i+1} ${a.name || "attached"}` : `#${i+1} —`;
         btn.disabled = !a;
         if(a){
-          btn.addEventListener("click", async ()=>{
-            await setActiveFile(file.id, {force:true});
-            attachSelectIndex(i);
-            pdfOpenViewer();
+          btn.addEventListener("click", ()=>{
+            // Do NOT switch active file here. Open viewer directly from this file's attachment.
+            const obj = a;
+            pdfOpenViewerForObject(obj, {source:'popover', fileId: file.id, index: i});
             closePopover();
           });
         }
