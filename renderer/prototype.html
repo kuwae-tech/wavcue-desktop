@@ -6536,36 +6536,30 @@ window.renderCueList = window.renderCueList || renderCues;
 const wave = $("wave");
 const wctx = wave.getContext("2d");
 
-function resizeCanvas(canvas){
-  if(!canvas) return false;
-  const dpr = Math.max(1, window.devicePixelRatio||1);
-  const r = canvas.getBoundingClientRect();
-  if(r.width <= 2 || r.height <= 2){
-    const id = canvas.id || canvas.getAttribute("data-id") || "canvas";
-    console.log(`[UI][resizeCanvas] skipped (rect small) id=${id} w=${r.width.toFixed(2)} h=${r.height.toFixed(2)}`);
-    return false;
-  }
-  canvas.width = Math.floor(r.width * dpr);
-  canvas.height = Math.floor(r.height * dpr);
-  const ctx = canvas.getContext("2d");
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  return true;
+function resizeCanvas(elOrId){
+  const el = (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId;
+  if(!el) return;
+  const r = el.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+
+  const w = Math.max(1, Math.floor(r.width * dpr));
+  const h = Math.max(1, Math.floor(r.height * dpr));
+
+  // width/height を入れるとコンテキスト状態がリセットされるので、サイズが同じでも transform は必ず再設定する
+  if(el.width !== w) el.width = w;
+  if(el.height !== h) el.height = h;
+
+  try{
+    const ctx = el.getContext && el.getContext("2d");
+    if(ctx && ctx.setTransform){
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }catch(_){}
 }
 function resizeAll(){
-  const okWave = resizeCanvas(wave);
-  const okMeter = resizeCanvas($("meterCanvas"));
-  const okImager = resizeCanvas($("imagerCanvas"));
-  if(!(okWave && okMeter && okImager)){
-    resizeAll._retryCount = (resizeAll._retryCount || 0) + 1;
-    if(resizeAll._retryCount <= 2){
-      console.log(`[UI][resizeAll] retry=${resizeAll._retryCount}/2`);
-      requestAnimationFrame(()=>{ resizeAll(); });
-    }else{
-      resizeAll._retryCount = 0;
-    }
-    return;
-  }
-  resizeAll._retryCount = 0;
+  resizeCanvas($("wave"));
+  resizeCanvas($("meterCanvas"));
+  resizeCanvas($("imagerCanvas"));
 }
 
 function drawWaveform(){
@@ -12635,8 +12629,25 @@ window.addEventListener("resize", ()=>{
   updateViewportVars();
   resizeAll();
   drawAll();
-  requestAnimationFrame(()=>{ forceDrawAnalyzersOnBoot(); });
-  _recoverProFileDockLayout("resize");
+  requestAnimationFrame(()=>{
+    try{ resizeAll(); }catch(_){}
+    try{ drawAll(); }catch(_){}
+    try{ forceDrawAnalyzersOnBoot(); }catch(_){}
+  });
+  _recoverProFileDockLayout("window:resize");
+  try{
+    const waveEl = $("wave");
+    const meterEl = $("meterCanvas");
+    const imagerEl = $("imagerCanvas");
+    const waveRect = waveEl?.getBoundingClientRect?.() || {width:0,height:0};
+    const meterRect = meterEl?.getBoundingClientRect?.() || {width:0,height:0};
+    const imagerRect = imagerEl?.getBoundingClientRect?.() || {width:0,height:0};
+    console.log("[UI][canvas]", {
+      wave: { rectW: waveRect.width, rectH: waveRect.height, w: waveEl?.width, h: waveEl?.height },
+      meter: { rectW: meterRect.width, rectH: meterRect.height, w: meterEl?.width, h: meterEl?.height },
+      imager: { rectW: imagerRect.width, rectH: imagerRect.height, w: imagerEl?.width, h: imagerEl?.height },
+    });
+  }catch(_){}
 });
 
 function init(){
