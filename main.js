@@ -128,8 +128,8 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: initialWidth,
     height: initialHeight,
-    minWidth: initialWidth,
-    minHeight: initialHeight,
+    minWidth: 1060,
+    minHeight: 680,
     autoHideMenuBar: true,
     backgroundColor: '#0b0c0f',
     ...(isMac

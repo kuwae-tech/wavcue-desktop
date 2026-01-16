@@ -55,22 +55,41 @@
     flex: 0 0 auto;
     overflow: visible;
     padding-bottom: 2px;
+    flex-wrap: nowrap;
+    white-space: nowrap;
   }
   .hdrLeft{
-    flex:1 1 auto;
+    flex:0 0 auto;
     display:flex;
     align-items:center;
     gap:12px;
     min-width:0;
-    flex-wrap:wrap;
+    flex-wrap:nowrap;
+    min-width:max-content;
+  }
+  .hdrMid{
+    flex: 1 1 auto;
+    min-width: 0;
   }
   .hdrRight{
-    flex:0 0 auto;
+    flex:0 1 auto;
     display:flex;
     align-items:center;
     gap:10px;
     margin-left:auto;
+    min-width: 0;
+    max-width: 55vw;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    -webkit-app-region: no-drag;
   }
+  .hdrRight > *{
+    flex: 0 0 auto;
+  }
+  .hdrRight::-webkit-scrollbar{ height: 6px; }
+  .hdrRight::-webkit-scrollbar-thumb{ background: rgba(255,255,255,.18); border-radius: 8px; }
+  .hdrRight{ scrollbar-width: thin; }
   .appHeader button,
   .appHeader a,
   .appHeader input,
@@ -3339,6 +3358,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div class="btnRow"><input accept=".wav,audio/wav,audio/wave" hidden="" id="fileInput" type="file"/><button class="btn" id="btnBrowse" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-folder" xlink:href="#ico-folder"></use></svg>ファイルを開く</button><span class="pill" id="statusPill">ファイル未選択</span><span class="pill fileName" id="fileName">-</span></div>
   </div>
+  <div class="hdrMid"></div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
