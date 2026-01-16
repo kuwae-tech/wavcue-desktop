@@ -6539,11 +6539,19 @@ const wctx = wave.getContext("2d");
 function resizeCanvas(elOrId){
   const el = (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId;
   if(!el) return;
-  const r = el.getBoundingClientRect();
-  const dpr = window.devicePixelRatio || 1;
 
+  // NOTE:
+  // 縮小時に canvas.width/height(属性) が小さくなると、canvas自身の rect が小さい値で固定され、
+  // 拡大後も getBoundingClientRect が更新されず “小さいまま” になるケースがある。
+  // そのため、親コンテナの rect を測って属性サイズを更新する。
+  const measureEl = (el.parentElement && el.parentElement.getBoundingClientRect) ? el.parentElement : el;
+  const r = measureEl.getBoundingClientRect();
+
+  const dpr = window.devicePixelRatio || 1;
   const w = Math.max(1, Math.floor(r.width * dpr));
   const h = Math.max(1, Math.floor(r.height * dpr));
+
+  const changed = (el.width !== w) || (el.height !== h);
 
   // width/height を入れるとコンテキスト状態がリセットされるので、サイズが同じでも transform は必ず再設定する
   if(el.width !== w) el.width = w;
@@ -6555,6 +6563,14 @@ function resizeCanvas(elOrId){
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
   }catch(_){}
+
+  // 追加ログ（必要最小限）
+  if(changed){
+    try{
+      const id = el.id || "(no-id)";
+      console.log("[UI][resizeCanvas]", { id, rectW: r.width, rectH: r.height, w, h, dpr });
+    }catch(_){}
+  }
 }
 function resizeAll(){
   resizeCanvas($("wave"));
