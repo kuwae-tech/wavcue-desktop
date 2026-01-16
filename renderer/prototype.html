@@ -2640,98 +2640,136 @@ body, #appRoot, .appRoot, .mainLayout{
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
 
 
-/* ===== Layout lock (Pro multi-file) ===== */
+/* ===== Layout lock (Pro multi-file) - resize safe (FIX) ===== */
 
-/* main: 左可変 / 右固定 */
-.main{
-  display:grid !important;
-  grid-template-columns: minmax(0,1fr) 340px !important;
-  gap: 12px !important;
-  height: calc((var(--vh, 1vh) * 100) - var(--topbar-h, 0px)) !important; /* 既存があればそれ優先でもOK */
-  min-height: 0 !important;
+/* 右サイド幅・下段高さをここに統一 */
+:root{
+  --cueW: 340px;
+  --bottomH: 190px;     /* 下段(メーター/イメージャ/ファイルリスト)固定高さ */
+  --meterW: 140px;
+  --imagerS: 190px;
+  --gap: 12px;
 }
 
-/* 左カラム：縦flexで「上可変 + 下固定」を成立させる */
+/* main は “flexで伸びる” を最優先（height固定しない） */
+.main{
+  display:grid !important;
+  grid-template-columns: minmax(0,1fr) var(--cueW) !important;
+  gap: var(--gap) !important;
+
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  height: auto !important;        /* ★重要：calc(vh...)で固定しない */
+}
+
+/* 左カラム */
 .left{
   min-width: 0 !important;
   min-height: 0 !important;
   overflow: hidden !important;
+
+  display:flex !important;
+  flex-direction: column !important;
 }
-.waveWrap{
+
+/* 左カラム内：上可変 + 下固定 を “flex” で作る（grid固定と競合させない） */
+.workCol{
   display:flex !important;
   flex-direction: column !important;
   min-height: 0 !important;
-  height: 100% !important;
+  height: auto !important;
+  overflow: hidden !important;
 }
-.waveBox{
+.workTop{
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  display:flex !important;
+  flex-direction: column !important;
+  overflow: hidden !important;
+}
+
+/* sectionHead の下を波形+トランスポートで使い切る */
+.waveWrap{
+  flex: 1 1 auto !important;      /* ★重要：height:100%は禁止 */
+  min-height: 0 !important;
+  height: auto !important;
+  display:flex !important;
+  flex-direction: column !important;
+}
+
+/* 波形枠は残りを占有 */
+.waveBox, #waveBox{
   flex: 1 1 auto !important;
   min-height: 0 !important;
   overflow: hidden !important;
 }
 
-/* ★下段 analyzers を“固定高さ”にする（他を押し出さない） */
-.analyzers, #analyzersRow{
-  flex: 0 0 190px !important;     /* 固定 */
-  height: 190px !important;
-  min-height: 190px !important;
+/* 下段（analyzersRow）は高さを var(--bottomH) に統一 */
+.workBottom,
+.analyzers,
+#analyzersRow{
+  flex: 0 0 var(--bottomH) !important;
+  height: var(--bottomH) !important;
+  min-height: var(--bottomH) !important;
+  max-height: var(--bottomH) !important;
+
   display:flex !important;
-  gap: 12px !important;
+  gap: var(--gap) !important;
   align-items: stretch !important;
   overflow: hidden !important;
   position: relative !important;
-  z-index: 1 !important;
 }
 
-/* メーター：固定幅 */
-.meterBlock{
-  width: 140px !important;
-  min-width: 140px !important;
+/* メーター・イメージャの枠 */
+.meterBox, .meterBlock{
+  width: var(--meterW) !important;
+  min-width: var(--meterW) !important;
   height: 100% !important;
   overflow: hidden !important;
   border-radius: 12px !important;
 }
-
-/* イメージャ：正方形固定（ユーザー要望） */
-.imagerBlock{
-  width: 190px !important;
-  min-width: 190px !important;
+.imagerBox, .imagerBlock{
+  width: var(--imagerS) !important;
+  min-width: var(--imagerS) !important;
   height: 100% !important;
   aspect-ratio: 1 / 1 !important;
   overflow: hidden !important;
   border-radius: 12px !important;
 }
 
-/* ファイルリスト：残り横幅すべて（可変は横だけ。縦は固定枠内スクロール） */
+/* ファイルリストは残り横幅を全て、縦は枠内スクロール */
 #proFileDock, .proFileDock{
   flex: 1 1 auto !important;
   min-width: 0 !important;
   height: 100% !important;
-  overflow: hidden !important;  /* 外枠は隠す */
+  overflow: hidden !important;
   border-radius: 12px !important;
+  display:flex !important;
+  flex-direction: column !important;
 }
 #proFileListWrap{
-  height: 100% !important;
-  overflow: auto !important;    /* 中だけスクロール */
+  flex: 1 1 auto !important;
+  min-height: 0 !important;
+  overflow: auto !important;
 }
 
-/* キャンバスは親のサイズに追従（はみ出し防止） */
+/* canvasは枠に追従 */
 #meterCanvas, #imagerCanvas{
   width: 100% !important;
   height: 100% !important;
   display:block !important;
 }
 
-/* 右サイド（CUE）を grid の2列目に固定 */
+/* 右サイド */
 #cueSide, .cueSide{
   grid-column: 2 / 3 !important;
   min-height: 0 !important;
   height: 100% !important;
   overflow: hidden !important;
+  position: relative !important;
 }
-
-/* CUEメニュー上部ボタンが2列に折れるのを防止 */
-#cueSide .btnRow, 
-#cueSide .row, 
+#cueSide .btnRow,
+#cueSide .row,
 #cueSide .cueTopRow{
   display:flex !important;
   flex-wrap: nowrap !important;
@@ -2741,133 +2779,7 @@ body, #appRoot, .appRoot, .mainLayout{
   white-space: nowrap !important;
 }
 
-/* もし “position:fixed/absolute” でCUEが浮いていたら殺す */
-#cueSide{
-  position: relative !important;
-}
-
 /* ===== end ===== */
-  :root{
-    --cueW: 340px;
-    --bottomH: 170px;
-    --meterW: 140px;
-    --imagerS: 170px;
-    --gap: 12px;
-  }
-
-  /* ===== Work area layout lock ===== */
-  .workCol{
-    display: grid !important;
-    grid-template-rows: 1fr var(--bottomH) !important;
-    min-height: 0 !important;
-    height: 100% !important;
-    overflow: hidden !important;
-  }
-
-  .workTop{
-    min-height: 0 !important;
-    position: relative !important;
-    overflow: hidden !important;
-    z-index: 1 !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  .workBottom{
-    min-height: var(--bottomH) !important;
-    height: var(--bottomH) !important;
-    position: relative !important;
-    z-index: 2 !important;
-    overflow: hidden !important;
-  }
-
-.proBottomRow{
-    display: flex !important;
-    gap: var(--gap) !important;
-    align-items: stretch !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  .proMeterBox{
-    width: var(--meterW) !important;
-    min-width: var(--meterW) !important;
-    height: 100% !important;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .proImagerBox{
-    width: var(--imagerS) !important;
-    min-width: var(--imagerS) !important;
-    height: 100% !important;
-    aspect-ratio: 1 / 1;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .proFileListBox{
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    height: 100% !important;
-    width: 100% !important;
-    border-radius: 12px;
-    overflow: hidden;
-    position: relative;
-    box-sizing: border-box !important;
-  }
-
-  #proFileListWrap, #proFileDock{
-    height: 100% !important;
-    max-height: 100% !important;
-    overflow: auto !important;
-    position: relative !important;
-    inset: auto !important;
-    width: 100% !important;
-    box-sizing: border-box !important;
-  }
-
-  #meterCanvas, canvas#meterCanvas{
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-  }
-  #imagerCanvas, canvas#imagerCanvas{
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-  }
-
-  .workTop .overlay,
-  .workTop .dropOverlay,
-  .workTop .dropHint,
-  .workTop .modalOverlay,
-  .workTop .blockingOverlay{
-    max-height: 100% !important;
-  }
-
-  .analyzers{
-    height: var(--bottomH) !important;
-    overflow: hidden !important;
-  }
-
-  .cueRow, .cueRowTop, .cueAddRow, .cueButtonsRow{
-    display: flex !important;
-    gap: 10px !important;
-    align-items: center !important;
-    flex-wrap: nowrap !important;
-  }
-  .cueRow button, .cueRowTop button, .cueAddRow button, .cueButtonsRow button{
-    flex: 0 0 auto !important;
-    white-space: nowrap !important;
-  }
-
   /* ===== Pro layout hard-fix (bottom row) ===== */
 
   /* 下段の行は必ず横幅100%を取る。ここが 180px 固定になっていたのが崩れの主因 */
