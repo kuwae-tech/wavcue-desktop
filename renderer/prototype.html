@@ -12553,6 +12553,35 @@ window.addEventListener("keydown", (e)=>{
     return;
   }
 });
+function installWindowResizeRelayout(){
+  if(window.__resizeRelayoutInstalled) return;
+  window.__resizeRelayoutInstalled = true;
+  let lastW = window.innerWidth;
+  let lastH = window.innerHeight;
+  let timer = 0;
+  const safe = window.safeCall || ((fn, ...args)=>{
+    try{ if(typeof fn === "function") return fn(...args); }catch(_){}
+  });
+  const run = ()=>{
+    safe(window.requestFullRefresh, "window:resize");
+    safe(window.forceRedraw, "window:resize");
+    safe(window.drawWaveform);
+    safe(window.drawAnalyzers);
+    safe(window.bootDrawAnalyzers, "resize");
+  };
+  const handler = ()=>{
+    const w = window.innerWidth;
+    const h = window.innerHeight;
+    if(w === lastW && h === lastH) return;
+    lastW = w;
+    lastH = h;
+    if(timer) clearTimeout(timer);
+    timer = setTimeout(()=>{
+      requestAnimationFrame(run);
+    }, 100);
+  };
+  window.addEventListener("resize", handler, {passive:true});
+}
 /* Resize */
 window.addEventListener("resize", ()=>{
   resizeAll();
@@ -12562,6 +12591,7 @@ window.addEventListener("resize", ()=>{
 });
 
 function init(){
+  installWindowResizeRelayout();
   setupDragAndDrop();
 
   // 1回目：従来どおり
