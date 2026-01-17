@@ -11832,11 +11832,13 @@ function _scRunMeasureAndRender(opts){
   opts = opts || {};
   const switchToResults = (opts.switchToResults !== false);
   state.qcHasRun = true;
-  if(switchToResults){
+  const dlg = $("stdCheckDialog");
+  // NOTE: batch/headless mode may run QC without opening the dialog.
+  // Even when dlg is missing, still compute qcResult and update __wavcueLastQc.
+  // UI rendering helpers (_scSet/_scSetHtml) are already no-op when elements are absent.
+  if(switchToResults && dlg){
     try{ _scSetTab("results"); }catch(_){}
   }
-  const dlg = $("stdCheckDialog");
-  if(!dlg) return;
 
   const preset0 = _scGetPresetById(state.qcPresetId);
   _scRenderTargets(preset0);
