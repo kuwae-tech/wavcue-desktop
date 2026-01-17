@@ -11927,11 +11927,7 @@ function _scRunMeasureAndRender(opts){
     try{ _scSetTab("results"); }catch(_){}
   }
   const dlg = $("stdCheckDialog");
-  // まずヘッドレスでQC結果を必ず生成（ダイアログが無くても）
-  const headless = _scComputeQcResultHeadless();
-
-  // dlg が無い場合は「UI描画は不要」なので、結果だけ返して終了
-  if(!dlg) return headless;
+  if(!dlg) return null;
 
   const preset0 = _scGetPresetById(state.qcPresetId);
   _scRenderTargets(preset0);
@@ -11945,7 +11941,7 @@ function _scRunMeasureAndRender(opts){
     _scSet("sc_ch", "—");
     _scSet("sc_clip", "—");
     _scSet("sc_silence", "—");
-        return;
+        return null;
   }
 
 
@@ -12150,14 +12146,8 @@ if(!sil.hasSound){
     fileKey: String(state.fileName || ""),
     result: qcResult || {}
   };
-  if(headless){
-    window.__wavcueLastQc = {
-      fileKey: String(state.fileName || ""),
-      result: headless,
-      at: Date.now(),
-    };
-  }
   state.scLast = {presetId: state.qcPresetId, fileKey: _scCurrentFileKey(), lufs, tpDb, sr, bd, chN, clipDetected, headSilenceSec: sil.headSec, tailSilenceSec: sil.tailSec, silenceMinSec: silMin, silenceMaxSec: silMax, silenceAllowSec: silMax, effectiveMonoWarn: !!effMonoWarn, effectiveMonoCorr: effMono?.corr ?? null, effectiveMonoDiffRatio: effMono?.diffRatio ?? null};
+  return qcResult;
 }
 
 function _scClamp(x){ return Math.max(-1, Math.min(1, x)); }
@@ -14702,10 +14692,57 @@ try{
         await setActiveFile(id, {force:true});
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
         if(type==='qc'){
-          const qc0 = _scRunMeasureAndRender({switchToResults:false});
-          const qc = qc0 || getLastQcForCurrentFile();
-          if(!qc) throw new Error("QC結果が生成されませんでした（buffer/プリセット/計測）");
-          applyQcResultToFile(f, qc);
+          const waitForActiveBuffer = async (fileRec, timeoutMs)=>{
+            const t0 = Date.now();
+            while(Date.now() - t0 < (timeoutMs || 15000)){
+              try{
+                const okActive = (project && project.activeId===fileRec.id);
+                const okFile = (state && state.file && fileRec.file && state.file===fileRec.file);
+                const okBuf = !!(state && state.buffer);
+                if(okActive && okFile && okBuf) return true;
+              }catch(_){}
+              await new Promise(r=>setTimeout(r, 50));
+            }
+            return false;
+          };
+          const formatErr = (e)=>{
+            try{ return `${e?.name||"Error"} ${e?.message||e}`.trim(); }catch(_){ return "Error"; }
+          };
+
+          // 1) buffer準備を待つ（D&D直後の即開始でここが必須）
+          const ready = await waitForActiveBuffer(f, 15000);
+          if(!ready){
+            const msg = "QC失敗: AudioBuffer準備待ち timeout（D&D直後に即開始した可能性）";
+            try{ f.status = f.status || {}; f.status.qc = "unverified"; f.status.qcReason = msg; }catch(_){}
+            throw new Error(msg);
+          }
+
+          // 2) QC実行（結果は _scRunMeasureAndRender が return する想定）
+          let qcRes = null;
+          try{
+            qcRes = _scRunMeasureAndRender({switchToResults:false}) || null;
+          }catch(e){
+            const msg = "QC実行中に例外: " + formatErr(e);
+            try{ f.status = f.status || {}; f.status.qc = "unverified"; f.status.qcReason = msg; }catch(_){}
+            throw e;
+          }
+
+          // 3) 最終結果を確実に取る（lastQc fallback）
+          let finalQc = (qcRes && qcRes.items) ? qcRes : null;
+          if(!finalQc){
+            try{
+              const last = (typeof getLastQcForCurrentFile==="function") ? getLastQcForCurrentFile() : null;
+              if(last && last.items) finalQc = last;
+            }catch(_){}
+          }
+          if(!finalQc){
+            const msg = "QC失敗: QC結果が取得できません（__wavcueLastQc未生成）";
+            try{ f.status = f.status || {}; f.status.qc = "unverified"; f.status.qcReason = msg; }catch(_){}
+            throw new Error(msg);
+          }
+
+          // 4) ファイルに反映
+          applyQcResultToFile(f, finalQc);
           const verdict = (f.status.qc==='ok') ? 'OK' : (f.status.qc==='ng' ? 'NG' : '未');
           logJob(`${verdict}: ${f.name}`, (verdict==='OK') ? 'ok' : (verdict==='NG' ? 'fail' : 'info'));
         }
