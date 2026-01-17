@@ -2632,11 +2632,156 @@ body, #appRoot, .appRoot, .mainLayout{
 .proPopRow{ display:flex; justify-content:space-between; gap:8px; }
 .proPopItem{ padding:6px 8px; border-radius:10px; background:rgba(255,255,255,0.06); }
 .proPopItem button{ all:unset; cursor:pointer; color:inherit; }
-.proJobPanel{ position:absolute; right:12px; bottom:56px; width:420px; max-height:240px; overflow:hidden; border-radius:12px; background:rgba(20,20,24,0.96); border:1px solid rgba(255,255,255,0.12); padding:10px; z-index:9999; }
+/* ===== Pro Job Panel (Batch) - Hi-Quality Redesign ===== */
+.proJobPanel{
+  position:fixed;
+  right:14px;
+  bottom:14px;
+  width:min(720px, calc(100vw - 28px));
+  height:min(420px, calc(100vh - 120px));
+  display:flex;
+  flex-direction:column;
+  resize:both;
+  overflow:hidden;
+  min-width:360px;
+  min-height:220px;
+  border-radius:16px;
+  background:rgba(18,18,22,0.92);
+  border:1px solid rgba(255,255,255,0.14);
+  box-shadow: 0 24px 64px rgba(0,0,0,0.45), 0 6px 18px rgba(0,0,0,0.35);
+  backdrop-filter: blur(10px);
+  z-index:99999;
+}
 .proJobPanel.hidden{ display:none; }
-.proJobPanelRow{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
-.proJobTitle{ font-weight:700; }
-.proJobLog{ overflow:auto; max-height:120px; font-size:12px; opacity:0.9; padding:6px; border-radius:10px; background:rgba(255,255,255,0.06); }
+
+.proJobPanel.isLarge{
+  width:min(860px, calc(100vw - 28px));
+  height:min(620px, calc(100vh - 120px));
+}
+
+.proJobHead{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  padding:12px 12px 10px;
+  background:linear-gradient(to bottom, rgba(255,255,255,0.06), rgba(255,255,255,0));
+  border-bottom:1px solid rgba(255,255,255,0.10);
+}
+.proJobHeadLeft{ display:flex; align-items:center; gap:10px; min-width:0; }
+.proJobTitle{ font-weight:700; letter-spacing:0.02em; }
+.proJobPill{
+  font-size:12px;
+  padding:4px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.06);
+  color:rgba(255,255,255,0.88);
+  white-space:nowrap;
+}
+.proJobPill.running{
+  border-color: rgba(96, 255, 190, 0.25);
+  background: rgba(96, 255, 190, 0.10);
+}
+.proJobPill.done{
+  border-color: rgba(120, 190, 255, 0.25);
+  background: rgba(120, 190, 255, 0.10);
+}
+.proJobPill.failed{
+  border-color: rgba(255, 120, 120, 0.25);
+  background: rgba(255, 120, 120, 0.10);
+}
+
+.proJobHeadRight{ display:flex; align-items:center; gap:8px; }
+.proJobBody{
+  padding:12px;
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+  min-height:0;
+}
+
+.proJobTopRow{
+  display:flex;
+  align-items:flex-start;
+  justify-content:space-between;
+  gap:10px;
+}
+.proJobNow{
+  flex:1 1 auto;
+  min-width:0;
+  font-size:13px;
+  line-height:1.35;
+  color:rgba(255,255,255,0.90);
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.proJobCount{
+  flex:0 0 auto;
+  font-size:12px;
+  padding:4px 8px;
+  border-radius:10px;
+  border:1px solid rgba(255,255,255,0.12);
+  background:rgba(255,255,255,0.05);
+  color:rgba(255,255,255,0.86);
+}
+
+.proJobProgress{
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.10);
+  overflow:hidden;
+}
+.proJobProgressBar{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(120,255,205,0.95), rgba(120,190,255,0.95));
+  box-shadow: 0 0 22px rgba(120,255,205,0.18);
+  transition: width 160ms ease;
+}
+
+.proJobMeta{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  font-size:12px;
+  color:rgba(255,255,255,0.78);
+}
+.proJobStat{ white-space:nowrap; }
+.proJobEta{ white-space:nowrap; opacity:0.9; }
+
+.proJobLog{
+  flex:1 1 auto;
+  min-height:160px;
+  max-height:none;
+  overflow:auto;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.10);
+  background:rgba(0,0,0,0.22);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  font-size:12px;
+  line-height:1.45;
+  color:rgba(255,255,255,0.86);
+}
+.proJobLogLine{ display:flex; gap:10px; padding:4px 0; }
+.proJobLogTs{ color:rgba(255,255,255,0.55); white-space:nowrap; }
+.proJobLogMsg{ min-width:0; overflow-wrap:anywhere; }
+.proJobLogLine.ok .proJobLogMsg{ color:rgba(120,255,205,0.95); }
+.proJobLogLine.fail .proJobLogMsg{ color:rgba(255,140,140,0.95); }
+.proJobLogLine.info .proJobLogMsg{ color:rgba(255,255,255,0.86); }
+
+.proJobActions{
+  display:flex;
+  gap:10px;
+  justify-content:flex-end;
+  padding-top:2px;
+}
+/* ===== end ===== */
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
 
 
@@ -3304,21 +3449,42 @@ body, #appRoot, .appRoot, .mainLayout{
         <div id="proFileList" class="proFileList" tabindex="0"></div>
   </div>
 
-  <div id="proJobPanel" class="proJobPanel hidden">
-    <div class="proJobPanelRow">
-      <div class="proJobTitle">バッチ処理</div>
-      <button id="proJobClose" class="btnGhost">閉</button>
+  <div id="proJobPanel" class="proJobPanel hidden" aria-live="polite" aria-label="バッチ処理">
+    <div class="proJobHead">
+      <div class="proJobHeadLeft">
+        <div class="proJobTitle">バッチ処理</div>
+        <div id="proJobPill" class="proJobPill">待機</div>
+      </div>
+      <div class="proJobHeadRight">
+        <button id="proJobCopy" class="btnGhost" type="button" title="ログをコピー">コピー</button>
+        <button id="proJobClear" class="btnGhost" type="button" title="ログをクリア">クリア</button>
+        <button id="proJobToggleSize" class="btnGhost" type="button" title="パネルを拡大/縮小">拡大</button>
+        <button id="proJobClose" class="btnGhost" type="button" title="閉じる">閉</button>
+      </div>
     </div>
-    <div class="proJobPanelRow">
-      <div id="proJobNow">—</div>
-      <div id="proJobCount">0/0</div>
+
+    <div class="proJobBody">
+      <div class="proJobTopRow">
+        <div id="proJobNow" class="proJobNow">—</div>
+        <div id="proJobCount" class="proJobCount mono">0/0</div>
+      </div>
+
+      <div class="proJobProgress" aria-hidden="true">
+        <div id="proJobProgressBar" class="proJobProgressBar"></div>
+      </div>
+
+      <div class="proJobMeta">
+        <div id="proJobStat" class="proJobStat">OK:0 / 失敗:0</div>
+        <div id="proJobEta" class="proJobEta mono">—</div>
+      </div>
+
+      <div id="proJobLog" class="proJobLog" role="log" aria-label="ログ"></div>
+
+      <div class="proJobActions">
+        <button id="proJobRetryFailed" class="btn" type="button">失敗のみ再実行</button>
+        <button id="proJobCancel" class="btnGhost" type="button">停止</button>
+      </div>
     </div>
-    <div class="proJobPanelRow">
-      <div id="proJobStat">OK:0 / 失敗:0</div>
-      <button id="proJobRetryFailed" class="btn">失敗のみ再実行</button>
-      <button id="proJobCancel" class="btnGhost">停止</button>
-    </div>
-    <div id="proJobLog" class="proJobLog"></div>
   </div>
 </div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow cueTopControls cuePairTop" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div></div><div class="row cueButtonsRow cuePairBottom" style="margin-top:6px;align-items:center"><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
@@ -11702,6 +11868,57 @@ function _scSetTab(name){
   }
 }
 
+function _scComputeQcResultHeadless(){
+  const buf = state.buffer;
+  if(!buf) return null;
+  const preset = _scGetPresetById(state.qcPresetId);
+  const range = _ecFindRange();
+  const startSec = range.hasSeg ? range.start : 0;
+  const endSec = range.hasSeg ? range.end : buf.duration;
+  const lenSec = Math.max(0, endSec - startSec);
+
+  const lufsRes = _ecComputeIntegratedLufs(buf, startSec, endSec);
+  const lufs = lufsRes?.lufs ?? null;
+  const lufsOk = (preset && lufs!=null)
+    ? (Math.abs(lufs - preset.targetLufs) <= preset.tolLufs)
+    : true;
+  const lufsReason = (preset && lufs!=null)
+    ? (lufsOk
+      ? `OK（目標 ${preset.targetLufs.toFixed(1)} ±${preset.tolLufs.toFixed(1)} / 実測 ${lufs.toFixed(1)}）`
+      : `許容範囲外（目標 ${preset.targetLufs.toFixed(1)} ±${preset.tolLufs.toFixed(1)} → 許容 [${(preset.targetLufs-preset.tolLufs).toFixed(1)}, ${(preset.targetLufs+preset.tolLufs).toFixed(1)}] / 実測 ${lufs.toFixed(1)}）`)
+    : "測定値なし";
+
+  const pk = _ecComputePeaks(buf, startSec, endSec);
+  const tpDb = (pk && pk.truePeak!=null) ? (20*Math.log10(pk.truePeak)) : null;
+  const tpLimit = (preset && isFinite(preset.maxTruePeakDb)) ? preset.maxTruePeakDb : null;
+  const tpOk = (tpLimit==null || tpDb==null) ? true : (tpDb <= tpLimit);
+  const tpReason = (tpLimit!=null && tpDb!=null)
+    ? (tpOk
+      ? `OK（上限 ${tpLimit.toFixed(2)} dBTP / 実測 ${tpDb.toFixed(2)} dBTP）`
+      : `上限超過（上限 ${tpLimit.toFixed(2)} dBTP / 実測 ${tpDb.toFixed(2)} dBTP）`)
+    : "測定値なし";
+
+  const items = [
+    { key: "lufs", label: "Integrated LUFS", ok: lufsOk, reason: lufsReason },
+    { key: "tp", label: "TruePeak", ok: tpOk, reason: tpReason },
+    { key: "sr", label: "サンプルレート", ok: true, reason: `${buf.sampleRate} Hz` },
+    { key: "ch", label: "チャンネル", ok: true, reason: `${buf.numberOfChannels} ch` },
+    { key: "len", label: "本編秒数", ok: true, reason: `${lenSec.toFixed(3)} s` },
+  ];
+
+  const qcResult = {
+    items,
+    meta:{ startSec, endSec, lenSec, presetId: state.qcPresetId, fileName: state.fileName || "" },
+    at: Date.now(),
+  };
+  window.__wavcueLastQc = {
+    fileKey: String(state.fileName || ""),
+    result: qcResult,
+    at: Date.now(),
+  };
+  return qcResult;
+}
+
 function _scRunMeasureAndRender(opts){
   opts = opts || {};
   const switchToResults = (opts.switchToResults !== false);
@@ -11710,7 +11927,7 @@ function _scRunMeasureAndRender(opts){
     try{ _scSetTab("results"); }catch(_){}
   }
   const dlg = $("stdCheckDialog");
-  if(!dlg) return;
+  if(!dlg) return null;
 
   const preset0 = _scGetPresetById(state.qcPresetId);
   _scRenderTargets(preset0);
@@ -11724,7 +11941,7 @@ function _scRunMeasureAndRender(opts){
     _scSet("sc_ch", "—");
     _scSet("sc_clip", "—");
     _scSet("sc_silence", "—");
-        return;
+        return null;
   }
 
 
@@ -11930,6 +12147,7 @@ if(!sil.hasSound){
     result: qcResult || {}
   };
   state.scLast = {presetId: state.qcPresetId, fileKey: _scCurrentFileKey(), lufs, tpDb, sr, bd, chN, clipDetected, headSilenceSec: sil.headSec, tailSilenceSec: sil.tailSec, silenceMinSec: silMin, silenceMaxSec: silMax, silenceAllowSec: silMax, effectiveMonoWarn: !!effMonoWarn, effectiveMonoCorr: effMono?.corr ?? null, effectiveMonoDiffRatio: effMono?.diffRatio ?? null};
+  return qcResult;
 }
 
 function _scClamp(x){ return Math.max(-1, Math.min(1, x)); }
@@ -13951,16 +14169,19 @@ try{
     selectedIds:new Set(),
     filter:{status:'all'},
     lastClickIndex:null,
-    popover:{openType:null, openFileId:null, anchorEl:null}
+    popover:{openType:null, openFileId:null, anchorEl:null},
+    isAdding:false
   };
-  const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
+  const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0, startedAt:0 };
 
   function esc(str){ return String(str).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function uid(){ return 'f_' + Math.random().toString(16).slice(2) + Date.now().toString(16); }
   function $(id){ return document.getElementById(id); }
   const W = window.WavCue || {};
   const api = W.api || {};
-  const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
+  const loadSingleWav = (typeof loadFile === "function")
+    ? loadFile
+    : ((typeof api.loadFile === "function") ? api.loadFile : null);
   function proGetAppCues(){
     const st = window.WavCue?.state;
     if(!st || !Array.isArray(st.cues)) return null;
@@ -14095,6 +14316,7 @@ try{
   }
   async function addFiles(fileList){
     try{
+      project.isAdding = true;
       const files = Array.from(fileList || []).filter(isWavFile);
       if(!files.length) return;
       const dndGuard = (files.length > 1) ? { expected: files.length, seen: 0, startedAt: Date.now() } : null;
@@ -14234,6 +14456,8 @@ try{
       console.error("[DND] addFiles failed", err);
       if (typeof window.diagErr === "function") window.diagErr("[DND]", "addFiles failed", err);
       return [];
+    }finally{
+      project.isAdding = false;
     }
   }
   async function setActiveFile(id, opts){
@@ -14260,12 +14484,13 @@ try{
 
       // 本体APIが無いならここで止める（波形が出ない原因を明示）
       if(typeof loadSingleWav !== "function"){
-        console.warn("[Pro] window.WavCue.api.loadFile が見つかりません。Pro側からWAVを読み込めません。");
+        console.warn("[Pro] loadSingleWav が見つかりません。Pro側からWAVを読み込めません。");
         return;
       }
 
       console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
       await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
+      console.log("[Pro] setActiveFile loaded", { id, name: rec.name, hasBuffer: !!state.buffer, sr: state.buffer?.sampleRate || null });
       project.lastLoadedId = id;
       proForceRedraw("after-load");
       proApplyEditsToApp(rec, "after-load");
@@ -14365,10 +14590,10 @@ try{
       console.error("[Pro] setActiveFile error", err);
       if (typeof window.diagErr === "function") window.diagErr("[ACTIVE]", "error", err);
     }finally{
-      render();
-      if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch");
-      console.log("[Pro] setActiveFile done", id);
-      if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id }));
+      try{ render(); }catch(e){ try{ console.error("[Pro] render failed", e); }catch(_){ } }
+      try{ if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch"); }catch(e){ try{ console.error("[Pro] requestFullRefresh failed", e); }catch(_){ } }
+      try{ console.log("[Pro] setActiveFile done", id); }catch(_){ }
+      try{ if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id })); }catch(_){ }
     }
   }
   function filtered(){
@@ -14383,17 +14608,29 @@ try{
       return true;
     });
   }
+  function _jobPanelApplySize(){
+    const p = $('proJobPanel');
+    if(!p) return;
+    const wantLarge = (localStorage.getItem('wavcue_jobpanel_large') === '1');
+    p.classList.toggle('isLarge', wantLarge);
+    const b = $('proJobToggleSize');
+    if(b) b.textContent = wantLarge ? '縮小' : '拡大';
+  }
   function showJob(open){
     const p = $('proJobPanel');
     if(!p) return;
     if(open===undefined) p.classList.toggle('hidden');
     else p.classList.toggle('hidden', !open);
+    _jobPanelApplySize();
   }
-  function logJob(s){
+  function logJob(s, level){
     const box = $('proJobLog');
     if(!box) return;
     const t = new Date().toLocaleTimeString();
-    box.innerHTML += `<div>[${esc(t)}] ${esc(s)}</div>`;
+    const lv = level || 'info';
+    box.insertAdjacentHTML('beforeend',
+      `<div class="proJobLogLine ${esc(lv)}"><span class="proJobLogTs">[${esc(t)}]</span><span class="proJobLogMsg">${esc(s)}</span></div>`
+    );
     box.scrollTop = box.scrollHeight;
   }
   function updateJobUI(now){
@@ -14405,12 +14642,50 @@ try{
     if(count) count.textContent = `${job.done}/${job.total}`;
     const stat = $('proJobStat');
     if(stat) stat.textContent = `OK:${job.ok} / 失敗:${job.failed.length}`;
+    const pill = $('proJobPill');
+    if(pill){
+      const hasDone = job.total > 0 && job.done >= job.total && !job.running;
+      const hasFail = job.failed.length > 0 && hasDone;
+      pill.classList.toggle('running', job.running);
+      pill.classList.toggle('done', hasDone && !hasFail);
+      pill.classList.toggle('failed', hasFail);
+      if(job.running) pill.textContent = '実行中';
+      else if(hasFail) pill.textContent = '失敗あり';
+      else if(hasDone) pill.textContent = '完了';
+      else pill.textContent = '待機';
+    }
+    const bar = $('proJobProgressBar');
+    if(bar){
+      const pct = job.total ? (job.done / job.total) * 100 : 0;
+      const val = Math.max(0, Math.min(100, pct));
+      bar.style.width = `${val}%`;
+    }
+    const eta = $('proJobEta');
+    if(eta){
+      if(job.startedAt){
+        const sec = Math.max(0, Math.floor((Date.now() - job.startedAt) / 1000));
+        const mm = String(Math.floor(sec / 60)).padStart(2, '0');
+        const ss = String(sec % 60).padStart(2, '0');
+        eta.textContent = `経過 ${mm}:${ss}`;
+      }else{
+        eta.textContent = '—';
+      }
+    }
   }
   async function runJob(type, ids){
     if(!ids.length) return;
-    job.running = true; job.cancel=false; job.failed=[]; job.done=0; job.total=ids.length; job.ok=0;
+    job.running = true; job.cancel=false; job.failed=[]; job.done=0; job.total=ids.length; job.ok=0; job.startedAt=Date.now();
     updateJobUI();
     showJob(true);
+    logJob(`開始: ${type==='qc'?'一括チェック':'まとめて書き出し'} (${ids.length}件)`);
+
+    if(project.isAdding){
+      logJob("読み込み中…完了待ち");
+      const startedWait = Date.now();
+      while(project.isAdding && (Date.now() - startedWait) < 60000){
+        await new Promise(r=>setTimeout(r, 50));
+      }
+    }
 
     for(const id of ids){
       if(job.cancel) break;
@@ -14420,17 +14695,79 @@ try{
         await setActiveFile(id, {force:true});
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
         if(type==='qc'){
-          try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
-          applyQcResultToFile(f, getLastQcForCurrentFile());
+          log(`開始: 規格チェック: ${f.name}`);
+          const waitForActiveBuffer = async (fileRec, timeoutMs)=>{
+            const t0 = Date.now();
+            while(Date.now() - t0 < (timeoutMs || 15000)){
+              try{
+                const okActive = (project && project.activeId===fileRec.id);
+                const okFile = (state && state.file && fileRec.file && state.file===fileRec.file);
+                const okBuf = !!(state && state.buffer);
+                if(okActive && okFile && okBuf) return true;
+              }catch(_){}
+              await new Promise(r=>setTimeout(r, 50));
+            }
+            return false;
+          };
+          const formatErr = (e)=>{
+            try{ return `${e?.name||"Error"} ${e?.message||e}`.trim(); }catch(_){ return "Error"; }
+          };
+
+          // 1) buffer準備を待つ（D&D直後の即開始でここが必須）
+          const ready = await waitForActiveBuffer(f, 15000);
+          if(!ready){
+            const msg = "QC失敗: AudioBuffer準備待ち timeout（D&D直後に即開始した可能性）";
+            try{ f.status = f.status || {}; f.status.qc = "unverified"; f.status.qcReason = msg; }catch(_){}
+            throw new Error(msg);
+          }
+
+          // 2) QC実行（結果は _scRunMeasureAndRender が return する想定）
+          let qcRes = null;
+          try{
+            if(!state.buffer){
+              throw new Error("QC失敗: AudioBuffer未準備 (load完了前の可能性)");
+            }
+            qcRes = _scRunMeasureAndRender({switchToResults:false}) || null;
+          }catch(e){
+            const msg = "QC実行中に例外: " + formatErr(e);
+            try{ f.status = f.status || {}; f.status.qc = "unverified"; f.status.qcReason = msg; }catch(_){}
+            throw e;
+          }
+
+          // 3) 最終結果を確実に取る（lastQc fallback）
+          let finalQc = (qcRes && qcRes.items) ? qcRes : null;
+          if(!finalQc){
+            try{
+              const last = (typeof getLastQcForCurrentFile==="function") ? getLastQcForCurrentFile() : null;
+              if(last && last.items) finalQc = last;
+            }catch(_){}
+          }
+          if(!finalQc){
+            const msg = "QC失敗: QC結果が取得できません（__wavcueLastQc未生成）";
+            try{ f.status = f.status || {}; f.status.qc = "unverified"; f.status.qcReason = msg; }catch(_){}
+            throw new Error(msg);
+          }
+
+          // 4) ファイルに反映
+          applyQcResultToFile(f, finalQc);
+          const verdict = (f.status.qc==='ok') ? 'OK' : (f.status.qc==='ng' ? 'NG' : '未');
+          logJob(`${verdict}: ${f.name}`, (verdict==='OK') ? 'ok' : (verdict==='NG' ? 'fail' : 'info'));
         }
         if(type==='export'){
           await doFinalExport();
           f.status.exported = true;
+          logJob(`書き出し完了: ${f.name}`, 'ok');
         }
         job.ok++;
       }catch(e){
+        if(type==='qc'){
+          try{ applyQcResultToFile(f, null); }catch(_){ }
+          try{ f.status.qcReason = `失敗: ${e?.message || e}`; }catch(_){ }
+        }
         job.failed.push(id);
-        logJob(`失敗: ${f.name}`);
+        const errName = e?.name || "Error";
+        const errMsg = e?.message || e;
+        logJob(`失敗: ${f.name} / ${errName} ${errMsg}`, 'fail');
       }finally{
         job.done++;
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
@@ -14445,8 +14782,17 @@ try{
   }
   function idsSelectedOrActive(){
     const ids = Array.from(project.selectedIds);
-    if(ids.length===0 && project.activeId) ids.push(project.activeId);
-    return ids;
+    if(ids.length > 0) return ids;
+
+    // 選択なしなら「表示中（フィルタ適用）」を優先
+    try{
+      const vis = (typeof filtered === "function") ? filtered() : [];
+      const vIds = Array.isArray(vis) ? vis.map(f=>f?.id).filter(Boolean) : [];
+      if(vIds.length > 0) return vIds;
+    }catch(_){}
+
+    // フィルタが空なら全件
+    return project.files.map(f=>f.id).filter(Boolean);
   }
   function setPopoverContent(title, bodyNode){
     const titleEl = $('proPopTitle');
@@ -14654,12 +15000,49 @@ try{
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
 
+    $('proBtnBatchCheck')?.setAttribute('title','選択なしの場合は表示中の全ファイルを対象に実行');
+    $('proBtnBatchExport')?.setAttribute('title','選択なしの場合は表示中の全ファイルを対象に実行');
     $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc', idsSelectedOrActive()));
     $('proBtnBatchExport')?.addEventListener('click', ()=> runJob('export', idsSelectedOrActive()));
 
     $('proJobMini')?.addEventListener('click', ()=> showJob());
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
     $('proJobCancel')?.addEventListener('click', ()=> { job.cancel=true; logJob('停止要求'); });
+    $('proJobCopy')?.addEventListener('click', async()=>{
+      const box = $('proJobLog');
+      if(!box) return;
+      const text = box.innerText || "";
+      try{
+        if(navigator.clipboard?.writeText){
+          await navigator.clipboard.writeText(text);
+        }else{
+          throw new Error("clipboard api missing");
+        }
+      }catch(_){
+        try{
+          const range = document.createRange();
+          range.selectNodeContents(box);
+          const sel = window.getSelection();
+          sel.removeAllRanges();
+          sel.addRange(range);
+          document.execCommand('copy');
+          sel.removeAllRanges();
+        }catch(err){
+          console.warn("[Pro] log copy failed", err);
+        }
+      }
+    });
+    $('proJobClear')?.addEventListener('click', ()=>{
+      const box = $('proJobLog');
+      if(!box) return;
+      box.innerHTML = "";
+      box.scrollTop = 0;
+    });
+    $('proJobToggleSize')?.addEventListener('click', ()=>{
+      const cur = (localStorage.getItem('wavcue_jobpanel_large') === '1');
+      localStorage.setItem('wavcue_jobpanel_large', cur ? '0' : '1');
+      _jobPanelApplySize();
+    });
     $('proJobRetryFailed')?.addEventListener('click', ()=>{
       if(job.failed.length) runJob('qc', job.failed.slice());
     });
@@ -14675,6 +15058,12 @@ try{
     window.addEventListener('scroll', ()=>{ if(project.popover.openType) positionPopover(); }, {passive:true});
     $('proFileListWrap')?.addEventListener('scroll', ()=>{ if(project.popover.openType) positionPopover(); }, {passive:true});
 
+    const __jobPanel = $('proJobPanel');
+    if(__jobPanel && __jobPanel.parentElement !== document.body){
+      document.body.appendChild(__jobPanel);
+    }
+
+    _jobPanelApplySize();
     updateJobUI();
     render();
   }
