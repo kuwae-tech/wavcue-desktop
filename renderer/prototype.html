@@ -11868,6 +11868,57 @@ function _scSetTab(name){
   }
 }
 
+function _scComputeQcResultHeadless(){
+  const buf = state.buffer;
+  if(!buf) return null;
+  const preset = _scGetPresetById(state.qcPresetId);
+  const range = _ecFindRange();
+  const startSec = range.hasSeg ? range.start : 0;
+  const endSec = range.hasSeg ? range.end : buf.duration;
+  const lenSec = Math.max(0, endSec - startSec);
+
+  const lufsRes = _ecComputeIntegratedLufs(buf, startSec, endSec);
+  const lufs = lufsRes?.lufs ?? null;
+  const lufsOk = (preset && lufs!=null)
+    ? (Math.abs(lufs - preset.targetLufs) <= preset.tolLufs)
+    : true;
+  const lufsReason = (preset && lufs!=null)
+    ? (lufsOk
+      ? `OK（目標 ${preset.targetLufs.toFixed(1)} ±${preset.tolLufs.toFixed(1)} / 実測 ${lufs.toFixed(1)}）`
+      : `許容範囲外（目標 ${preset.targetLufs.toFixed(1)} ±${preset.tolLufs.toFixed(1)} → 許容 [${(preset.targetLufs-preset.tolLufs).toFixed(1)}, ${(preset.targetLufs+preset.tolLufs).toFixed(1)}] / 実測 ${lufs.toFixed(1)}）`)
+    : "測定値なし";
+
+  const pk = _ecComputePeaks(buf, startSec, endSec);
+  const tpDb = (pk && pk.truePeak!=null) ? (20*Math.log10(pk.truePeak)) : null;
+  const tpLimit = (preset && isFinite(preset.maxTruePeakDb)) ? preset.maxTruePeakDb : null;
+  const tpOk = (tpLimit==null || tpDb==null) ? true : (tpDb <= tpLimit);
+  const tpReason = (tpLimit!=null && tpDb!=null)
+    ? (tpOk
+      ? `OK（上限 ${tpLimit.toFixed(2)} dBTP / 実測 ${tpDb.toFixed(2)} dBTP）`
+      : `上限超過（上限 ${tpLimit.toFixed(2)} dBTP / 実測 ${tpDb.toFixed(2)} dBTP）`)
+    : "測定値なし";
+
+  const items = [
+    { key: "lufs", label: "Integrated LUFS", ok: lufsOk, reason: lufsReason },
+    { key: "tp", label: "TruePeak", ok: tpOk, reason: tpReason },
+    { key: "sr", label: "サンプルレート", ok: true, reason: `${buf.sampleRate} Hz` },
+    { key: "ch", label: "チャンネル", ok: true, reason: `${buf.numberOfChannels} ch` },
+    { key: "len", label: "本編秒数", ok: true, reason: `${lenSec.toFixed(3)} s` },
+  ];
+
+  const qcResult = {
+    items,
+    meta:{ startSec, endSec, lenSec, presetId: state.qcPresetId, fileName: state.fileName || "" },
+    at: Date.now(),
+  };
+  window.__wavcueLastQc = {
+    fileKey: String(state.fileName || ""),
+    result: qcResult,
+    at: Date.now(),
+  };
+  return qcResult;
+}
+
 function _scRunMeasureAndRender(opts){
   opts = opts || {};
   const switchToResults = (opts.switchToResults !== false);
@@ -11875,8 +11926,12 @@ function _scRunMeasureAndRender(opts){
   if(switchToResults){
     try{ _scSetTab("results"); }catch(_){}
   }
-  const dlg = $("stdCheckDialog"); // batch QC では存在しない場合がある（UI更新は存在時のみでOK）
-  // if(!dlg) return;  // ←削除：QC計算自体はDOM無しでも走らせる
+  const dlg = $("stdCheckDialog");
+  // まずヘッドレスでQC結果を必ず生成（ダイアログが無くても）
+  const headless = _scComputeQcResultHeadless();
+
+  // dlg が無い場合は「UI描画は不要」なので、結果だけ返して終了
+  if(!dlg) return headless;
 
   const preset0 = _scGetPresetById(state.qcPresetId);
   _scRenderTargets(preset0);
@@ -12095,6 +12150,13 @@ if(!sil.hasSound){
     fileKey: String(state.fileName || ""),
     result: qcResult || {}
   };
+  if(headless){
+    window.__wavcueLastQc = {
+      fileKey: String(state.fileName || ""),
+      result: headless,
+      at: Date.now(),
+    };
+  }
   state.scLast = {presetId: state.qcPresetId, fileKey: _scCurrentFileKey(), lufs, tpDb, sr, bd, chN, clipDetected, headSilenceSec: sil.headSec, tailSilenceSec: sil.tailSec, silenceMinSec: silMin, silenceMaxSec: silMax, silenceAllowSec: silMax, effectiveMonoWarn: !!effMonoWarn, effectiveMonoCorr: effMono?.corr ?? null, effectiveMonoDiffRatio: effMono?.diffRatio ?? null};
 }
 
@@ -14264,10 +14326,7 @@ try{
     try{
       project.isAdding = true;
       const files = Array.from(fileList || []).filter(isWavFile);
-      if(!files.length){
-        project.isAdding = false;
-        return;
-      }
+      if(!files.length) return;
       const dndGuard = (files.length > 1) ? { expected: files.length, seen: 0, startedAt: Date.now() } : null;
       if (typeof window.diagLog === "function") window.diagLog("[DND]", "start", window.diagState({ count: files.length, startedAt: dndGuard?.startedAt || null }));
       console.log(`[DND] start ${files.length}`);
@@ -14400,13 +14459,13 @@ try{
       if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("dnd:done");
       console.log(`[Pro] addFiles done total=${project.files.length}`);
       if (typeof window.diagLog === "function") window.diagLog("[DND]", "addFiles done", window.diagState({ total: project.files.length }));
-      project.isAdding = false;
       return addedIds;
     }catch(err){
       console.error("[DND] addFiles failed", err);
       if (typeof window.diagErr === "function") window.diagErr("[DND]", "addFiles failed", err);
-      project.isAdding = false;
       return [];
+    }finally{
+      project.isAdding = false;
     }
   }
   async function setActiveFile(id, opts){
@@ -14643,9 +14702,9 @@ try{
         await setActiveFile(id, {force:true});
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
         if(type==='qc'){
-          _scRunMeasureAndRender({switchToResults:false});
-          const qc = getLastQcForCurrentFile();
-          if(!qc) throw new Error("QC結果が生成されませんでした（buffer未準備/DOM未生成など）");
+          const qc0 = _scRunMeasureAndRender({switchToResults:false});
+          const qc = qc0 || getLastQcForCurrentFile();
+          if(!qc) throw new Error("QC結果が生成されませんでした（buffer/プリセット/計測）");
           applyQcResultToFile(f, qc);
           const verdict = (f.status.qc==='ok') ? 'OK' : (f.status.qc==='ng' ? 'NG' : '未');
           logJob(`${verdict}: ${f.name}`, (verdict==='OK') ? 'ok' : (verdict==='NG' ? 'fail' : 'info'));
@@ -14659,10 +14718,12 @@ try{
       }catch(e){
         if(type==='qc'){
           try{ applyQcResultToFile(f, null); }catch(_){ }
+          try{ f.status.qcReason = `失敗: ${e?.message || e}`; }catch(_){ }
         }
         job.failed.push(id);
-        const msg = e?.message ? ` / ${e.message}` : '';
-        logJob(`失敗: ${f.name}${msg}`, 'fail');
+        const errName = e?.name || "Error";
+        const errMsg = e?.message || e;
+        logJob(`失敗: ${f.name} / ${errName} ${errMsg}`, 'fail');
       }finally{
         job.done++;
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
