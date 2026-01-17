@@ -15093,16 +15093,32 @@ try{
           if(!st || !st.buffer){
             throw new Error("QC失敗: AudioBuffer未準備（ロード未完了の可能性）");
           }
-          const qcResult = await runQcAndWaitResult();
-          if(!qcResult){
-            throw new Error("QC失敗: 結果取得できず（qcHasRun/lastQc未更新の可能性）");
-          }
-          applyQcResultToFile(f, qcResult);
+
+          // QC実行：例外は握りつぶさずログ化して失敗扱い
           try{
-            const { ng } = safeExtract(qcResult);
-            logJob(`成功: ${f.name} / ${ng && ng.length ? `NG(${ng.length})` : "OK"}`);
-          }catch(_){
-            logJob(`成功: ${f.name}`);
+            _scRunMeasureAndRender({switchToResults:false});
+          }catch(e){
+            const msg = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
+            logJob(`QC例外: ${f.name} / ${msg}`, "bad");
+            throw new Error("QC失敗: 実行中に例外が発生しました（詳細はログ/console）");
+          }
+
+          // QC結果取得：取れなければ失敗（成功扱いにしない）
+          const qcResult =
+            (typeof window.getLastQcForCurrentFile === "function")
+              ? window.getLastQcForCurrentFile()
+              : ((typeof getLastQcForCurrentFile === "function")
+                ? getLastQcForCurrentFile()
+                : (window.__wavcueLastQc?.result || null));
+
+          if(!qcResult){
+            throw new Error("QC失敗: 結果取得できず（__wavcueLastQc 未更新の可能性）");
+          }
+
+          applyQcResultToFile(f, qcResult);
+
+          if(!f.status || f.status.qc === "unverified"){
+            throw new Error("QC失敗: バッジ更新できず（apply後も未のまま）");
           }
         }
         if(type==='export'){
@@ -15110,7 +15126,7 @@ try{
           f.status.exported = true;
         }
         job.ok++;
-        if(type!=='qc') logJob(`成功: ${f.name}`);
+        logJob(`成功: ${f.name} (${(f.status?.qc||'unverified').toUpperCase()})`);
       }catch(e){
         job.failed.push(id);
         logJob(`失敗: ${f.name} / ${e?.message || e}`);
@@ -15127,17 +15143,12 @@ try{
     render();
   }
   function idsSelectedOrActive(){
-    const selected = Array.from(project.selectedIds || []);
-    if(selected.length) return selected;
-
+    // 仕様統一：一括処理は「現在リストに表示されているファイル全て（フィルタ反映）」を対象にする
     const all = (project.files || [])
       .filter(matchesFilter)
       .map(f => f.id)
       .filter(Boolean);
-
-    if(all.length) return all;
-    if(project.activeId) return [project.activeId];
-    return [];
+    return all;
   }
   function setPopoverContent(title, bodyNode){
     const titleEl = $('proPopTitle');
