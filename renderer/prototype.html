@@ -14643,6 +14643,34 @@ try{
     const ng = arr.filter(it => it && (it.ok === false || it.status === "ng" || it.pass === false));
     return { items: arr, ng };
   };
+  async function runQcAndWaitResult(){
+    const st = window.WavCue?.state;
+    const fileKey = String(st?.fileName || "");
+    try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
+
+    const t0 = Date.now();
+    const timeoutMs = 8000;
+    while(Date.now() - t0 < timeoutMs){
+      try{
+        if(typeof window.getLastQcForCurrentFile === "function"){
+          const r = window.getLastQcForCurrentFile();
+          if(r) return r;
+        }
+      }catch(_){}
+
+      try{
+        const last = window.__wavcueLastQc;
+        if(last && last.result){
+          if(!fileKey || !last.fileKey || String(last.fileKey) === fileKey){
+            return last.result;
+          }
+        }
+      }catch(_){}
+
+      await new Promise(r=>setTimeout(r, 60));
+    }
+    return null;
+  }
   function qcReasonText(qcResult){
     if(!qcResult) return "未チェック/理由なし";
     const { ng } = safeExtract(qcResult);
@@ -15063,20 +15091,24 @@ try{
           if(!st || !st.buffer){
             throw new Error("QC失敗: AudioBuffer未準備（ロード未完了の可能性）");
           }
-          try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
-          const qcResult = (typeof window.getLastQcForCurrentFile === "function")
-            ? window.getLastQcForCurrentFile()
-            : ((typeof getLastQcForCurrentFile === "function")
-              ? getLastQcForCurrentFile()
-              : (window.__wavcueLastQc?.result || null));
+          const qcResult = await runQcAndWaitResult();
+          if(!qcResult){
+            throw new Error("QC失敗: 結果取得できず（qcHasRun/lastQc未更新の可能性）");
+          }
           applyQcResultToFile(f, qcResult);
+          try{
+            const { ng } = safeExtract(qcResult);
+            logJob(`成功: ${f.name} / ${ng && ng.length ? `NG(${ng.length})` : "OK"}`);
+          }catch(_){
+            logJob(`成功: ${f.name}`);
+          }
         }
         if(type==='export'){
           await doFinalExport();
           f.status.exported = true;
         }
         job.ok++;
-        logJob(`成功: ${f.name}`);
+        if(type!=='qc') logJob(`成功: ${f.name}`);
       }catch(e){
         job.failed.push(id);
         logJob(`失敗: ${f.name} / ${e?.message || e}`);
