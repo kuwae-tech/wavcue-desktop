@@ -14032,10 +14032,16 @@ try{
   const api = W.api || {};
   const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
   const audioCache = { map: new Map(), totalBytes: 0 };
+  const _getCFG = ()=>{
+    return (window.WavCue && window.WavCue.CFG) ? window.WavCue.CFG
+      : ((window.BWFJ && window.BWFJ.CFG) ? window.BWFJ.CFG
+      : ((typeof CFG !== "undefined") ? CFG : null));
+  };
+  const _cfg0 = _getCFG() || {};
   const audioCacheCfg = {
-    capBytes: Math.max(0, (CFG?.PRO_AUDIO_CACHE_CAP_MB ?? 768) * 1024 * 1024),
-    margin: (CFG?.PRO_AUDIO_CACHE_MARGIN ?? 0.92),
-    lowWater: (CFG?.PRO_AUDIO_CACHE_LOW_WATER ?? 0.80),
+    capBytes: Math.max(0, (Number(_cfg0.PRO_AUDIO_CACHE_CAP_MB) || 768) * 1024 * 1024),
+    margin: (Number(_cfg0.PRO_AUDIO_CACHE_MARGIN) || 0.92),
+    lowWater: (Number(_cfg0.PRO_AUDIO_CACHE_LOW_WATER) || 0.80),
   };
   function audioCacheLimits(){
     const cap = audioCacheCfg.capBytes;
@@ -14163,7 +14169,7 @@ try{
     const pk = _ecComputePeaks(state.buffer, startSec, endSec);
     const tpDb = (pk && pk.truePeak != null && pk.truePeak > 0) ? (20*Math.log10(pk.truePeak)) : null;
     const fmt = _ecParseFmtInfo();
-    const sil = _scComputeHeadTailSilence(state.buffer, startSec, endSec, (CFG?.STDCHK_SILENCE_THRESHOLD_DB ?? -60));
+    const sil = _scComputeHeadTailSilence(state.buffer, startSec, endSec, (Number(_cfg0.STDCHK_SILENCE_THRESHOLD_DB) || -60));
     const analysis = {
       integratedLufs: lufs,
       truePeakDbtp: (tpDb != null && isFinite(tpDb)) ? tpDb : null,
@@ -14185,7 +14191,7 @@ try{
   function proBuildQcResultFromAnalysis(rec){
     const analysis = rec?.analysis;
     if(!analysis) return null;
-    const presetId = state.qcPresetId || CFG.QC_DEFAULT_PRESET_ID || null;
+    const presetId = state.qcPresetId || _cfg0.QC_DEFAULT_PRESET_ID || null;
     const preset = _scGetPresetById(presetId);
     if(!preset) return null;
 
@@ -14899,7 +14905,7 @@ try{
           const qcResult = {
             items: [{ key: "error", label: "計測エラー", ok: false, reason: message }],
             summary: { ngCount: 1, warnCount: 0 },
-            presetId: state.qcPresetId || CFG.QC_DEFAULT_PRESET_ID || null,
+            presetId: state.qcPresetId || _cfg0.QC_DEFAULT_PRESET_ID || null,
           };
           proApplyQcResult(f, qcResult);
         }
