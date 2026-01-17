@@ -2638,7 +2638,7 @@ body, #appRoot, .appRoot, .mainLayout{
 .proPopItem{ padding:6px 8px; border-radius:10px; background:rgba(255,255,255,0.06); }
 .proPopItem button{ all:unset; cursor:pointer; color:inherit; }
 .proJobPanel{
-  position:absolute;
+  position:fixed;
   right:16px;
   bottom:72px;
   width:min(720px, calc(100vw - 64px));
@@ -2649,7 +2649,7 @@ body, #appRoot, .appRoot, .mainLayout{
   border:1px solid rgba(255,255,255,0.12);
   box-shadow: 0 16px 60px rgba(0,0,0,0.45);
   padding:12px;
-  z-index:9999;
+  z-index:10030;
   backdrop-filter: blur(10px);
 }
 .proJobPanel.hidden{ display:none; }
@@ -14112,6 +14112,39 @@ try{
   };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
 
+  (function ensureGlobalLog(){
+    if(typeof window.log === "function") return;
+
+    const pad2 = (n)=> String(n).padStart(2,"0");
+    const nowTime = ()=> {
+      const d = new Date();
+      return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    };
+
+    window.log = function(msg){
+      try{
+        const line = document.createElement("div");
+        line.className = "logLine";
+        line.textContent = `[${nowTime()}] ${String(msg ?? "")}`;
+
+        const box = document.getElementById("logBox");
+        if(box) box.prepend(line);
+
+        const box2 = document.getElementById("logBox2");
+        if(box2){
+          const line2 = line.cloneNode(true);
+          box2.prepend(line2);
+        }
+
+        if(!box && !box2){
+          console.log("[LOG]", msg);
+        }
+      }catch(err){
+        console.log("[LOG][fallback]", msg, err);
+      }
+    };
+  })();
+
   function esc(str){ return String(str).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function uid(){ return 'f_' + Math.random().toString(16).slice(2) + Date.now().toString(16); }
   function $(id){ return document.getElementById(id); }
@@ -15274,6 +15307,14 @@ try{
     }
   }
   function bind(){
+    try{
+      const p = document.getElementById("proJobPanel");
+      if(p && p.parentElement !== document.body) document.body.appendChild(p);
+      const pop = document.getElementById("proGlobalPopover");
+      if(pop && pop.parentElement !== document.body) document.body.appendChild(pop);
+      const toastRoot = document.getElementById("toastRoot");
+      if(toastRoot && toastRoot.parentElement !== document.body) document.body.appendChild(toastRoot);
+    }catch(_){}
     window.__wavcueProAddFiles = addFiles;
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
