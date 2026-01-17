@@ -2611,7 +2611,12 @@ body, #appRoot, .appRoot, .mainLayout{
 .proCueBtn{ border-color:rgba(56,189,248,.45); color:#bae6fd; }
 .proClipBtn{ border-color:rgba(255,255,255,0.2); }
 .miniIcon{ width:12px; height:12px; display:inline-block; }
-.proJobMini{ font-size:12px; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,0.10); user-select:none; cursor:pointer; }
+.proJobMini{
+  font-size:12px; padding:2px 10px; border-radius:999px;
+  background:rgba(255,255,255,0.10);
+  user-select:none; cursor:pointer;
+  border:1px solid rgba(255,255,255,0.10);
+}
 .proGlobalPopover{
   position:fixed;
   z-index:10020;
@@ -2634,40 +2639,76 @@ body, #appRoot, .appRoot, .mainLayout{
 .proPopItem button{ all:unset; cursor:pointer; color:inherit; }
 .proJobPanel{
   position:fixed;
-  right:14px;
-  bottom:64px;
-  width:min(560px, 92vw);
-  min-width:320px;
-  min-height:220px;
-  max-height:min(60vh, 380px);
-  overflow:hidden;
-  border-radius:14px;
-  background:rgba(20,20,24,0.96);
-  border:1px solid rgba(255,255,255,0.14);
-  padding:12px;
-  z-index:9999;
-  resize:both;
+  right:18px;
+  bottom:18px;
+  width:min(760px, calc(100vw - 36px));
+  height:min(420px, calc(100vh - 96px));
   display:flex;
   flex-direction:column;
-  gap:8px;
-  box-shadow: 0 18px 48px rgba(0,0,0,.42);
+  border-radius:16px;
+  background:rgba(18,18,22,0.96);
+  border:1px solid rgba(255,255,255,0.14);
+  box-shadow:0 20px 60px rgba(0,0,0,0.45);
+  padding:14px;
+  z-index:9999;
+  backdrop-filter: blur(10px);
 }
 .proJobPanel.hidden{ display:none; }
 .proJobHead{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.proJobTitle{ font-weight:700; }
-.proJobBtns{ display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
-.proJobPanelRow{ display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.proJobHeadLeft{ display:flex; align-items:center; gap:10px; }
+.proJobTitle{ font-weight:800; letter-spacing:0.02em; }
+.proJobBadge{
+  font-size:12px; padding:3px 10px; border-radius:999px;
+  background:rgba(255,255,255,0.10);
+  border:1px solid rgba(255,255,255,0.12);
+  user-select:none;
+}
+.proJobBadge.bad{ background:rgba(255,80,80,0.14); border-color:rgba(255,80,80,0.25); }
+.proJobBadge.good{ background:rgba(80,255,160,0.12); border-color:rgba(80,255,160,0.22); }
+
+.proJobHeadRight{ display:flex; align-items:center; gap:8px; }
+
+.proJobProgRow{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+.proJobProgBar{
+  flex:1;
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.08);
+  overflow:hidden;
+  border:1px solid rgba(255,255,255,0.10);
+}
+.proJobProgFill{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(120,235,210,0.95), rgba(90,160,255,0.95));
+}
+.proJobProgMeta{ display:flex; align-items:center; gap:10px; opacity:0.9; }
+
+.proJobNowRow{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.proJobNow{ flex:1; opacity:0.95; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.proJobStat{ opacity:0.9; }
 .proJobLog{
+  margin-top:10px;
   flex:1;
   overflow:auto;
-  min-height:120px;
   font-size:12px;
-  line-height:1.5;
-  opacity:0.92;
-  padding:8px;
-  border-radius:10px;
+  line-height:1.55;
+  padding:10px;
+  border-radius:12px;
   background:rgba(255,255,255,0.06);
-  border:1px solid rgba(255,255,255,0.08);
+  border:1px solid rgba(255,255,255,0.10);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+.proJobLog .bad{ color: #ff8a8a; }
+.proJobLog .good{ color: #8dffbf; }
+.proJobLog .muted{ opacity:0.85; }
+
+.proJobFoot{ margin-top:10px; display:flex; justify-content:flex-end; gap:10px; }
+
+.proJobPanel.is-expanded{
+  width:min(980px, calc(100vw - 36px));
+  height:min(640px, calc(100vh - 96px));
 }
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
 
@@ -3336,25 +3377,39 @@ body, #appRoot, .appRoot, .mainLayout{
         <div id="proFileList" class="proFileList" tabindex="0"></div>
   </div>
 
-  <div id="proJobPanel" class="proJobPanel hidden">
+  <div id="proJobPanel" class="proJobPanel hidden" aria-label="バッチ処理パネル">
     <div class="proJobHead">
-      <div class="proJobTitle">バッチ処理</div>
-      <div class="proJobBtns">
-        <button id="proJobCopy" class="btnGhost" type="button">Copy</button>
-        <button id="proJobClear" class="btnGhost" type="button">Clear</button>
+      <div class="proJobHeadLeft">
+        <div class="proJobTitle">バッチ処理</div>
+        <div id="proJobBadge" class="proJobBadge">—</div>
+      </div>
+      <div class="proJobHeadRight">
+        <button id="proJobCopy" class="btnGhost" type="button">コピー</button>
+        <button id="proJobClear" class="btnGhost" type="button">クリア</button>
+        <button id="proJobExpand" class="btnGhost" type="button">拡大</button>
         <button id="proJobClose" class="btnGhost" type="button">閉</button>
       </div>
     </div>
-    <div class="proJobPanelRow">
-      <div id="proJobNow">—</div>
-      <div id="proJobCount">0/0</div>
+
+    <div class="proJobProgRow">
+      <div class="proJobProgBar"><div id="proJobProgFill" class="proJobProgFill"></div></div>
+      <div class="proJobProgMeta">
+        <div id="proJobCount" class="mono">0/0</div>
+        <div id="proJobElapsed" class="mono">00:00</div>
+      </div>
     </div>
-    <div class="proJobPanelRow">
-      <div id="proJobStat">OK:0 / 失敗:0</div>
+
+    <div class="proJobNowRow">
+      <div id="proJobNow" class="proJobNow">—</div>
+      <div id="proJobStat" class="proJobStat mono">OK:0 / 失敗:0</div>
+    </div>
+
+    <div id="proJobLog" class="proJobLog" aria-label="バッチログ"></div>
+
+    <div class="proJobFoot">
       <button id="proJobRetryFailed" class="btn" type="button">失敗のみ再実行</button>
       <button id="proJobCancel" class="btnGhost" type="button">停止</button>
     </div>
-    <div id="proJobLog" class="proJobLog"></div>
   </div>
 </div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow cueTopControls cuePairTop" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div></div><div class="row cueButtonsRow cuePairBottom" style="margin-top:6px;align-items:center"><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
@@ -14030,7 +14085,17 @@ try{
   function $(id){ return document.getElementById(id); }
   const W = window.WavCue || {};
   const api = W.api || {};
-  const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
+  const loadSingleWav =
+    (typeof loadFile === "function")
+      ? loadFile
+      : ((typeof api.loadFile === "function") ? api.loadFile : null);
+  function safeLog(msg){
+    try{
+      if(typeof window?.log === "function"){ window.log(msg); return; }
+      if(typeof log === "function"){ log(msg); return; }
+    }catch(_){}
+    try{ console.log(msg); }catch(_){}
+  }
   const audioCache = { map: new Map(), totalBytes: 0 };
   const _getCFG = ()=>{
     return (window.WavCue && window.WavCue.CFG) ? window.WavCue.CFG
@@ -14480,6 +14545,29 @@ try{
     return file.type === "audio/wav" || file.type === "audio/wave"
       || name.endsWith(".wav") || name.endsWith(".wave");
   }
+  const extractQcNgItems = (typeof window.extractQcNgItems === "function")
+    ? window.extractQcNgItems
+    : function extractQcNgItemsLocal(qcResult){
+      const out = { ng: [], ok: [] };
+      if(!qcResult) return out;
+
+      const cand =
+        qcResult.ngItems ??
+        qcResult.ng ??
+        qcResult.items ??
+        qcResult.issues ??
+        qcResult.failures ??
+        [];
+
+      if(Array.isArray(cand)) out.ng = cand.filter(Boolean);
+
+      if(out.ng.length===0){
+        if(qcResult.ok === false || qcResult.pass === false || qcResult.passed === false){
+          out.ng = ["NG"];
+        }
+      }
+      return out;
+    };
   function qcReasonText(qcResult){
     if(!qcResult) return "未チェック/理由なし";
     const { ng } = extractQcNgItems(qcResult);
@@ -14840,11 +14928,18 @@ try{
     if(open===undefined) p.classList.toggle('hidden');
     else p.classList.toggle('hidden', !open);
   }
-  function logJob(s){
+  function fmtElapsed(ms){
+    const s = Math.max(0, Math.floor(ms/1000));
+    const mm = String(Math.floor(s/60)).padStart(2,"0");
+    const ss = String(s%60).padStart(2,"0");
+    return `${mm}:${ss}`;
+  }
+  function logJob(s, level){
     const box = $('proJobLog');
     if(!box) return;
     const t = new Date().toLocaleTimeString();
-    box.innerHTML += `<div>[${esc(t)}] ${esc(s)}</div>`;
+    const cls = level==="bad" ? "bad" : (level==="good" ? "good" : "muted");
+    box.innerHTML += `<div class="${cls}">[${esc(t)}] ${esc(s)}</div>`;
     box.scrollTop = box.scrollHeight;
   }
   function updateJobUI(now){
@@ -14856,10 +14951,45 @@ try{
     if(count) count.textContent = `${job.done}/${job.total}`;
     const stat = $('proJobStat');
     if(stat) stat.textContent = `OK:${job.ok} / 失敗:${job.failed.length}`;
+    const fill = $('proJobProgFill');
+    if(fill){
+      const pct = job.total ? Math.round((job.done/job.total)*100) : 0;
+      fill.style.width = `${pct}%`;
+    }
+    const badge = $('proJobBadge');
+    if(badge){
+      badge.classList.remove("bad","good");
+      if(job.running){
+        badge.textContent = "処理中";
+      }else{
+        if(job.failed.length){
+          badge.textContent = "失敗あり";
+          badge.classList.add("bad");
+        }else if(job.total){
+          badge.textContent = "完了";
+          badge.classList.add("good");
+        }else{
+          badge.textContent = "—";
+        }
+      }
+    }
+    const el = $('proJobElapsed');
+    if(el){
+      const ms = job.startedAt ? (Date.now() - job.startedAt) : 0;
+      el.textContent = fmtElapsed(ms);
+    }
   }
   async function runJob(type, ids){
     if(!ids.length) return;
-    job.running = true; job.cancel=false; job.failed=[]; job.done=0; job.total=ids.length; job.ok=0;
+    job.running = true;
+    job.cancel=false;
+    job.failed=[];
+    job.done=0;
+    job.total=ids.length;
+    job.ok=0;
+    job.startedAt = Date.now();
+
+    logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${ids.length}件)`, "muted");
     updateJobUI();
     showJob(true);
 
@@ -14868,47 +14998,26 @@ try{
       const f = project.files.find(x=>x.id===id);
       if(!f) continue;
       try{
-        if(type==='qc'){
-          logJob(`開始: ${f.name}`);
-        }
-        const needsAnalysis = (type==='qc' && !f.analysis);
-        const shouldActivate = (type==='export') || needsAnalysis || audioCacheHas(f);
-        if(shouldActivate){
-          await setActiveFile(id, {force:true, allowDecode: (type==='export') || needsAnalysis});
-        }
+        await setActiveFile(id, {force:true});
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
         if(type==='qc'){
-          if(needsAnalysis){
-            const analysis = proComputeAnalysisFromState(f);
-            if(!analysis){
-              throw new Error("解析に失敗しました");
-            }
+          const st = window.WavCue?.state;
+          if(!st || !st.buffer){
+            throw new Error("QC失敗: AudioBuffer未準備（ロード未完了の可能性）");
           }
-          const qcResult = proBuildQcResultFromAnalysis(f);
-          if(!qcResult){
-            throw new Error("QC結果を生成できませんでした");
-          }
-          proApplyQcResult(f, qcResult);
-          const { ng } = extractQcNgItems(qcResult);
-          logJob(`${ng.length ? "NG" : "OK"}: ${f.name}`);
+          try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
+          applyQcResultToFile(f, getLastQcForCurrentFile());
         }
         if(type==='export'){
           await doFinalExport();
           f.status.exported = true;
         }
         job.ok++;
+        logJob(`成功: ${f.name}`, "good");
       }catch(e){
         job.failed.push(id);
-        const message = e?.message || String(e);
-        logJob(`失敗: ${f.name} / ${message}`);
-        if(type==='qc'){
-          const qcResult = {
-            items: [{ key: "error", label: "計測エラー", ok: false, reason: message }],
-            summary: { ngCount: 1, warnCount: 0 },
-            presetId: state.qcPresetId || _cfg0.QC_DEFAULT_PRESET_ID || null,
-          };
-          proApplyQcResult(f, qcResult);
-        }
+        const msg = (e && e.message) ? e.message : String(e);
+        logJob(`失敗: ${f?.name || id} / ${msg}`, "bad");
       }finally{
         job.done++;
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
@@ -14916,7 +15025,7 @@ try{
       }
     }
 
-    logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
+    logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`, job.failed.length ? "bad" : "good");
     job.running = false;
     updateJobUI();
     render();
@@ -15022,7 +15131,7 @@ try{
               fn(a, {source:"popover", fileId: file.id, index: i});
             }else{
               try{ console.warn("[PDF] pdfOpenViewerForObject missing (popover)"); }catch(_){}
-              log("WARN: ビューアの起動関数が見つかりません。");
+              safeLog("WARN: ビューアの起動関数が見つかりません。");
             }
             closePopover();
           });
@@ -15138,15 +15247,27 @@ try{
     $('proJobMini')?.addEventListener('click', ()=> showJob());
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
     $('proJobCopy')?.addEventListener('click', async ()=>{
-      const text = proGetJobLogText();
-      if(!text) return;
-      await copyTextToClipboard(text);
+      try{
+        const txt = $('proJobLog')?.innerText || "";
+        await navigator.clipboard.writeText(txt);
+        logJob("コピーしました", "muted");
+      }catch(_){
+        logJob("コピーに失敗しました（権限/環境）", "bad");
+      }
     });
     $('proJobClear')?.addEventListener('click', ()=>{
       const box = $('proJobLog');
       if(box) box.innerHTML = "";
+      logJob("クリアしました", "muted");
     });
-    $('proJobCancel')?.addEventListener('click', ()=> { job.cancel=true; logJob('停止要求'); });
+    $('proJobExpand')?.addEventListener('click', ()=>{
+      const p = $('proJobPanel');
+      if(!p) return;
+      p.classList.toggle("is-expanded");
+      const b = $('proJobExpand');
+      if(b) b.textContent = p.classList.contains("is-expanded") ? "縮小" : "拡大";
+    });
+    $('proJobCancel')?.addEventListener('click', ()=> { job.cancel=true; logJob('停止要求', "muted"); });
     $('proJobRetryFailed')?.addEventListener('click', ()=>{
       if(job.failed.length) runJob('qc', job.failed.slice());
     });
