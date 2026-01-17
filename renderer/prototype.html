@@ -2638,77 +2638,110 @@ body, #appRoot, .appRoot, .mainLayout{
 .proPopItem{ padding:6px 8px; border-radius:10px; background:rgba(255,255,255,0.06); }
 .proPopItem button{ all:unset; cursor:pointer; color:inherit; }
 .proJobPanel{
-  position:fixed;
-  right:18px;
-  bottom:18px;
-  width:min(760px, calc(100vw - 36px));
-  height:min(420px, calc(100vh - 96px));
-  display:flex;
-  flex-direction:column;
+  position:absolute;
+  right:16px;
+  bottom:72px;
+  width:min(720px, calc(100vw - 64px));
+  max-height:min(520px, calc(100vh - 160px));
+  overflow:hidden;
   border-radius:16px;
-  background:rgba(18,18,22,0.96);
-  border:1px solid rgba(255,255,255,0.14);
-  box-shadow:0 20px 60px rgba(0,0,0,0.45);
-  padding:14px;
+  background:rgba(18,18,22,0.94);
+  border:1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 16px 60px rgba(0,0,0,0.45);
+  padding:12px;
   z-index:9999;
   backdrop-filter: blur(10px);
 }
 .proJobPanel.hidden{ display:none; }
-.proJobHead{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.proJobHeadLeft{ display:flex; align-items:center; gap:10px; }
-.proJobTitle{ font-weight:800; letter-spacing:0.02em; }
-.proJobBadge{
-  font-size:12px; padding:3px 10px; border-radius:999px;
-  background:rgba(255,255,255,0.10);
-  border:1px solid rgba(255,255,255,0.12);
-  user-select:none;
+.proJobPanel.isExpanded{
+  right:24px;
+  bottom:24px;
+  width:min(920px, calc(100vw - 72px));
+  max-height:min(680px, calc(100vh - 72px));
 }
-.proJobBadge.bad{ background:rgba(255,80,80,0.14); border-color:rgba(255,80,80,0.25); }
-.proJobBadge.good{ background:rgba(80,255,160,0.12); border-color:rgba(80,255,160,0.22); }
-
-.proJobHeadRight{ display:flex; align-items:center; gap:8px; }
-
-.proJobProgRow{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:12px; }
-.proJobProgBar{
-  flex:1;
+.proJobPanelHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+.proJobTitleRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.proJobTitle{
+  font-weight:700;
+  letter-spacing:0.02em;
+}
+.proJobBadge{
+  font-size:12px;
+  padding:2px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.16);
+  background:rgba(255,255,255,0.06);
+}
+.proJobBadge.isFail{
+  border-color: rgba(255,120,120,0.40);
+  background: rgba(255,120,120,0.10);
+}
+.proJobHeaderBtns{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.btnMini{
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.06);
+  color:#e9eef7;
+}
+.btnMini:hover{ background:rgba(255,255,255,0.10); }
+.proJobProgressWrap{
+  width:100%;
   height:10px;
   border-radius:999px;
   background:rgba(255,255,255,0.08);
   overflow:hidden;
-  border:1px solid rgba(255,255,255,0.10);
+  margin:6px 0 10px;
 }
-.proJobProgFill{
+.proJobProgressBar{
   height:100%;
   width:0%;
   border-radius:999px;
-  background:linear-gradient(90deg, rgba(120,235,210,0.95), rgba(90,160,255,0.95));
+  background:linear-gradient(90deg, rgba(120,240,200,0.95), rgba(120,180,255,0.95));
 }
-.proJobProgMeta{ display:flex; align-items:center; gap:10px; opacity:0.9; }
-
-.proJobNowRow{ margin-top:10px; display:flex; align-items:center; justify-content:space-between; gap:10px; }
-.proJobNow{ flex:1; opacity:0.95; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.proJobStat{ opacity:0.9; }
-.proJobLog{
-  margin-top:10px;
-  flex:1;
-  overflow:auto;
+.proJobMetaRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+  color:rgba(233,238,247,0.85);
   font-size:12px;
-  line-height:1.55;
+}
+.proJobNow{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proJobLog{
+  height: min(360px, calc(100vh - 320px));
+  overflow:auto;
   padding:10px;
   border-radius:12px;
-  background:rgba(255,255,255,0.06);
   border:1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.18);
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:12px;
+  line-height:1.55;
+  white-space:pre-wrap;
 }
-.proJobLog .bad{ color: #ff8a8a; }
-.proJobLog .good{ color: #8dffbf; }
-.proJobLog .muted{ opacity:0.85; }
-
-.proJobFoot{ margin-top:10px; display:flex; justify-content:flex-end; gap:10px; }
-
-.proJobPanel.is-expanded{
-  width:min(980px, calc(100vw - 36px));
-  height:min(640px, calc(100vh - 96px));
+.proJobLog .err{ color: rgba(255,140,140,0.95); }
+.proJobFooter{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:10px;
 }
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
 
@@ -3377,38 +3410,37 @@ body, #appRoot, .appRoot, .mainLayout{
         <div id="proFileList" class="proFileList" tabindex="0"></div>
   </div>
 
-  <div id="proJobPanel" class="proJobPanel hidden" aria-label="バッチ処理パネル">
-    <div class="proJobHead">
-      <div class="proJobHeadLeft">
+  <div id="proJobPanel" class="proJobPanel hidden">
+    <div class="proJobPanelHeader">
+      <div class="proJobTitleRow">
         <div class="proJobTitle">バッチ処理</div>
-        <div id="proJobBadge" class="proJobBadge">—</div>
+        <div id="proJobFailBadge" class="proJobBadge">—</div>
       </div>
-      <div class="proJobHeadRight">
-        <button id="proJobCopy" class="btnGhost" type="button">コピー</button>
-        <button id="proJobClear" class="btnGhost" type="button">クリア</button>
-        <button id="proJobExpand" class="btnGhost" type="button">拡大</button>
-        <button id="proJobClose" class="btnGhost" type="button">閉</button>
-      </div>
-    </div>
-
-    <div class="proJobProgRow">
-      <div class="proJobProgBar"><div id="proJobProgFill" class="proJobProgFill"></div></div>
-      <div class="proJobProgMeta">
-        <div id="proJobCount" class="mono">0/0</div>
-        <div id="proJobElapsed" class="mono">00:00</div>
+      <div class="proJobHeaderBtns">
+        <button id="proJobCopy" class="btnMini">コピー</button>
+        <button id="proJobClear" class="btnMini">クリア</button>
+        <button id="proJobExpand" class="btnMini">拡大</button>
+        <button id="proJobClose" class="btnMini">閉</button>
       </div>
     </div>
 
-    <div class="proJobNowRow">
+    <div class="proJobProgressWrap">
+      <div id="proJobProgressBar" class="proJobProgressBar"></div>
+    </div>
+
+    <div class="proJobMetaRow">
       <div id="proJobNow" class="proJobNow">—</div>
-      <div id="proJobStat" class="proJobStat mono">OK:0 / 失敗:0</div>
+      <div>
+        <span id="proJobCount">0/0</span>
+        <span style="margin-left:10px" id="proJobStat">OK:0 / 失敗:0</span>
+      </div>
     </div>
 
-    <div id="proJobLog" class="proJobLog" aria-label="バッチログ"></div>
+    <div id="proJobLog" class="proJobLog"></div>
 
-    <div class="proJobFoot">
-      <button id="proJobRetryFailed" class="btn" type="button">失敗のみ再実行</button>
-      <button id="proJobCancel" class="btnGhost" type="button">停止</button>
+    <div class="proJobFooter">
+      <button id="proJobRetryFailed" class="btn">失敗のみ再実行</button>
+      <button id="proJobCancel" class="btnGhost">停止</button>
     </div>
   </div>
 </div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow cueTopControls cuePairTop" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div></div><div class="row cueButtonsRow cuePairBottom" style="margin-top:6px;align-items:center"><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
@@ -14568,9 +14600,19 @@ try{
       }
       return out;
     };
+  const safeExtract = (qcResult)=>{
+    try{
+      if(typeof window.extractQcNgItems === "function") return window.extractQcNgItems(qcResult);
+      if(typeof extractQcNgItems === "function") return extractQcNgItems(qcResult);
+    }catch(_){}
+    const items = qcResult?.items || qcResult?.rows || qcResult?.results || [];
+    const arr = Array.isArray(items) ? items : [];
+    const ng = arr.filter(it => it && (it.ok === false || it.status === "ng" || it.pass === false));
+    return { items: arr, ng };
+  };
   function qcReasonText(qcResult){
     if(!qcResult) return "未チェック/理由なし";
-    const { ng } = extractQcNgItems(qcResult);
+    const { ng } = safeExtract(qcResult);
     if(!ng.length) return "規格OK";
     const reasons = ng.map(it=>{
       const label = it?.label || it?.key || "NG";
@@ -14587,7 +14629,7 @@ try{
       file.qcResult = null;
       return;
     }
-    const { ng } = extractQcNgItems(qcResult);
+    const { ng } = safeExtract(qcResult);
     file.status.qc = ng.length ? "ng" : "ok";
     file.status.qcReason = qcReasonText(qcResult);
     file.qcResult = qcResult;
@@ -14910,17 +14952,18 @@ try{
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id }));
     }
   }
-  function filtered(){
+  function matchesFilter(file){
     const st = project.filter.status;
-    return project.files.filter(f=>{
-      if(st==='all') return true;
-      if(st==='unverified') return f.status.qc==='unverified';
-      if(st==='ok') return f.status.qc==='ok';
-      if(st==='ng') return f.status.qc==='ng';
-      if(st==='edited') return !!f.status.edited;
-      if(st==='exported') return !!f.status.exported;
-      return true;
-    });
+    if(st==='all') return true;
+    if(st==='unverified') return file.status.qc==='unverified';
+    if(st==='ok') return file.status.qc==='ok';
+    if(st==='ng') return file.status.qc==='ng';
+    if(st==='edited') return !!file.status.edited;
+    if(st==='exported') return !!file.status.exported;
+    return true;
+  }
+  function filtered(){
+    return project.files.filter(matchesFilter);
   }
   function showJob(open){
     const p = $('proJobPanel');
@@ -14928,17 +14971,11 @@ try{
     if(open===undefined) p.classList.toggle('hidden');
     else p.classList.toggle('hidden', !open);
   }
-  function fmtElapsed(ms){
-    const s = Math.max(0, Math.floor(ms/1000));
-    const mm = String(Math.floor(s/60)).padStart(2,"0");
-    const ss = String(s%60).padStart(2,"0");
-    return `${mm}:${ss}`;
-  }
   function logJob(s, level){
     const box = $('proJobLog');
     if(!box) return;
     const t = new Date().toLocaleTimeString();
-    const cls = level==="bad" ? "bad" : (level==="good" ? "good" : "muted");
+    const cls = level==="bad" ? "err" : "";
     box.innerHTML += `<div class="${cls}">[${esc(t)}] ${esc(s)}</div>`;
     box.scrollTop = box.scrollHeight;
   }
@@ -14951,32 +14988,20 @@ try{
     if(count) count.textContent = `${job.done}/${job.total}`;
     const stat = $('proJobStat');
     if(stat) stat.textContent = `OK:${job.ok} / 失敗:${job.failed.length}`;
-    const fill = $('proJobProgFill');
+    const fill = $('proJobProgressBar');
     if(fill){
       const pct = job.total ? Math.round((job.done/job.total)*100) : 0;
       fill.style.width = `${pct}%`;
     }
-    const badge = $('proJobBadge');
+    const badge = $('proJobFailBadge');
     if(badge){
-      badge.classList.remove("bad","good");
-      if(job.running){
-        badge.textContent = "処理中";
+      if(job.failed.length){
+        badge.textContent = "失敗あり";
+        badge.classList.add("isFail");
       }else{
-        if(job.failed.length){
-          badge.textContent = "失敗あり";
-          badge.classList.add("bad");
-        }else if(job.total){
-          badge.textContent = "完了";
-          badge.classList.add("good");
-        }else{
-          badge.textContent = "—";
-        }
+        badge.textContent = job.total ? "失敗なし" : "—";
+        badge.classList.remove("isFail");
       }
-    }
-    const el = $('proJobElapsed');
-    if(el){
-      const ms = job.startedAt ? (Date.now() - job.startedAt) : 0;
-      el.textContent = fmtElapsed(ms);
     }
   }
   async function runJob(type, ids){
@@ -14987,9 +15012,8 @@ try{
     job.done=0;
     job.total=ids.length;
     job.ok=0;
-    job.startedAt = Date.now();
 
-    logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${ids.length}件)`, "muted");
+    logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${ids.length}件)`);
     updateJobUI();
     showJob(true);
 
@@ -14998,6 +15022,7 @@ try{
       const f = project.files.find(x=>x.id===id);
       if(!f) continue;
       try{
+        logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
         await setActiveFile(id, {force:true});
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
         if(type==='qc'){
@@ -15006,18 +15031,22 @@ try{
             throw new Error("QC失敗: AudioBuffer未準備（ロード未完了の可能性）");
           }
           try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
-          applyQcResultToFile(f, getLastQcForCurrentFile());
+          const qcResult = (typeof window.getLastQcForCurrentFile === "function")
+            ? window.getLastQcForCurrentFile()
+            : ((typeof getLastQcForCurrentFile === "function")
+              ? getLastQcForCurrentFile()
+              : (window.__wavcueLastQc?.result || null));
+          applyQcResultToFile(f, qcResult);
         }
         if(type==='export'){
           await doFinalExport();
           f.status.exported = true;
         }
         job.ok++;
-        logJob(`成功: ${f.name}`, "good");
+        logJob(`成功: ${f.name}`);
       }catch(e){
         job.failed.push(id);
-        const msg = (e && e.message) ? e.message : String(e);
-        logJob(`失敗: ${f?.name || id} / ${msg}`, "bad");
+        logJob(`失敗: ${f.name} / ${e?.message || e}`);
       }finally{
         job.done++;
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
@@ -15025,15 +15054,23 @@ try{
       }
     }
 
-    logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`, job.failed.length ? "bad" : "good");
+    logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
     job.running = false;
     updateJobUI();
     render();
   }
   function idsSelectedOrActive(){
-    const ids = Array.from(project.selectedIds);
-    if(ids.length===0 && project.activeId) ids.push(project.activeId);
-    return ids;
+    const selected = Array.from(project.selectedIds || []);
+    if(selected.length) return selected;
+
+    const all = (project.files || [])
+      .filter(matchesFilter)
+      .map(f => f.id)
+      .filter(Boolean);
+
+    if(all.length) return all;
+    if(project.activeId) return [project.activeId];
+    return [];
   }
   function setPopoverContent(title, bodyNode){
     const titleEl = $('proPopTitle');
@@ -15258,16 +15295,16 @@ try{
     $('proJobClear')?.addEventListener('click', ()=>{
       const box = $('proJobLog');
       if(box) box.innerHTML = "";
-      logJob("クリアしました", "muted");
+      logJob("クリアしました");
     });
     $('proJobExpand')?.addEventListener('click', ()=>{
       const p = $('proJobPanel');
       if(!p) return;
-      p.classList.toggle("is-expanded");
+      p.classList.toggle("isExpanded");
       const b = $('proJobExpand');
-      if(b) b.textContent = p.classList.contains("is-expanded") ? "縮小" : "拡大";
+      if(b) b.textContent = p.classList.contains("isExpanded") ? "縮小" : "拡大";
     });
-    $('proJobCancel')?.addEventListener('click', ()=> { job.cancel=true; logJob('停止要求', "muted"); });
+    $('proJobCancel')?.addEventListener('click', ()=> { job.cancel=true; logJob('停止要求'); });
     $('proJobRetryFailed')?.addEventListener('click', ()=>{
       if(job.failed.length) runJob('qc', job.failed.slice());
     });
