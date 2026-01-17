@@ -14179,7 +14179,9 @@ try{
   function $(id){ return document.getElementById(id); }
   const W = window.WavCue || {};
   const api = W.api || {};
-  const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
+  const loadSingleWav = (typeof loadFile === "function")
+    ? loadFile
+    : ((typeof api.loadFile === "function") ? api.loadFile : null);
   function proGetAppCues(){
     const st = window.WavCue?.state;
     if(!st || !Array.isArray(st.cues)) return null;
@@ -14482,12 +14484,13 @@ try{
 
       // 本体APIが無いならここで止める（波形が出ない原因を明示）
       if(typeof loadSingleWav !== "function"){
-        console.warn("[Pro] window.WavCue.api.loadFile が見つかりません。Pro側からWAVを読み込めません。");
+        console.warn("[Pro] loadSingleWav が見つかりません。Pro側からWAVを読み込めません。");
         return;
       }
 
       console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
       await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
+      console.log("[Pro] setActiveFile loaded", { id, name: rec.name, hasBuffer: !!state.buffer, sr: state.buffer?.sampleRate || null });
       project.lastLoadedId = id;
       proForceRedraw("after-load");
       proApplyEditsToApp(rec, "after-load");
@@ -14692,6 +14695,7 @@ try{
         await setActiveFile(id, {force:true});
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
         if(type==='qc'){
+          log(`開始: 規格チェック: ${f.name}`);
           const waitForActiveBuffer = async (fileRec, timeoutMs)=>{
             const t0 = Date.now();
             while(Date.now() - t0 < (timeoutMs || 15000)){
@@ -14720,6 +14724,9 @@ try{
           // 2) QC実行（結果は _scRunMeasureAndRender が return する想定）
           let qcRes = null;
           try{
+            if(!state.buffer){
+              throw new Error("QC失敗: AudioBuffer未準備 (load完了前の可能性)");
+            }
             qcRes = _scRunMeasureAndRender({switchToResults:false}) || null;
           }catch(e){
             const msg = "QC実行中に例外: " + formatErr(e);
