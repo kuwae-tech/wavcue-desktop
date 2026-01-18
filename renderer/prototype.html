@@ -2611,7 +2611,12 @@ body, #appRoot, .appRoot, .mainLayout{
 .proCueBtn{ border-color:rgba(56,189,248,.45); color:#bae6fd; }
 .proClipBtn{ border-color:rgba(255,255,255,0.2); }
 .miniIcon{ width:12px; height:12px; display:inline-block; }
-.proJobMini{ font-size:12px; padding:2px 8px; border-radius:999px; background:rgba(255,255,255,0.10); user-select:none; cursor:pointer; }
+.proJobMini{
+  font-size:12px; padding:2px 10px; border-radius:999px;
+  background:rgba(255,255,255,0.10);
+  user-select:none; cursor:pointer;
+  border:1px solid rgba(255,255,255,0.10);
+}
 .proGlobalPopover{
   position:fixed;
   z-index:10020;
@@ -2632,11 +2637,112 @@ body, #appRoot, .appRoot, .mainLayout{
 .proPopRow{ display:flex; justify-content:space-between; gap:8px; }
 .proPopItem{ padding:6px 8px; border-radius:10px; background:rgba(255,255,255,0.06); }
 .proPopItem button{ all:unset; cursor:pointer; color:inherit; }
-.proJobPanel{ position:absolute; right:12px; bottom:56px; width:420px; max-height:240px; overflow:hidden; border-radius:12px; background:rgba(20,20,24,0.96); border:1px solid rgba(255,255,255,0.12); padding:10px; z-index:9999; }
+.proJobPanel{
+  position:fixed;
+  right:16px;
+  bottom:72px;
+  width:min(720px, calc(100vw - 64px));
+  max-height:min(520px, calc(100vh - 160px));
+  overflow:hidden;
+  border-radius:16px;
+  background:rgba(18,18,22,0.94);
+  border:1px solid rgba(255,255,255,0.12);
+  box-shadow: 0 16px 60px rgba(0,0,0,0.45);
+  padding:12px;
+  z-index:10030;
+  backdrop-filter: blur(10px);
+}
 .proJobPanel.hidden{ display:none; }
-.proJobPanelRow{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:6px; }
-.proJobTitle{ font-weight:700; }
-.proJobLog{ overflow:auto; max-height:120px; font-size:12px; opacity:0.9; padding:6px; border-radius:10px; background:rgba(255,255,255,0.06); }
+.proJobPanel.isExpanded{
+  right:24px;
+  bottom:24px;
+  width:min(920px, calc(100vw - 72px));
+  max-height:min(680px, calc(100vh - 72px));
+}
+.proJobPanelHeader{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:8px;
+}
+.proJobTitleRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.proJobTitle{
+  font-weight:700;
+  letter-spacing:0.02em;
+}
+.proJobBadge{
+  font-size:12px;
+  padding:2px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.16);
+  background:rgba(255,255,255,0.06);
+}
+.proJobBadge.isFail{
+  border-color: rgba(255,120,120,0.40);
+  background: rgba(255,120,120,0.10);
+}
+.proJobHeaderBtns{
+  display:flex;
+  gap:8px;
+  align-items:center;
+}
+.btnMini{
+  font-size:12px;
+  padding:6px 10px;
+  border-radius:999px;
+  border:1px solid rgba(255,255,255,0.14);
+  background:rgba(255,255,255,0.06);
+  color:#e9eef7;
+}
+.btnMini:hover{ background:rgba(255,255,255,0.10); }
+.proJobProgressWrap{
+  width:100%;
+  height:10px;
+  border-radius:999px;
+  background:rgba(255,255,255,0.08);
+  overflow:hidden;
+  margin:6px 0 10px;
+}
+.proJobProgressBar{
+  height:100%;
+  width:0%;
+  border-radius:999px;
+  background:linear-gradient(90deg, rgba(120,240,200,0.95), rgba(120,180,255,0.95));
+}
+.proJobMetaRow{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+  margin-bottom:8px;
+  color:rgba(233,238,247,0.85);
+  font-size:12px;
+}
+.proJobNow{ overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.proJobLog{
+  height: min(360px, calc(100vh - 320px));
+  overflow:auto;
+  padding:10px;
+  border-radius:12px;
+  border:1px solid rgba(255,255,255,0.10);
+  background: rgba(0,0,0,0.18);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size:12px;
+  line-height:1.55;
+  white-space:pre-wrap;
+}
+.proJobLog .err{ color: rgba(255,140,140,0.95); }
+.proJobFooter{
+  display:flex;
+  justify-content:flex-end;
+  gap:10px;
+  margin-top:10px;
+}
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
 
 
@@ -3305,20 +3411,37 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
 
   <div id="proJobPanel" class="proJobPanel hidden">
-    <div class="proJobPanelRow">
-      <div class="proJobTitle">バッチ処理</div>
-      <button id="proJobClose" class="btnGhost">閉</button>
+    <div class="proJobPanelHeader">
+      <div class="proJobTitleRow">
+        <div class="proJobTitle">バッチ処理</div>
+        <div id="proJobFailBadge" class="proJobBadge">—</div>
+      </div>
+      <div class="proJobHeaderBtns">
+        <button id="proJobCopy" class="btnMini">コピー</button>
+        <button id="proJobClear" class="btnMini">クリア</button>
+        <button id="proJobExpand" class="btnMini">拡大</button>
+        <button id="proJobClose" class="btnMini">閉</button>
+      </div>
     </div>
-    <div class="proJobPanelRow">
-      <div id="proJobNow">—</div>
-      <div id="proJobCount">0/0</div>
+
+    <div class="proJobProgressWrap">
+      <div id="proJobProgressBar" class="proJobProgressBar"></div>
     </div>
-    <div class="proJobPanelRow">
-      <div id="proJobStat">OK:0 / 失敗:0</div>
+
+    <div class="proJobMetaRow">
+      <div id="proJobNow" class="proJobNow">—</div>
+      <div>
+        <span id="proJobCount">0/0</span>
+        <span style="margin-left:10px" id="proJobStat">OK:0 / 失敗:0</span>
+      </div>
+    </div>
+
+    <div id="proJobLog" class="proJobLog"></div>
+
+    <div class="proJobFooter">
       <button id="proJobRetryFailed" class="btn">失敗のみ再実行</button>
       <button id="proJobCancel" class="btnGhost">停止</button>
     </div>
-    <div id="proJobLog" class="proJobLog"></div>
   </div>
 </div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow cueTopControls cuePairTop" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div></div><div class="row cueButtonsRow cuePairBottom" style="margin-top:6px;align-items:center"><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
 <select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
@@ -3794,6 +3917,9 @@ const CFG = Object.freeze({
   PDF_NAME_MAX_BYTES: 128,
   STDCHK_SILENCE_THRESHOLD_DB: -60,
   STDCHK_CLIP_SAMPLE_THRESH: 0.9999,
+  PRO_AUDIO_CACHE_CAP_MB: 768,
+  PRO_AUDIO_CACHE_MARGIN: 0.92,
+  PRO_AUDIO_CACHE_LOW_WATER: 0.80,
 
     // 規格チェッカー（局別プリセット：編集・保存可 / 初期値）
   QC_DEFAULT_PRESET_ID: "minhouren_default",
@@ -11706,11 +11832,13 @@ function _scRunMeasureAndRender(opts){
   opts = opts || {};
   const switchToResults = (opts.switchToResults !== false);
   state.qcHasRun = true;
-  if(switchToResults){
+  const dlg = $("stdCheckDialog");
+  // NOTE: batch/headless mode may run QC without opening the dialog.
+  // Even when dlg is missing, still compute qcResult and update __wavcueLastQc.
+  // UI rendering helpers (_scSet/_scSetHtml) are already no-op when elements are absent.
+  if(switchToResults && dlg){
     try{ _scSetTab("results"); }catch(_){}
   }
-  const dlg = $("stdCheckDialog");
-  if(!dlg) return;
 
   const preset0 = _scGetPresetById(state.qcPresetId);
   _scRenderTargets(preset0);
@@ -11931,6 +12059,7 @@ if(!sil.hasSound){
   };
   state.scLast = {presetId: state.qcPresetId, fileKey: _scCurrentFileKey(), lufs, tpDb, sr, bd, chN, clipDetected, headSilenceSec: sil.headSec, tailSilenceSec: sil.tailSec, silenceMinSec: silMin, silenceMaxSec: silMax, silenceAllowSec: silMax, effectiveMonoWarn: !!effMonoWarn, effectiveMonoCorr: effMono?.corr ?? null, effectiveMonoDiffRatio: effMono?.diffRatio ?? null};
 }
+try{ window._scRunMeasureAndRender = _scRunMeasureAndRender; }catch(_){}
 
 function _scClamp(x){ return Math.max(-1, Math.min(1, x)); }
 
@@ -12048,6 +12177,14 @@ async function _scUpdatePreviewAudio(){
 }
 
 async function _scApplyAutoFix(){
+  if(!state.buffer){
+    const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+    const rec = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(recId) : null;
+    const targetFile = rec?.file || state.file;
+    if(targetFile && typeof loadFile === "function"){
+      await loadFile(targetFile);
+    }
+  }
   if(!state.buffer) return;
   const preset = _scGetPresetById(state.qcPresetId);
   if(!preset){
@@ -12065,16 +12202,21 @@ async function _scApplyAutoFix(){
     return;
   }
 
-  // measure current LUFS/TP from current state.buffer
-  const r = _ecFindRange();
-  const st = r.hasSeg ? r.start : 0;
-  const ed = r.hasSeg ? r.end : state.buffer.duration;
-  const lufsRes = _ecComputeIntegratedLufs(state.buffer, st, ed);
-  const curLufs = lufsRes.lufs;
-  if(curLufs==null || !isFinite(curLufs)){
-    alert("LUFSを測定できませんでした。");
-    return;
-  }
+  const fixCtrl = new AbortController();
+  let fixProgShown = false;
+  try{ _prog.show("補正中…", "補正を実行中", fixCtrl); fixProgShown = true; }catch(_){ }
+
+  try{
+    // measure current LUFS/TP from current state.buffer
+    const r = _ecFindRange();
+    const st = r.hasSeg ? r.start : 0;
+    const ed = r.hasSeg ? r.end : state.buffer.duration;
+    const lufsRes = _ecComputeIntegratedLufs(state.buffer, st, ed);
+    const curLufs = lufsRes.lufs;
+    if(curLufs==null || !isFinite(curLufs)){
+      alert("LUFSを測定できませんでした。");
+      return;
+    }
 
   // gain to target
   const gainDb = preset.targetLufs - curLufs;
@@ -12139,8 +12281,21 @@ async function _scApplyAutoFix(){
   _scSet("sc_fixState", "適用中");
   _scSet("sc_fixInfo", `ゲイン ${gainDb.toFixed(2)} dB / TP安全 ${tpSafetyDb.toFixed(2)} dB（合計 ${totalDb.toFixed(2)} dB）`);
 
-  // re-measure
-  _scRunMeasureAndRender();
+    // re-measure
+    try{ _prog.set(null, "補正中…", "解析中…"); }catch(_){ }
+    _scRunMeasureAndRender();
+
+    try{
+      const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+      if(activeId && typeof window.__wavcueProAfterFix === "function"){
+        window.__wavcueProAfterFix(activeId);
+      }
+    }catch(_){ }
+  }finally{
+    if(fixProgShown){
+      try{ _prog.hide(); }catch(_){ }
+    }
+  }
 }
 
 async function _scRevertAutoFix(){
@@ -12424,12 +12579,17 @@ if($("sc_pm_delete")){
   }
 
   if($("sc_fix")){
-    $("sc_fix").addEventListener("click", async ()=>{
+    const btnFix = $("sc_fix");
+    btnFix.addEventListener("click", async ()=>{
+      if(btnFix.disabled) return;
+      btnFix.disabled = true;
       try{
         await _scApplyAutoFix();
       }catch(err){
         log(`ERROR: 自動補正でエラー: ${err?.message||err}`);
         alert("ラウドネスノーマライズに失敗しました。ログをご確認ください。");
+      }finally{
+        btnFix.disabled = false;
       }
     });
   }
@@ -13955,12 +14115,392 @@ try{
   };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
 
+  (function ensureGlobalLog(){
+    if(typeof window.log === "function") return;
+
+    const pad2 = (n)=> String(n).padStart(2,"0");
+    const nowTime = ()=> {
+      const d = new Date();
+      return `${pad2(d.getHours())}:${pad2(d.getMinutes())}:${pad2(d.getSeconds())}`;
+    };
+
+    window.log = function(msg){
+      try{
+        const line = document.createElement("div");
+        line.className = "logLine";
+        line.textContent = `[${nowTime()}] ${String(msg ?? "")}`;
+
+        const box = document.getElementById("logBox");
+        if(box) box.prepend(line);
+
+        const box2 = document.getElementById("logBox2");
+        if(box2){
+          const line2 = line.cloneNode(true);
+          box2.prepend(line2);
+        }
+
+        if(!box && !box2){
+          console.log("[LOG]", msg);
+        }
+      }catch(err){
+        console.log("[LOG][fallback]", msg, err);
+      }
+    };
+  })();
+
   function esc(str){ return String(str).replace(/[&<>"']/g, m=>({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[m])); }
   function uid(){ return 'f_' + Math.random().toString(16).slice(2) + Date.now().toString(16); }
   function $(id){ return document.getElementById(id); }
   const W = window.WavCue || {};
   const api = W.api || {};
-  const loadSingleWav = (typeof api.loadFile === "function") ? api.loadFile : null;
+  const loadSingleWav =
+    (typeof loadFile === "function")
+      ? loadFile
+      : ((typeof api.loadFile === "function") ? api.loadFile : null);
+  function safeLog(msg){
+    try{
+      if(typeof window?.log === "function"){ window.log(msg); return; }
+      if(typeof log === "function"){ log(msg); return; }
+    }catch(_){}
+    try{ console.log(msg); }catch(_){}
+  }
+  const audioCache = { map: new Map(), totalBytes: 0 };
+  const _getCFG = ()=>{
+    return (window.WavCue && window.WavCue.CFG) ? window.WavCue.CFG
+      : ((window.BWFJ && window.BWFJ.CFG) ? window.BWFJ.CFG
+      : ((typeof CFG !== "undefined") ? CFG : null));
+  };
+  const _cfg0 = _getCFG() || {};
+  const audioCacheCfg = {
+    capBytes: Math.max(0, (Number(_cfg0.PRO_AUDIO_CACHE_CAP_MB) || 768) * 1024 * 1024),
+    margin: (Number(_cfg0.PRO_AUDIO_CACHE_MARGIN) || 0.92),
+    lowWater: (Number(_cfg0.PRO_AUDIO_CACHE_LOW_WATER) || 0.80),
+  };
+  function audioCacheLimits(){
+    const cap = audioCacheCfg.capBytes;
+    return {
+      cap,
+      hi: cap * audioCacheCfg.margin,
+      low: cap * audioCacheCfg.lowWater,
+    };
+  }
+  function audioCacheBytes(buf){
+    if(!buf) return 0;
+    return Math.max(0, (buf.length || 0) * (buf.numberOfChannels || 1) * 4);
+  }
+  function audioCacheLog(action, detail){
+    try{
+      const extra = detail ? ` ${JSON.stringify(detail)}` : "";
+      console.log(`[Pro][AudioCache] ${action}${extra}`);
+    }catch(_){
+      console.log(`[Pro][AudioCache] ${action}`);
+    }
+  }
+  function audioCacheEvictToFit(bytesNeeded){
+    const { hi, low } = audioCacheLimits();
+    if(audioCache.totalBytes + bytesNeeded <= hi) return;
+    const target = Math.max(low, hi - bytesNeeded);
+    const activeId = project.activeId;
+    const pickCandidate = ()=>{
+      let oldest = null;
+      let oldestActive = null;
+      for(const [id, entry] of audioCache.map){
+        if(id === activeId){
+          if(!oldestActive || entry.usedAt < oldestActive.usedAt) oldestActive = entry;
+          continue;
+        }
+        if(!oldest || entry.usedAt < oldest.usedAt) oldest = entry;
+      }
+      return oldest || oldestActive || null;
+    };
+    while(audioCache.totalBytes > target || (audioCache.totalBytes + bytesNeeded > hi)){
+      const candidate = pickCandidate();
+      if(!candidate) break;
+      audioCache.map.delete(candidate.id);
+      audioCache.totalBytes = Math.max(0, audioCache.totalBytes - candidate.bytes);
+      audioCacheLog("evict", { id: candidate.id, name: candidate.name, mb: (candidate.bytes/1024/1024).toFixed(1) });
+      if(audioCache.totalBytes <= target && audioCache.totalBytes + bytesNeeded <= hi) break;
+    }
+  }
+  function audioCacheRemember(rec, buffer, peaks){
+    if(!rec || !buffer) return false;
+    const { hi } = audioCacheLimits();
+    const bytes = audioCacheBytes(buffer);
+    if(bytes <= 0) return false;
+    if(bytes > hi){
+      rec._audioCachePolicy = "oversize-nocache";
+      audioCacheLog("skip oversize", { id: rec.id, name: rec.name, mb: (bytes/1024/1024).toFixed(1) });
+      return false;
+    }
+    if(audioCache.map.has(rec.id)){
+      const prev = audioCache.map.get(rec.id);
+      if(prev && prev.bytes) audioCache.totalBytes = Math.max(0, audioCache.totalBytes - prev.bytes);
+      audioCache.map.delete(rec.id);
+    }
+    audioCacheEvictToFit(bytes);
+    if(audioCache.totalBytes + bytes > hi){
+      audioCacheLog("skip", { id: rec.id, name: rec.name, reason: "no-space" });
+      return false;
+    }
+    const entry = {
+      id: rec.id,
+      name: rec.name,
+      buffer,
+      peaks,
+      bytes,
+      usedAt: Date.now(),
+    };
+    audioCache.map.set(rec.id, entry);
+    audioCache.totalBytes += bytes;
+    rec._audioCachePolicy = "cached";
+    audioCacheLog("remember", { id: rec.id, name: rec.name, mb: (bytes/1024/1024).toFixed(1) });
+    return true;
+  }
+  function audioCacheApply(rec){
+    if(!rec) return false;
+    const entry = audioCache.map.get(rec.id);
+    if(!entry) return false;
+    entry.usedAt = Date.now();
+    state.buffer = entry.buffer;
+    state.origBuffer = entry.buffer;
+    state.peaks = entry.peaks;
+    state.sr = entry.buffer.sampleRate;
+    rec._audioCachePolicy = "cached";
+    audioCacheLog("apply", { id: rec.id, name: rec.name });
+    return true;
+  }
+  function audioCacheHas(rec){
+    if(!rec) return false;
+    return audioCache.map.has(rec.id);
+  }
+  async function proEnsureAudioSrc(rec){
+    if(!rec?.file) return;
+    const audio = await ensureAudioEl();
+    if(state.previewUrl){ try{ URL.revokeObjectURL(state.previewUrl); }catch(_){ } state.previewUrl=null; }
+    if(state.audioUrl){ try{ URL.revokeObjectURL(state.audioUrl); }catch(_){ } }
+    state.audioUrl = URL.createObjectURL(rec.file);
+    audio.src = state.audioUrl;
+    audio.currentTime = 0;
+    state.isPlaying = false;
+  }
+  function proApplyStateSnapshot(rec){
+    const snap = rec?._stateSnap;
+    if(!snap) return;
+    const keys = [
+      "srcAb","srcFmtPayload","srcDataPayload","srcBextPayload","srcIXmlPayload","srcCmcdPayload",
+      "srcChunks","fileSr","fileBlockAlign","fileTotalSamples","_pcmInfo","cuePatchMeta","loadedCueSig",
+    ];
+    keys.forEach((k)=>{ if(snap[k] != null) state[k] = snap[k]; });
+  }
+  function proComputeAnalysisFromState(rec){
+    if(!rec || !state.buffer) return null;
+    const range = _ecFindRange();
+    const startSec = range.hasSeg ? range.start : 0;
+    const endSec = range.hasSeg ? range.end : state.buffer.duration;
+    const lufsRes = _ecComputeIntegratedLufs(state.buffer, startSec, endSec);
+    const lufs = (lufsRes && isFinite(lufsRes.lufs)) ? lufsRes.lufs : null;
+    const pk = _ecComputePeaks(state.buffer, startSec, endSec);
+    const tpDb = (pk && pk.truePeak != null && pk.truePeak > 0) ? (20*Math.log10(pk.truePeak)) : null;
+    const fmt = _ecParseFmtInfo();
+    const sil = _scComputeHeadTailSilence(state.buffer, startSec, endSec, (Number(_cfg0.STDCHK_SILENCE_THRESHOLD_DB) || -60));
+    const analysis = {
+      integratedLufs: lufs,
+      truePeakDbtp: (tpDb != null && isFinite(tpDb)) ? tpDb : null,
+      rangeStartSec: startSec,
+      rangeEndSec: endSec,
+      measuredAt: Date.now(),
+      sr: fmt?.sampleRate || state.buffer.sampleRate,
+      ch: fmt?.numChannels || state.buffer.numberOfChannels,
+      durSec: state.buffer.duration,
+      bits: (fmt && isFinite(fmt.bitsPerSample)) ? fmt.bitsPerSample : null,
+      clipCount: pk?.clipped ?? 0,
+      headSilenceSec: sil?.headSec ?? 0,
+      tailSilenceSec: sil?.tailSec ?? 0,
+      hasSound: (sil?.hasSound !== false),
+    };
+    rec.analysis = analysis;
+    return analysis;
+  }
+  function proBuildQcResultFromAnalysis(rec){
+    const analysis = rec?.analysis;
+    if(!analysis) return null;
+    const presetId = state.qcPresetId || _cfg0.QC_DEFAULT_PRESET_ID || null;
+    const preset = _scGetPresetById(presetId);
+    if(!preset) return null;
+
+    const lufs = analysis.integratedLufs;
+    let lufsKind = "warn";
+    if(lufs != null && preset){
+      lufsKind = (Math.abs(lufs - preset.targetLufs) <= preset.tolLufs) ? "ok" : "ng";
+    }
+    const lufsReason = (lufs != null && preset) ? (
+      (lufsKind==="ok")
+        ? `OK（目標 ${preset.targetLufs.toFixed(1)} ±${preset.tolLufs.toFixed(1)} / 実測 ${lufs.toFixed(1)}）`
+        : `許容範囲外（目標 ${preset.targetLufs.toFixed(1)} ±${preset.tolLufs.toFixed(1)} → 許容 [${(preset.targetLufs-preset.tolLufs).toFixed(1)}, ${(preset.targetLufs+preset.tolLufs).toFixed(1)}] / 実測 ${lufs.toFixed(1)}）`
+    ) : "";
+
+    const tpDb = analysis.truePeakDbtp;
+    let tpKind = "warn";
+    if(tpDb != null && preset){
+      tpKind = (tpDb <= preset.maxTruePeakDb) ? "ok" : "ng";
+    }
+    const tpReason = (tpDb != null && preset && isFinite(tpDb)) ? (
+      (tpKind==="ok")
+        ? `OK（上限 ${preset.maxTruePeakDb.toFixed(2)} dBTP / 実測 ${tpDb.toFixed(2)} dBTP）`
+        : `上限超過（上限 ${preset.maxTruePeakDb.toFixed(2)} dBTP / 実測 ${tpDb.toFixed(2)} dBTP）`
+    ) : "";
+
+    const sr = analysis.sr;
+    const bd = analysis.bits;
+    const chN = analysis.ch;
+    let srKind="warn", bdKind="warn", chKind="warn";
+    if(preset){
+      const srList = Array.isArray(preset.allowedSampleRates) ? preset.allowedSampleRates : [];
+      const bdList = Array.isArray(preset.allowedBits) ? preset.allowedBits : [];
+      const chList = Array.isArray(preset.allowedChannels) ? preset.allowedChannels : [];
+      srKind = (srList.length===0 || srList.includes(sr)) ? "ok" : "ng";
+      bdKind = (bd==null) ? "warn" : ((bdList.length===0 || bdList.includes(bd)) ? "ok" : "ng");
+      chKind = (chList.length===0 || chList.includes(chN)) ? "ok" : "ng";
+    }
+    let srReason = "";
+    if(preset){
+      const allowed = preset.allowedSampleRates;
+      if(!allowed || allowed.length===0) srReason = "（制限なし）";
+      else {
+        const a = allowed.join(", ");
+        srReason = (srKind==="ok") ? `OK（許容: ${a} / 実測: ${sr}）` : `許容外（許容: ${a} / 実測: ${sr}）`;
+      }
+    }
+    let bdReason = "";
+    if(preset){
+      const allowed = preset.allowedBits;
+      if(!allowed || allowed.length===0) bdReason = "（制限なし）";
+      else {
+        const a = allowed.join(", ");
+        bdReason = (bdKind==="ok") ? `OK（許容: ${a} / 実測: ${bd}）` : `許容外（許容: ${a} / 実測: ${bd}）`;
+      }
+    }
+    let chReason = "";
+    if(preset){
+      const allowed = preset.allowedChannels;
+      if(!allowed || allowed.length===0) chReason = "（制限なし）";
+      else {
+        const a = allowed.map(_scFormatCh).join(", ");
+        const v = _scFormatCh(chN);
+        chReason = (chKind==="ok") ? `OK（許容: ${a} / 実測: ${v}）` : `許容外（許容: ${a} / 実測: ${v}）`;
+      }
+    }
+
+    const clipDetected = (analysis.clipCount || 0) > 0;
+    const clipReason = clipDetected ? `クリップ検出（clipped: ${analysis.clipCount}）` : "";
+
+    const silMin = (preset && isFinite(preset.silenceMinSec)) ? Number(preset.silenceMinSec) : 0.0;
+    const silMax = (preset && isFinite(preset.silenceMaxSec)) ? Number(preset.silenceMaxSec) : ((preset && isFinite(preset.silenceAllowSec)) ? Number(preset.silenceAllowSec) : 0.5);
+    let silKind = "ok";
+    let silReason = "";
+    if(analysis.hasSound === false){
+      silKind = "ng";
+      silReason = "音声が検出できません（無音）";
+    }else{
+      const h = analysis.headSilenceSec ?? 0;
+      const t = analysis.tailSilenceSec ?? 0;
+      const underH = (h < silMin);
+      const underT = (t < silMin);
+      const overH = (h > silMax);
+      const overT = (t > silMax);
+      const ok = !underH && !underT && !overH && !overT;
+      silKind = ok ? "ok" : "ng";
+      if(ok){
+        silReason = `OK（前 ${h.toFixed(2)}s / 後 ${t.toFixed(2)}s / 許容 ${silMin.toFixed(2)}〜${silMax.toFixed(2)}s）`;
+      }else{
+        const parts = [];
+        if(underH) parts.push(`前が不足（${h.toFixed(2)}s）`);
+        if(overH) parts.push(`前が許容超過（${h.toFixed(2)}s）`);
+        if(underT) parts.push(`後が不足（${t.toFixed(2)}s）`);
+        if(overT) parts.push(`後が許容超過（${t.toFixed(2)}s）`);
+        silReason = `${parts.join(" / ")}（許容 ${silMin.toFixed(2)}〜${silMax.toFixed(2)}s）`;
+      }
+    }
+
+    const summary = {failCount:0, warnCount:0};
+    const count = (k)=>{ if(k==="ng") summary.failCount++; else if(k==="warn") summary.warnCount++; };
+    count(lufsKind); count(tpKind); count(srKind); count(bdKind); count(chKind);
+    if(clipDetected) summary.failCount++;
+    if(silKind==="ng") summary.failCount++;
+
+    return {
+      items: [
+        { key: "lufs", label: "Integrated LUFS", ok: lufsKind !== "ng", reason: lufsReason },
+        { key: "tp", label: "TruePeak", ok: tpKind !== "ng", reason: tpReason },
+        { key: "sr", label: "サンプルレート", ok: srKind !== "ng", reason: srReason },
+        { key: "bd", label: "bit深度", ok: bdKind !== "ng", reason: bdReason },
+        { key: "ch", label: "チャンネル", ok: chKind !== "ng", reason: chReason },
+        { key: "clip", label: "クリッピング", ok: !clipDetected, reason: clipReason },
+        { key: "silence", label: "無音", ok: silKind !== "ng", reason: silReason },
+      ],
+      summary: { ngCount: summary.failCount, warnCount: summary.warnCount },
+      presetId,
+    };
+  }
+  function proApplyQcResult(rec, qcResult){
+    applyQcResultToFile(rec, qcResult);
+    if(project.activeId === rec.id && qcResult){
+      window.__wavcueLastQc = {
+        at: Date.now(),
+        fileKey: String(rec.name || ""),
+        result: qcResult || {}
+      };
+      state.qcHasRun = true;
+      const analysis = rec.analysis;
+      if(analysis){
+        const preset = _scGetPresetById(qcResult.presetId);
+        const silMin = (preset && isFinite(preset.silenceMinSec)) ? Number(preset.silenceMinSec) : 0.0;
+        const silMax = (preset && isFinite(preset.silenceMaxSec)) ? Number(preset.silenceMaxSec)
+          : ((preset && isFinite(preset.silenceAllowSec)) ? Number(preset.silenceAllowSec) : 0.5);
+        state.scLast = {
+          presetId: qcResult.presetId || null,
+          fileKey: String(rec.name || ""),
+          lufs: analysis.integratedLufs,
+          tpDb: analysis.truePeakDbtp,
+          sr: analysis.sr,
+          bd: analysis.bits,
+          chN: analysis.ch,
+          clipDetected: (analysis.clipCount || 0) > 0,
+          headSilenceSec: analysis.headSilenceSec,
+          tailSilenceSec: analysis.tailSilenceSec,
+          silenceMinSec: silMin,
+          silenceMaxSec: silMax,
+          silenceAllowSec: silMax,
+          effectiveMonoWarn: false,
+          effectiveMonoCorr: null,
+          effectiveMonoDiffRatio: null,
+        };
+      }
+    }
+  }
+  function proGetJobLogText(){
+    const box = $('proJobLog');
+    if(!box) return "";
+    return Array.from(box.querySelectorAll("div")).map(el=>el.textContent||"").join("\n");
+  }
+  function proUpdateAfterFix(rec){
+    if(!rec) return;
+    try{
+      const snap = (typeof window.safeCloneLite === "function")
+        ? window.safeCloneLite(window.WavCue?.state || null)
+        : (window.WavCue?.state || null);
+      rec._stateSnap = snap || rec._stateSnap;
+    }catch(_){ }
+    try{ proComputeAnalysisFromState(rec); }catch(err){ console.warn("[Pro] analysis update failed", rec?.name, err); }
+    try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
+    try{
+      const qcResult = proBuildQcResultFromAnalysis(rec);
+      if(qcResult) proApplyQcResult(rec, qcResult);
+    }catch(err){
+      console.warn("[Pro] qc update failed", rec?.name, err);
+    }
+    render();
+  }
   function proGetAppCues(){
     const st = window.WavCue?.state;
     if(!st || !Array.isArray(st.cues)) return null;
@@ -14054,6 +14594,10 @@ try{
   window.updateBadges = window.updateBadges || proUpdateBadges;
   window.__wavcueProGetActiveId = window.__wavcueProGetActiveId || (()=> project.activeId);
   window.__wavcueProGetRecById = window.__wavcueProGetRecById || ((id)=> project.files.find(f=>f.id===id) || null);
+  window.__wavcueProAfterFix = window.__wavcueProAfterFix || ((id)=>{
+    const rec = project.files.find(f=>f.id===id) || null;
+    proUpdateAfterFix(rec);
+  });
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
     try{ if(typeof window.resizeAll === "function") window.resizeAll(); }catch(_){}
@@ -14069,9 +14613,70 @@ try{
     return file.type === "audio/wav" || file.type === "audio/wave"
       || name.endsWith(".wav") || name.endsWith(".wave");
   }
+  const extractQcNgItems = (typeof window.extractQcNgItems === "function")
+    ? window.extractQcNgItems
+    : function extractQcNgItemsLocal(qcResult){
+      const out = { ng: [], ok: [] };
+      if(!qcResult) return out;
+
+      const cand =
+        qcResult.ngItems ??
+        qcResult.ng ??
+        qcResult.items ??
+        qcResult.issues ??
+        qcResult.failures ??
+        [];
+
+      if(Array.isArray(cand)) out.ng = cand.filter(Boolean);
+
+      if(out.ng.length===0){
+        if(qcResult.ok === false || qcResult.pass === false || qcResult.passed === false){
+          out.ng = ["NG"];
+        }
+      }
+      return out;
+    };
+  const safeExtract = (qcResult)=>{
+    try{
+      if(typeof window.extractQcNgItems === "function") return window.extractQcNgItems(qcResult);
+      if(typeof extractQcNgItems === "function") return extractQcNgItems(qcResult);
+    }catch(_){}
+    const items = qcResult?.items || qcResult?.rows || qcResult?.results || [];
+    const arr = Array.isArray(items) ? items : [];
+    const ng = arr.filter(it => it && (it.ok === false || it.status === "ng" || it.pass === false));
+    return { items: arr, ng };
+  };
+  async function runQcAndWaitResult(){
+    const st = window.WavCue?.state;
+    const fileKey = String(st?.fileName || "");
+    try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
+
+    const t0 = Date.now();
+    const timeoutMs = 8000;
+    while(Date.now() - t0 < timeoutMs){
+      try{
+        if(typeof window.getLastQcForCurrentFile === "function"){
+          const r = window.getLastQcForCurrentFile();
+          if(r) return r;
+        }
+      }catch(_){}
+
+      try{
+        const last = window.__wavcueLastQc;
+        if(last && last.result){
+          if(!fileKey || !last.fileKey || String(last.fileKey) === fileKey){
+            return last.result;
+          }
+        }
+      }catch(_){}
+
+      await new Promise(r=>setTimeout(r, 60));
+    }
+    return null;
+  }
   function qcReasonText(qcResult){
     if(!qcResult) return "未チェック/理由なし";
-    const { ng } = extractQcNgItems(qcResult);
+    const { ng } = safeExtract(qcResult);
     if(!ng.length) return "規格OK";
     const reasons = ng.map(it=>{
       const label = it?.label || it?.key || "NG";
@@ -14088,7 +14693,7 @@ try{
       file.qcResult = null;
       return;
     }
-    const { ng } = extractQcNgItems(qcResult);
+    const { ng } = safeExtract(qcResult);
     file.status.qc = ng.length ? "ng" : "ok";
     file.status.qcReason = qcReasonText(qcResult);
     file.qcResult = qcResult;
@@ -14201,6 +14806,16 @@ try{
               }
             }catch(err){ console.error("[MIGRATE] fullLoad normalize error", err); }
             proSyncRecFromState(rec, "dnd:fullLoad", {markEdited:false});
+            try{
+              proComputeAnalysisFromState(rec);
+            }catch(err){
+              console.warn("[Pro] analysis failed", rec.name, err);
+            }
+            try{
+              audioCacheRemember(rec, state.buffer, state.peaks);
+            }catch(err){
+              console.warn("[Pro] audio cache remember failed", rec.name, err);
+            }
             console.log("[DND] fullLoad done", rec.name);
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad done", window.diagState({ name: rec.name, fileId: rec.id }));
           }catch(err){
@@ -14264,11 +14879,41 @@ try{
         return;
       }
 
-      console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
-      await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
-      project.lastLoadedId = id;
-      proForceRedraw("after-load");
-      proApplyEditsToApp(rec, "after-load");
+      const allowDecode = (opts?.allowDecode !== false);
+      const cacheHit = audioCacheApply(rec);
+      if(cacheHit){
+        state.fileName = rec.name;
+        state.file = rec.file;
+        proApplyStateSnapshot(rec);
+        state.procApplied = false;
+        state.procDataPayload = null;
+        state.procInfo = null;
+        state.scLast = null;
+        state.qcHasRun = false;
+        state.zoom = 1;
+        state.vZoom = 1;
+        state.scrollPx = 0;
+        state.playheadSec = 0;
+        state.playStartSec = 0;
+        await proEnsureAudioSrc(rec);
+        project.lastLoadedId = id;
+        proForceRedraw("cache-hit");
+        proApplyEditsToApp(rec, "cache-hit");
+      }else if(!allowDecode){
+        console.log("[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
+        return;
+      }else{
+        console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
+        await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
+        project.lastLoadedId = id;
+        proForceRedraw("after-load");
+        proApplyEditsToApp(rec, "after-load");
+        try{
+          audioCacheRemember(rec, state.buffer, state.peaks);
+        }catch(err){
+          console.warn("[Pro] audio cache remember failed", rec.name, err);
+        }
+      }
 
       // 読み込み後に、本体stateからキュー情報を同期（表示用）
       const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
@@ -14371,17 +15016,18 @@ try{
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id }));
     }
   }
-  function filtered(){
+  function matchesFilter(file){
     const st = project.filter.status;
-    return project.files.filter(f=>{
-      if(st==='all') return true;
-      if(st==='unverified') return f.status.qc==='unverified';
-      if(st==='ok') return f.status.qc==='ok';
-      if(st==='ng') return f.status.qc==='ng';
-      if(st==='edited') return !!f.status.edited;
-      if(st==='exported') return !!f.status.exported;
-      return true;
-    });
+    if(st==='all') return true;
+    if(st==='unverified') return file.status.qc==='unverified';
+    if(st==='ok') return file.status.qc==='ok';
+    if(st==='ng') return file.status.qc==='ng';
+    if(st==='edited') return !!file.status.edited;
+    if(st==='exported') return !!file.status.exported;
+    return true;
+  }
+  function filtered(){
+    return project.files.filter(matchesFilter);
   }
   function showJob(open){
     const p = $('proJobPanel');
@@ -14389,11 +15035,12 @@ try{
     if(open===undefined) p.classList.toggle('hidden');
     else p.classList.toggle('hidden', !open);
   }
-  function logJob(s){
+  function logJob(s, level){
     const box = $('proJobLog');
     if(!box) return;
     const t = new Date().toLocaleTimeString();
-    box.innerHTML += `<div>[${esc(t)}] ${esc(s)}</div>`;
+    const cls = level==="bad" ? "err" : "";
+    box.innerHTML += `<div class="${cls}">[${esc(t)}] ${esc(s)}</div>`;
     box.scrollTop = box.scrollHeight;
   }
   function updateJobUI(now){
@@ -14405,32 +15052,94 @@ try{
     if(count) count.textContent = `${job.done}/${job.total}`;
     const stat = $('proJobStat');
     if(stat) stat.textContent = `OK:${job.ok} / 失敗:${job.failed.length}`;
+    const fill = $('proJobProgressBar');
+    if(fill){
+      const pct = job.total ? Math.round((job.done/job.total)*100) : 0;
+      fill.style.width = `${pct}%`;
+    }
+    const badge = $('proJobFailBadge');
+    if(badge){
+      if(job.failed.length){
+        badge.textContent = "失敗あり";
+        badge.classList.add("isFail");
+      }else{
+        badge.textContent = job.total ? "失敗なし" : "—";
+        badge.classList.remove("isFail");
+      }
+    }
   }
   async function runJob(type, ids){
-    if(!ids.length) return;
-    job.running = true; job.cancel=false; job.failed=[]; job.done=0; job.total=ids.length; job.ok=0;
+    const targets = Array.isArray(ids) ? ids : [];
+    if(!targets.length){
+      logJob("対象件数: 0");
+      return;
+    }
+    job.running = true;
+    job.cancel=false;
+    job.failed=[];
+    job.done=0;
+    job.total=targets.length;
+    job.ok=0;
+
+    logJob(`対象件数: ${targets.length}`);
+    logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
     updateJobUI();
     showJob(true);
 
-    for(const id of ids){
+    for(const id of targets){
       if(job.cancel) break;
       const f = project.files.find(x=>x.id===id);
       if(!f) continue;
       try{
+        logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
         await setActiveFile(id, {force:true});
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
         if(type==='qc'){
-          try{ _scRunMeasureAndRender({switchToResults:false}); }catch(_){}
-          applyQcResultToFile(f, getLastQcForCurrentFile());
+          const st = window.WavCue?.state;
+          if(!st || !st.buffer){
+            throw new Error("QC失敗: AudioBuffer未準備（ロード未完了の可能性）");
+          }
+
+          // QC実行：例外は握りつぶさずログ化して失敗扱い
+          try{
+            const runQc = (typeof window._scRunMeasureAndRender === "function") ? window._scRunMeasureAndRender : null;
+            if(!runQc){
+              throw new Error("QC失敗: window._scRunMeasureAndRender が未定義です（公開漏れ）");
+            }
+            runQc({ switchToResults:false });
+          }catch(e){
+            const msg = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
+            logJob(`QC例外: ${f.name} / ${msg}`, "bad");
+            throw new Error("QC失敗: 実行中に例外が発生しました（詳細はログ/console）");
+          }
+
+          // QC結果取得：取れなければ失敗（成功扱いにしない）
+          const qcResult =
+            (typeof window.getLastQcForCurrentFile === "function")
+              ? window.getLastQcForCurrentFile()
+              : ((typeof getLastQcForCurrentFile === "function")
+                ? getLastQcForCurrentFile()
+                : (window.__wavcueLastQc?.result || null));
+
+          if(!qcResult){
+            throw new Error("QC失敗: 結果取得できず（__wavcueLastQc 未更新の可能性）");
+          }
+
+          applyQcResultToFile(f, qcResult);
+
+          if(!f.status || f.status.qc === "unverified"){
+            throw new Error("QC失敗: バッジ更新できず（apply後も未のまま）");
+          }
         }
         if(type==='export'){
           await doFinalExport();
           f.status.exported = true;
         }
         job.ok++;
+        logJob(`成功: ${f.name} (${(f.status?.qc||'unverified').toUpperCase()})`);
       }catch(e){
         job.failed.push(id);
-        logJob(`失敗: ${f.name}`);
+        logJob(`失敗: ${f.name} / ${e?.message || e}`);
       }finally{
         job.done++;
         updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
@@ -14444,9 +15153,12 @@ try{
     render();
   }
   function idsSelectedOrActive(){
-    const ids = Array.from(project.selectedIds);
-    if(ids.length===0 && project.activeId) ids.push(project.activeId);
-    return ids;
+    // 仕様統一：一括処理は「現在リストに表示されているファイル全て（フィルタ反映）」を対象にする
+    const all = (project.files || [])
+      .filter(matchesFilter)
+      .map(f => f.id)
+      .filter(Boolean);
+    return all;
   }
   function setPopoverContent(title, bodyNode){
     const titleEl = $('proPopTitle');
@@ -14544,7 +15256,7 @@ try{
               fn(a, {source:"popover", fileId: file.id, index: i});
             }else{
               try{ console.warn("[PDF] pdfOpenViewerForObject missing (popover)"); }catch(_){}
-              log("WARN: ビューアの起動関数が見つかりません。");
+              safeLog("WARN: ビューアの起動関数が見つかりません。");
             }
             closePopover();
           });
@@ -14650,6 +15362,14 @@ try{
     }
   }
   function bind(){
+    try{
+      const p = document.getElementById("proJobPanel");
+      if(p && p.parentElement !== document.body) document.body.appendChild(p);
+      const pop = document.getElementById("proGlobalPopover");
+      if(pop && pop.parentElement !== document.body) document.body.appendChild(pop);
+      const toastRoot = document.getElementById("toastRoot");
+      if(toastRoot && toastRoot.parentElement !== document.body) document.body.appendChild(toastRoot);
+    }catch(_){}
     window.__wavcueProAddFiles = addFiles;
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
@@ -14659,6 +15379,27 @@ try{
 
     $('proJobMini')?.addEventListener('click', ()=> showJob());
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
+    $('proJobCopy')?.addEventListener('click', async ()=>{
+      try{
+        const txt = $('proJobLog')?.innerText || "";
+        await navigator.clipboard.writeText(txt);
+        logJob("コピーしました", "muted");
+      }catch(_){
+        logJob("コピーに失敗しました（権限/環境）", "bad");
+      }
+    });
+    $('proJobClear')?.addEventListener('click', ()=>{
+      const box = $('proJobLog');
+      if(box) box.innerHTML = "";
+      logJob("クリアしました");
+    });
+    $('proJobExpand')?.addEventListener('click', ()=>{
+      const p = $('proJobPanel');
+      if(!p) return;
+      p.classList.toggle("isExpanded");
+      const b = $('proJobExpand');
+      if(b) b.textContent = p.classList.contains("isExpanded") ? "縮小" : "拡大";
+    });
     $('proJobCancel')?.addEventListener('click', ()=> { job.cancel=true; logJob('停止要求'); });
     $('proJobRetryFailed')?.addEventListener('click', ()=>{
       if(job.failed.length) runJob('qc', job.failed.slice());
