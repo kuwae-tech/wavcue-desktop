@@ -12207,6 +12207,8 @@ async function _scApplyAutoFix(){
   try{ _prog.show("補正中…", "補正を実行中", fixCtrl); fixProgShown = true; }catch(_){ }
 
   try{
+    const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+    const rec = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(recId) : null;
     // measure current LUFS/TP from current state.buffer
     const r = _ecFindRange();
     const st = r.hasSeg ? r.start : 0;
@@ -12246,7 +12248,14 @@ async function _scApplyAutoFix(){
   const len = src.length;
   const sr = src.sampleRate;
 
-  const ctx = await ensureAudioCtx();
+  const ctx = (typeof ensureAudioCtx === "function")
+    ? await ensureAudioCtx()
+    : (async ()=>{
+      if(state.audioCtx) return state.audioCtx;
+      state.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      try{ await state.audioCtx.resume(); }catch(_){}
+      return state.audioCtx;
+    })();
   const outBuf = ctx.createBuffer(nch, len, sr);
 
   for(let ch=0; ch<nch; ch++){
@@ -12263,12 +12272,72 @@ async function _scApplyAutoFix(){
     return;
   }
 
-  // apply to state
-  if(!state.origBuffer) state.origBuffer = src;
+  // ensure original WAV bytes for rebuild
+  let srcAb = state.srcAb || rec?.srcAb || rec?._stateSnap?.srcAb || null;
+  if(!srcAb){
+    try{
+      const fileForAb = rec?.file || state.file || null;
+      if(fileForAb && typeof fileForAb.arrayBuffer === "function"){
+        srcAb = await fileForAb.arrayBuffer();
+        state.srcAb = srcAb;
+        if(rec) rec.srcAb = srcAb;
+      }
+    }catch(err){
+      console.warn("[FixCommitB] srcAb fetch failed", err);
+    }
+  }
+
+  let rebuiltAb = null;
+  let replacedFile = false;
+  let rebuiltBytesLen = 0;
+  let dataReplaceOk = false;
+  const replacements = { dataBuf: _makeChunk("data", payload) };
+  const chunks = state.srcChunks || (srcAb ? parseRiffChunks(srcAb) : null);
+  if(srcAb && chunks && Array.isArray(chunks) && chunks.length){
+    try{
+      const rebuiltBlob = rebuildWaveFromOriginal(srcAb, chunks, replacements);
+      rebuiltAb = await rebuiltBlob.arrayBuffer();
+      rebuiltBytesLen = rebuiltAb.byteLength;
+      dataReplaceOk = true;
+      if(!state.srcChunks) state.srcChunks = chunks;
+    }catch(err){
+      console.warn("[FixCommitB] data-replace failed", err);
+    }
+  }else{
+    console.warn("[FixCommitB] data-replace skipped (missing srcAb/chunks)", { hasSrcAb: !!srcAb, hasChunks: !!(chunks && chunks.length) });
+  }
+
+  if(dataReplaceOk && rebuiltAb){
+    const name = rec?.name || state.fileName || "fixed.wav";
+    try{
+      const newFile = new File([rebuiltAb], name, {type:"audio/wav"});
+      if(rec){
+        rec.file = newFile;
+        rec._fixReplacedFile = true;
+        rec.srcAb = rebuiltAb;
+      }
+      state.file = newFile;
+      state.fileName = name;
+      state.srcAb = rebuiltAb;
+      state.srcDataPayload = payload;
+      state.procApplied = false;
+      state.procDataPayload = null;
+      state.procInfo = null;
+      state.origBuffer = null;
+      replacedFile = true;
+    }catch(err){
+      console.warn("[FixCommitB] replace file failed", err);
+    }
+  }
+
+  // apply to state (fallback: keep procApplied for temporary preview)
+  if(!replacedFile && !state.origBuffer) state.origBuffer = src;
   state.buffer = outBuf;
-  state.procApplied = true;
-  state.procDataPayload = payload;
-  state.procInfo = {totalDb, gainDb, tpSafetyDb};
+  if(!replacedFile){
+    state.procApplied = true;
+    state.procDataPayload = payload;
+    state.procInfo = {totalDb, gainDb, tpSafetyDb};
+  }
 
   // rebuild peaks and redraw
   state.peaks = buildPeaks(state.buffer, 6000);
@@ -12281,6 +12350,19 @@ async function _scApplyAutoFix(){
   _scSet("sc_fixState", "適用中");
   _scSet("sc_fixInfo", `ゲイン ${gainDb.toFixed(2)} dB / TP安全 ${tpSafetyDb.toFixed(2)} dB（合計 ${totalDb.toFixed(2)} dB）`);
 
+  console.log("[FixCommitB]", {
+    fileId: rec?.id || null,
+    name: rec?.name || state.fileName || null,
+    gainDb,
+    rebuiltBytesLen,
+    replacedFile,
+  });
+  if(dataReplaceOk){
+    console.log("[FixCommitB] data-replace ok", { fileId: rec?.id || null, bytes: rebuiltBytesLen });
+  }else{
+    console.warn("[FixCommitB] data-replace ng", { fileId: rec?.id || null, bytes: rebuiltBytesLen });
+  }
+
     // re-measure
     try{ _prog.set(null, "補正中…", "解析中…"); }catch(_){ }
     _scRunMeasureAndRender();
@@ -12289,6 +12371,9 @@ async function _scApplyAutoFix(){
       const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
       if(activeId && typeof window.__wavcueProAfterFix === "function"){
         window.__wavcueProAfterFix(activeId);
+      }
+      if(replacedFile && typeof window.requestFullRefresh === "function"){
+        window.requestFullRefresh("fix:commitB");
       }
     }catch(_){ }
   }finally{
@@ -14273,9 +14358,27 @@ try{
     if(!rec) return false;
     return audioCache.map.has(rec.id);
   }
+  async function proEnsureAudioElSafe(){
+    try{
+      if(typeof ensureAudioEl === "function") return ensureAudioEl();
+    }catch(_){}
+    if(state.audioEl) return state.audioEl;
+    const a = new Audio();
+    a.preload = "auto";
+    a.addEventListener("ended", ()=>{
+      state.isPlaying = false;
+      try{ if(typeof stopRaf === "function") stopRaf(); }catch(_){}
+      try{ if(typeof setPlayhead === "function") setPlayhead(state.playStartSec || 0); }catch(_){}
+      try{ if(typeof ensureVisibleSec === "function") ensureVisibleSec(currentPlayheadSec()); }catch(_){}
+      try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
+      try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
+    });
+    state.audioEl = a;
+    return a;
+  }
   async function proEnsureAudioSrc(rec){
     if(!rec?.file) return;
-    const audio = await ensureAudioEl();
+    const audio = await proEnsureAudioElSafe();
     if(state.previewUrl){ try{ URL.revokeObjectURL(state.previewUrl); }catch(_){ } state.previewUrl=null; }
     if(state.audioUrl){ try{ URL.revokeObjectURL(state.audioUrl); }catch(_){ } }
     state.audioUrl = URL.createObjectURL(rec.file);
@@ -14857,6 +14960,11 @@ try{
       if(!rec) return;
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "start", window.diagState({ fileId: id, hasGetState: (typeof window.getState === "function") }));
       console.log("[Pro] setActiveFile start", { id, name: rec.name, force: !!opts?.force });
+      console.log("[FixCommitB] restore-check", {
+        fileId: rec.id,
+        isReplacedFile: !!rec._fixReplacedFile,
+        srcAbLen: rec?.srcAb?.byteLength || rec?._stateSnap?.srcAb?.byteLength || null,
+      });
 
       if(!opts?.skipSave){
         proSaveActiveEdits("before-switch", true);
