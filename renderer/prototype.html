@@ -6068,7 +6068,8 @@ async function loadFile(file){
     audio.currentTime = 0;
 
     // decode for waveform/analyzer
-    const ctx = await ensureAudioCtx();
+    const ctx = window.__wavcueEnsureAudioCtx();
+    if(!ctx) throw new Error("AudioContext unavailable");
     let __loadOK = false;
     const __loadCtrl = new AbortController();
     _prog.show("読み込み中…","ファイルを読み取り中", __loadCtrl);
@@ -12246,7 +12247,8 @@ async function _scUpdatePreviewAudio(){
   const len = src.length;
   const sr = src.sampleRate;
 
-  const ctx = await ensureAudioCtx();
+  const ctx = window.__wavcueEnsureAudioCtx();
+  if(!ctx) throw new Error("AudioContext unavailable");
   const outBuf = ctx.createBuffer(nch, len, sr);
 
   for(let ch=0; ch<nch; ch++){
@@ -14164,22 +14166,34 @@ try{
     }catch(_){}
     try{ console.log(msg); }catch(_){}
   }
+  /* [AUDIOCTX] global singleton */
+  (function(){
+    const W = window;
+    if (typeof W.__wavcueEnsureAudioCtx === 'function') return;
+
+    let _ctx = null;
+
+    W.__wavcueEnsureAudioCtx = function __wavcueEnsureAudioCtx(){
+      const AC = W.AudioContext || W.webkitAudioContext;
+      if (!AC) {
+        console.warn('[AUDIOCTX] AudioContext unavailable in this environment');
+        return null;
+      }
+      if (_ctx && _ctx.state !== 'closed') {
+        console.log('[AUDIOCTX] reused state=' + _ctx.state);
+        return _ctx;
+      }
+      _ctx = new AC();
+      console.log('[AUDIOCTX] created state=' + _ctx.state);
+      return _ctx;
+    };
+
+    // Backward-compat alias (MUST)
+    W.ensureAudioCtx = W.__wavcueEnsureAudioCtx;
+  })();
   const audioCache = { map: new Map(), totalBytes: 0 };
   const originalBufferById = new Map();
   const fixedBufferById = new Map();
-  function ensureFixAudioCtx(){
-    if(typeof window.ensureAudioCtx === "function") return window.ensureAudioCtx();
-    if(typeof ensureAudioCtx === "function") return ensureAudioCtx();
-    if(state.audioCtx){
-      console.log("[FixPersist] ensureAudioCtx", "reused");
-      return Promise.resolve(state.audioCtx);
-    }
-    const Ctx = window.AudioContext || window.webkitAudioContext;
-    if(!Ctx) throw new Error("AudioContext unavailable");
-    state.audioCtx = new Ctx();
-    console.log("[FixPersist] ensureAudioCtx", "created");
-    return Promise.resolve(state.audioCtx);
-  }
   const _getCFG = ()=>{
     return (window.WavCue && window.WavCue.CFG) ? window.WavCue.CFG
       : ((window.BWFJ && window.BWFJ.CFG) ? window.BWFJ.CFG
@@ -14967,23 +14981,28 @@ try{
   async function ensureOriginalBufferForFix(fileId){
     const cached = getOriginalBufferFromCache(fileId);
     if(cached){
-      console.log("[FixPersist] ensureOriginal", { fileId, from: "cache" });
+      console.log("[FixPersist] ensureOriginal ok", { fileId, from: "map" });
       return cached;
     }
     const rec = fileId ? (project.files.find(f=>f.id===fileId) || null) : null;
     if(!rec?.file){
-      console.log("[FixPersist] ensureOriginal", { fileId, from: "fail", reason: "noFile" });
+      console.log("[FixPersist] ensureOriginal fail", { fileId, reason: "noFile" });
       return null;
     }
     try{
-      const ctx = await ensureFixAudioCtx();
+      const ctx = window.__wavcueEnsureAudioCtx();
+      if(!ctx){
+        console.warn("[FixPersist] ensureOriginal fail: AudioContext unavailable", { fileId });
+        console.log("[FixPersist] ensureOriginal fail", { fileId, reason: "AudioContext unavailable" });
+        return null;
+      }
       const ab = await rec.file.arrayBuffer();
       const buf = await new Promise((resolve,reject)=> ctx.decodeAudioData(ab.slice(0), resolve, reject));
       putOriginalBuffer(fileId, buf, "ensureOriginal:decode");
-      console.log("[FixPersist] ensureOriginal", { fileId, from: "decode", sr: buf.sampleRate, ch: buf.numberOfChannels, len: buf.length });
+      console.log("[FixPersist] ensureOriginal ok", { fileId, from: "decode" });
       return buf;
     }catch(err){
-      console.log("[FixPersist] ensureOriginal", { fileId, from: "fail", reason: err?.message || String(err) });
+      console.log("[FixPersist] ensureOriginal fail", { fileId, reason: err?.stack || err?.message || String(err) });
       return null;
     }
   }
@@ -14994,7 +15013,8 @@ try{
       const nch = src.numberOfChannels;
       const len = src.length;
       const sr = src.sampleRate;
-      const ctx = await ensureFixAudioCtx();
+      const ctx = window.__wavcueEnsureAudioCtx();
+      if(!ctx) throw new Error("AudioContext unavailable");
       const outBuf = ctx.createBuffer(nch, len, sr);
       for(let ch=0; ch<nch; ch++){
         const s = src.getChannelData(ch);
