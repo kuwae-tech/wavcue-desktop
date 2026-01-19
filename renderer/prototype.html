@@ -14719,19 +14719,32 @@ try{
   const extractQcNgItems = (typeof window.extractQcNgItems === "function")
     ? window.extractQcNgItems
     : function extractQcNgItemsLocal(qcResult){
-      const out = { ng: [], ok: [] };
+      const out = { items: [], ng: [], ok: [] };
       if(!qcResult) return out;
 
-      const cand =
+      // items は「全検査項目」。NG配列ではない
+      const itemsCand =
+        qcResult.items ??
+        qcResult.rows ??
+        qcResult.results ??
+        [];
+      out.items = Array.isArray(itemsCand) ? itemsCand : [];
+
+      // NG候補は専用フィールドのみ（itemsは入れない）
+      const ngCand =
         qcResult.ngItems ??
         qcResult.ng ??
-        qcResult.items ??
         qcResult.issues ??
         qcResult.failures ??
         [];
+      out.ng = Array.isArray(ngCand) ? ngCand.filter(Boolean) : [];
 
-      if(Array.isArray(cand)) out.ng = cand.filter(Boolean);
+      // ng専用フィールドが無い形式の場合は items から ok===false だけ抽出
+      if(out.ng.length===0 && out.items.length){
+        out.ng = out.items.filter(it => it && (it.ok === false || it.status === "ng" || it.pass === false || it.passed === false));
+      }
 
+      // 最終フォールバック（旧挙動維持）
       if(out.ng.length===0){
         if(qcResult.ok === false || qcResult.pass === false || qcResult.passed === false){
           out.ng = ["NG"];
