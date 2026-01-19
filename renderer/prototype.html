@@ -6068,7 +6068,8 @@ async function loadFile(file){
     audio.currentTime = 0;
 
     // decode for waveform/analyzer
-    const ctx = await ensureAudioCtx();
+    const ctx = window.__wavcueEnsureAudioCtx();
+    if(!ctx) throw new Error("AudioContext unavailable");
     let __loadOK = false;
     const __loadCtrl = new AbortController();
     _prog.show("読み込み中…","ファイルを読み取り中", __loadCtrl);
@@ -12176,7 +12177,7 @@ async function _scUpdatePreviewAudio(){
   }
 }
 
-async function _scApplyAutoFix(){
+  async function _scApplyAutoFix(){
   if(!state.buffer){
     const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
     const rec = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(recId) : null;
@@ -12246,7 +12247,8 @@ async function _scApplyAutoFix(){
   const len = src.length;
   const sr = src.sampleRate;
 
-  const ctx = await ensureAudioCtx();
+  const ctx = window.__wavcueEnsureAudioCtx();
+  if(!ctx) throw new Error("AudioContext unavailable");
   const outBuf = ctx.createBuffer(nch, len, sr);
 
   for(let ch=0; ch<nch; ch++){
@@ -12288,7 +12290,7 @@ async function _scApplyAutoFix(){
     try{
       const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
       if(activeId && typeof window.__wavcueProAfterFix === "function"){
-        window.__wavcueProAfterFix(activeId);
+        window.__wavcueProAfterFix(activeId, { before: curLufs, target: preset.targetLufs, computedGainDb: totalDb });
       }
     }catch(_){ }
   }finally{
@@ -14164,7 +14166,34 @@ try{
     }catch(_){}
     try{ console.log(msg); }catch(_){}
   }
+  /* [AUDIOCTX] global singleton */
+  (function(){
+    const W = window;
+    if (typeof W.__wavcueEnsureAudioCtx === 'function') return;
+
+    let _ctx = null;
+
+    W.__wavcueEnsureAudioCtx = function __wavcueEnsureAudioCtx(){
+      const AC = W.AudioContext || W.webkitAudioContext;
+      if (!AC) {
+        console.warn('[AUDIOCTX] AudioContext unavailable in this environment');
+        return null;
+      }
+      if (_ctx && _ctx.state !== 'closed') {
+        console.log('[AUDIOCTX] reused state=' + _ctx.state);
+        return _ctx;
+      }
+      _ctx = new AC();
+      console.log('[AUDIOCTX] created state=' + _ctx.state);
+      return _ctx;
+    };
+
+    // Backward-compat alias (MUST)
+    W.ensureAudioCtx = W.__wavcueEnsureAudioCtx;
+  })();
   const audioCache = { map: new Map(), totalBytes: 0 };
+  const originalBufferById = new Map();
+  const fixedBufferById = new Map();
   const _getCFG = ()=>{
     return (window.WavCue && window.WavCue.CFG) ? window.WavCue.CFG
       : ((window.BWFJ && window.BWFJ.CFG) ? window.BWFJ.CFG
@@ -14232,8 +14261,10 @@ try{
       audioCacheLog("skip oversize", { id: rec.id, name: rec.name, mb: (bytes/1024/1024).toFixed(1) });
       return false;
     }
+    let prevFix = rec.loudnessFix || null;
     if(audioCache.map.has(rec.id)){
       const prev = audioCache.map.get(rec.id);
+      prevFix = prev?.loudnessFix || prevFix || null;
       if(prev && prev.bytes) audioCache.totalBytes = Math.max(0, audioCache.totalBytes - prev.bytes);
       audioCache.map.delete(rec.id);
     }
@@ -14249,11 +14280,13 @@ try{
       peaks,
       bytes,
       usedAt: Date.now(),
+      loudnessFix: prevFix,
     };
     audioCache.map.set(rec.id, entry);
     audioCache.totalBytes += bytes;
     rec._audioCachePolicy = "cached";
     audioCacheLog("remember", { id: rec.id, name: rec.name, mb: (bytes/1024/1024).toFixed(1) });
+    try{ putOriginalBuffer(rec.id, buffer, "cache:put"); }catch(_){ }
     return true;
   }
   function audioCacheApply(rec){
@@ -14483,19 +14516,81 @@ try{
     if(!box) return "";
     return Array.from(box.querySelectorAll("div")).map(el=>el.textContent||"").join("\n");
   }
-  function proUpdateAfterFix(rec){
+  function proKeepLoudnessFix(rec, snap){
+    if(!rec) return null;
+    const keep = rec.loudnessFix || rec._stateSnap?.loudnessFix || snap?.loudnessFix || null;
+    if(keep){
+      rec.loudnessFix = keep;
+      if(rec._stateSnap) rec._stateSnap.loudnessFix = keep;
+      if(snap) snap.loudnessFix = keep;
+    }
+    return keep;
+  }
+  async function proCommitLoudnessCorrection({fileId, gainDb, buffer, before, target}={}){
+    const rec = fileId ? (project.files.find(f=>f.id===fileId) || null) : null;
     if(!rec) return;
+    const computedGain = (typeof gainDb === "number" && isFinite(gainDb))
+      ? gainDb
+      : (state.procInfo?.totalDb ?? state.procInfo?.gainDb ?? rec.loudnessFix?.gainDb ?? null);
+    const cleanGain = (computedGain != null && Math.abs(computedGain) < 0.01) ? 0 : computedGain;
+    console.log("[FixPersist] gain-debug", {
+      fileId: rec.id,
+      before: (typeof before === "number" && isFinite(before)) ? before : undefined,
+      target: (typeof target === "number" && isFinite(target)) ? target : undefined,
+      computedGainDb: computedGain,
+      savedGainDb: cleanGain,
+    });
+    const mode = (buffer && buffer.getChannelData) ? "buffer" : "gain";
+    const fixMeta = { v: 1, mode, gainDb: (cleanGain != null ? cleanGain : 0), ts: Date.now() };
+    rec.loudnessFix = fixMeta;
     try{
       const snap = (typeof window.safeCloneLite === "function")
         ? window.safeCloneLite(window.WavCue?.state || null)
         : (window.WavCue?.state || null);
       rec._stateSnap = snap || rec._stateSnap;
+      proKeepLoudnessFix(rec, snap);
     }catch(_){ }
-    try{ proComputeAnalysisFromState(rec); }catch(err){ console.warn("[Pro] analysis update failed", rec?.name, err); }
-    try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
+    const baseBuffer = state.origBuffer || buffer || null;
+    const basePeaks = (baseBuffer && baseBuffer === state.buffer) ? state.peaks : (baseBuffer ? buildPeaks(baseBuffer, 6000) : null);
+    if(baseBuffer){
+      try{ audioCacheRemember(rec, baseBuffer, basePeaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
+      try{ putOriginalBuffer(rec.id, baseBuffer, "commit"); }catch(_){ }
+    }
+    const entry = audioCache.map.get(rec.id);
+    if(entry){
+      entry.loudnessFix = {
+        mode,
+        gainDb: fixMeta.gainDb,
+        buffer: buffer || entry.loudnessFix?.buffer || null,
+      };
+    }
+    const original = await ensureOriginalBufferForFix(rec.id);
+    if(!original){
+      console.log("[FixPersist] applied-cache", { fileId: rec.id, reason: "commit", gainDb: fixMeta.gainDb, hasCache: false, note: "noOriginalBufferYet" });
+      return;
+    }
+    const fixed = await makeFixedBufferFromGain(original, fixMeta.gainDb);
+    if(!fixed){
+      console.log("[FixPersist] applied-cache", { fileId: rec.id, reason: "commit", gainDb: fixMeta.gainDb, hasCache: false, note: "fixBufferFailed" });
+      return;
+    }
+    setFixedBufferForId(rec.id, fixMeta.gainDb, fixed, "commit");
+    rec.loudnessFixPending = false;
+    console.log("[FixPersist] commit", {
+      fileId: rec.id,
+      gainDb: fixMeta.gainDb,
+      hasCache: !!getFixedBuffer(rec.id),
+      hasRec: !!rec.loudnessFix,
+    });
     try{
+      proComputeAnalysisFromState(rec);
       const qcResult = proBuildQcResultFromAnalysis(rec);
       if(qcResult) proApplyQcResult(rec, qcResult);
+      const qcNg = qcResult ? safeExtract(qcResult).ng.length > 0 : false;
+      const qcLabel = qcResult ? (qcNg ? "NG" : "OK") : "NG";
+      const qcInput = getBufferForQc(rec.id).input;
+      console.log("[FixPersist] qc", { fileId: rec.id, input: qcInput, result: qcLabel });
+      try{ if(typeof window.updateBadges === "function") window.updateBadges("fix:qcrefresh"); }catch(_){ }
     }catch(err){
       console.warn("[Pro] qc update failed", rec?.name, err);
     }
@@ -14594,9 +14689,15 @@ try{
   window.updateBadges = window.updateBadges || proUpdateBadges;
   window.__wavcueProGetActiveId = window.__wavcueProGetActiveId || (()=> project.activeId);
   window.__wavcueProGetRecById = window.__wavcueProGetRecById || ((id)=> project.files.find(f=>f.id===id) || null);
-  window.__wavcueProAfterFix = window.__wavcueProAfterFix || ((id)=>{
-    const rec = project.files.find(f=>f.id===id) || null;
-    proUpdateAfterFix(rec);
+  window.__wavcueProAfterFix = window.__wavcueProAfterFix || ((id, meta={})=>{
+    const gainDb = meta?.computedGainDb ?? state.procInfo?.totalDb ?? state.procInfo?.gainDb ?? null;
+    void proCommitLoudnessCorrection({
+      fileId: id,
+      gainDb,
+      buffer: state.buffer,
+      before: meta?.before,
+      target: meta?.target,
+    });
   });
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
@@ -14733,11 +14834,13 @@ try{
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad start", window.diagState({ name: rec.name, fileId: rec.id }));
             await loadSingleWav(rec.file);
             project.lastLoadedId = rec.id;
+            try{ if(state.buffer) putOriginalBuffer(rec.id, state.buffer, "dnd:fullLoad"); }catch(_){ }
             let stateLike = null;
             try{
               const raw = window.WavCue?.state || null;
               stateLike = (typeof window.safeCloneLite === "function") ? window.safeCloneLite(raw) : raw;
               rec._stateSnap = stateLike || null;
+              proKeepLoudnessFix(rec, stateLike);
             }catch(e){
               console.warn("[MIGRATE] state snapshot failed", e);
             }
@@ -14851,6 +14954,101 @@ try{
       return [];
     }
   }
+  function getCacheEntry(fileId){
+    if(!fileId) return null;
+    return audioCache.map.get(fileId) || null;
+  }
+  function getOriginalBufferFromCache(fileId){
+    const direct = originalBufferById.get(fileId) || null;
+    if(direct && direct.getChannelData) return direct;
+    const entry = getCacheEntry(fileId);
+    const cand = entry?.buffer || entry?.audioBuffer || entry?.ab || entry?.decoded || entry?.decodedBuffer || entry?.srcBuffer || null;
+    return (cand && cand.getChannelData) ? cand : null;
+  }
+  function putOriginalBuffer(fileId, audioBuffer, reason){
+    if(!fileId || !audioBuffer || !audioBuffer.getChannelData) return;
+    const hasExisting = originalBufferById.has(fileId);
+    originalBufferById.set(fileId, audioBuffer);
+    console.log("[FixPersist] original-cache-put", {
+      fileId,
+      reason,
+      durationSec: audioBuffer.duration,
+      sampleRate: audioBuffer.sampleRate,
+      channels: audioBuffer.numberOfChannels,
+      hasExisting,
+    });
+  }
+  async function ensureOriginalBufferForFix(fileId){
+    const cached = getOriginalBufferFromCache(fileId);
+    if(cached){
+      console.log("[FixPersist] ensureOriginal ok", { fileId, from: "map" });
+      return cached;
+    }
+    const rec = fileId ? (project.files.find(f=>f.id===fileId) || null) : null;
+    if(!rec?.file){
+      console.log("[FixPersist] ensureOriginal fail", { fileId, reason: "noFile" });
+      return null;
+    }
+    try{
+      const ctx = window.__wavcueEnsureAudioCtx();
+      if(!ctx){
+        console.warn("[FixPersist] ensureOriginal fail: AudioContext unavailable", { fileId });
+        console.log("[FixPersist] ensureOriginal fail", { fileId, reason: "AudioContext unavailable" });
+        return null;
+      }
+      const ab = await rec.file.arrayBuffer();
+      const buf = await new Promise((resolve,reject)=> ctx.decodeAudioData(ab.slice(0), resolve, reject));
+      putOriginalBuffer(fileId, buf, "ensureOriginal:decode");
+      console.log("[FixPersist] ensureOriginal ok", { fileId, from: "decode" });
+      return buf;
+    }catch(err){
+      console.log("[FixPersist] ensureOriginal fail", { fileId, reason: err?.stack || err?.message || String(err) });
+      return null;
+    }
+  }
+  async function makeFixedBufferFromGain(src, gainDb){
+    if(!src || !isFinite(gainDb)) return null;
+    const gain = Math.pow(10, gainDb/20);
+    try{
+      const nch = src.numberOfChannels;
+      const len = src.length;
+      const sr = src.sampleRate;
+      const ctx = window.__wavcueEnsureAudioCtx();
+      if(!ctx) throw new Error("AudioContext unavailable");
+      const outBuf = ctx.createBuffer(nch, len, sr);
+      for(let ch=0; ch<nch; ch++){
+        const s = src.getChannelData(ch);
+        const d = outBuf.getChannelData(ch);
+        for(let i=0;i<len;i++){
+          d[i] = _scClamp(s[i] * gain);
+        }
+      }
+      return outBuf;
+    }catch(_){
+      return null;
+    }
+  }
+  function setFixedBufferForId(fileId, gainDb, fixed, reason){
+    if(!fileId || !fixed) return false;
+    fixedBufferById.set(fileId, fixed);
+    const entry = getCacheEntry(fileId);
+    if(entry){
+      entry.loudnessFix = { mode: "buffer", gainDb, buffer: fixed, updatedAt: Date.now() };
+    }
+    console.log("[FixPersist] applied-cache", { fileId, reason, gainDb, hasCache: true, note: "ok" });
+    return true;
+  }
+  function getFixedBuffer(fileId){
+    return fixedBufferById.get(fileId) || getCacheEntry(fileId)?.loudnessFix?.buffer || null;
+  }
+  function getBufferForQc(fileId){
+    const fixed = getFixedBuffer(fileId);
+    if(fixed){
+      return { buffer: fixed, input: "fixed" };
+    }
+    const original = getOriginalBufferFromCache(fileId);
+    return { buffer: original || state.buffer || null, input: "original" };
+  }
   async function setActiveFile(id, opts){
     try{
       const rec = project.files.find(f=>f.id===id);
@@ -14879,26 +15077,50 @@ try{
         return;
       }
 
-      const allowDecode = (opts?.allowDecode !== false);
-      const cacheHit = audioCacheApply(rec);
-      if(cacheHit){
+      const recFix = rec.loudnessFix || null;
+      const recGainDb = (recFix && isFinite(recFix.gainDb)) ? Number(recFix.gainDb) : null;
+      const allowDecode = (opts?.allowDecode !== false) || (recGainDb != null);
+      console.log("[FixPersist] restore-check", {
+        fileId: rec.id,
+        hasRec: !!rec.loudnessFix,
+        hasCache: !!getFixedBuffer(rec.id),
+      });
+      const applyFixedState = async (buffer, source)=>{
+        const entry = audioCache.map.get(rec.id) || null;
         state.fileName = rec.name;
         state.file = rec.file;
         proApplyStateSnapshot(rec);
-        state.procApplied = false;
+        state.buffer = buffer;
+        state.origBuffer = entry?.buffer || buffer;
+        state.peaks = buildPeaks(state.buffer, 6000);
+        state.sr = state.buffer.sampleRate;
+        state.procApplied = (source !== "original");
         state.procDataPayload = null;
-        state.procInfo = null;
+        state.procInfo = state.procApplied ? { gainDb: (recGainDb ?? 0), tpSafetyDb: 0, totalDb: (recGainDb ?? 0) } : null;
         state.scLast = null;
-        state.qcHasRun = false;
+        state.qcHasRun = !!rec.qcResult;
         state.zoom = 1;
         state.vZoom = 1;
         state.scrollPx = 0;
         state.playheadSec = 0;
         state.playStartSec = 0;
         await proEnsureAudioSrc(rec);
+        if(state.procApplied){
+          try{
+            const fmt = _ecParseFmtInfo();
+            const payload = fmt ? _scEncodePcmPayloadFromBuffer(state.buffer, fmt) : null;
+            if(payload) state.procDataPayload = payload;
+          }catch(_){ }
+          try{ await _scUpdatePreviewAudio(); }catch(_){ }
+        }
         project.lastLoadedId = id;
-        proForceRedraw("cache-hit");
-        proApplyEditsToApp(rec, "cache-hit");
+        proForceRedraw(state.procApplied ? "fixed-restore" : "cache-hit");
+        proApplyEditsToApp(rec, state.procApplied ? "fixed-restore" : "cache-hit");
+      };
+      const cacheHit = audioCacheApply(rec);
+      if(cacheHit){
+        await applyFixedState(state.buffer, "original");
+        try{ putOriginalBuffer(rec.id, state.buffer, "restore:cache-hit"); }catch(_){ }
       }else if(!allowDecode){
         console.log("[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
         return;
@@ -14912,6 +15134,40 @@ try{
           audioCacheRemember(rec, state.buffer, state.peaks);
         }catch(err){
           console.warn("[Pro] audio cache remember failed", rec.name, err);
+        }
+        try{ putOriginalBuffer(rec.id, state.buffer, "restore:after-load"); }catch(_){ }
+      }
+      const fixedBuffer = getFixedBuffer(rec.id);
+      if(!fixedBuffer && recGainDb != null){
+        const original = await ensureOriginalBufferForFix(rec.id);
+        if(original){
+          const fixed = await makeFixedBufferFromGain(original, recGainDb);
+          if(fixed){
+            setFixedBufferForId(rec.id, recGainDb, fixed, "restore:materialize");
+          }
+        }
+      }
+      const finalFixed = getFixedBuffer(rec.id);
+      const finalSource = finalFixed
+        ? "fixed-cache"
+        : "original";
+      const hasFixed = !!finalFixed;
+      if(finalFixed){
+        await applyFixedState(finalFixed, "fixed-buffer");
+      }
+      console.log("[FixPersist] restore-applied", { fileId: rec.id, hasFixed, source: finalSource });
+      if(finalFixed){
+        try{
+          proComputeAnalysisFromState(rec);
+          const qcResult = proBuildQcResultFromAnalysis(rec);
+          if(qcResult) proApplyQcResult(rec, qcResult);
+          const qcNg = qcResult ? safeExtract(qcResult).ng.length > 0 : false;
+          const qcLabel = qcResult ? (qcNg ? "NG" : "OK") : "NG";
+          const qcInput = getBufferForQc(rec.id).input;
+          console.log("[FixPersist] qc", { fileId: rec.id, input: qcInput, result: qcLabel });
+          try{ if(typeof window.updateBadges === "function") window.updateBadges("fix:qcrefresh"); }catch(_){ }
+        }catch(err){
+          console.warn("[Pro] qc update failed", rec?.name, err);
         }
       }
 
