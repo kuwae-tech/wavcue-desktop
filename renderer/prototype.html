@@ -3735,7 +3735,7 @@ body, #appRoot, .appRoot, .mainLayout{
 <button class="btn" id="sc_fix" type="button">補正を実行</button> <span class="muted" id="sc_fixInfo">—</span>
 </div>
 <div class="muted" style="margin-top:8px">
-        補正を適用した状態で書き出します。<br/>元に戻す：Ctrl/⌘+Z
+        補正を適用した状態で書き出します。<br/><b style="color:#d33">補正実行後は元に戻せません</b>
       </div>
 </div>
 </div>
@@ -4343,6 +4343,12 @@ function _applyUndoState(s){
   try{ updateButtons(); }catch(_){}
   try{ drawAll(); }catch(_){}
   try{ refreshChunkDialogViews(); }catch(_){}
+  try{
+    if(state.procApplied){
+      const name = state.fileName || state.file?.name || "unknown";
+      console.log(`[FixCommit] undo-guard: fix is irreversible for name=${name}`);
+    }
+  }catch(_){}
 }
 
 function undoDo(){
@@ -12281,8 +12287,7 @@ async function _scApplyAutoFix(){
     return;
   }
 
-  // apply to state
-  if(!state.origBuffer) state.origBuffer = src;
+  // apply to state (commit as new baseline; irreversible)
   state.buffer = outBuf;
   state.procApplied = true;
   state.procDataPayload = payload;
@@ -12309,6 +12314,14 @@ async function _scApplyAutoFix(){
         window.__wavcueProAfterFix(activeId);
       }
     }catch(_){ }
+    try{
+      const name = state.fileName || state.file?.name || "unknown";
+      console.log(`[FixCommit] applied (no-undo): name=${name} totalDb=${totalDb} peaks=rebuilt cache=updated`);
+    }catch(_){ }
+    try{
+      const name = state.fileName || state.file?.name || "unknown";
+      console.log(`[FixCommit] committed via fullLoad route: name=${name}`);
+    }catch(_){ }
   }finally{
     if(fixProgShown){
       try{ _prog.hide(); }catch(_){ }
@@ -12317,45 +12330,7 @@ async function _scApplyAutoFix(){
 }
 
 async function _scRevertAutoFix(){
-  if(!state.procApplied){
-    _scSet("sc_fixState", "未適用");
-    _scSet("sc_fixInfo", "—");
-    return;
-  }
-  try{
-    const a = await ensureAudioEl();
-
-    state.procApplied = false;
-    state.procDataPayload = null;
-    state.procInfo = null;
-
-    // restore decoded buffer
-    if(state.origBuffer){
-      state.buffer = state.origBuffer;
-      state.peaks = buildPeaks(state.buffer, 6000);
-    }
-    // restore preview to original file URL
-    if(state.previewUrl){ try{ URL.revokeObjectURL(state.previewUrl); }catch(_){ } state.previewUrl=null; }
-    if(state.audioUrl) a.src = state.audioUrl;
-
-    drawAll();
-    updateButtons();
-
-    _scSet("sc_fixState", "未適用");
-    _scSet("sc_fixInfo", "—");
-    _scRunMeasureAndRender();
-    try{
-      const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-      let recUpdated = "no";
-      if(recId && typeof window.__wavcueProAfterFix === "function"){
-        window.__wavcueProAfterFix(recId);
-        recUpdated = "yes";
-      }
-      console.log(`[FixPersist] revert: applied=false recUpdated=${recUpdated}`);
-    }catch(_){}
-  }catch(err){
-    log(`WARN: 補正を戻す処理でエラー: ${err?.message||err}`);
-  }
+  alert("補正は元に戻せません。");
 }
 
 function _scWire(){
@@ -12642,12 +12617,6 @@ window.addEventListener("keydown", (e)=>{
   if((e.metaKey || e.ctrlKey) && !e.altKey){
     const k = (e.key || "").toLowerCase();
     if(k === "z"){
-      // If auto gain correction is currently applied, Ctrl/Cmd+Z reverts it (no separate button)
-      if(!e.shiftKey && (state?.procApplied) && (typeof _scRevertAutoFix === "function")){
-        e.preventDefault();
-        _scRevertAutoFix();
-        return;
-      }
       e.preventDefault();
       if(e.shiftKey) redoDo(); else undoDo();
       return;
