@@ -8873,8 +8873,7 @@ async function exportWav(){
           console.log("[FixPersist] export payload generated: ok");
         }catch(e){
           console.log("[FixPersist] export payload generated: fail", e);
-          window.safeToast && window.safeToast("補正済み書き出し用PCM生成に失敗しました","ng");
-          log(`WARN: 補正済み書き出し用PCM生成に失敗しました: ${e?.message||e}`);
+          alert("補正済み書き出し用PCM生成に失敗しました。");
           return;
         }
       }
@@ -12345,6 +12344,12 @@ async function _scRevertAutoFix(){
     _scSet("sc_fixState", "未適用");
     _scSet("sc_fixInfo", "—");
     _scRunMeasureAndRender();
+    try{
+      const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+      const rec = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(recId) : null;
+      if(rec) proUpdateAfterFix(rec);
+      console.log("[FixPersist] revert -> sync rec");
+    }catch(_){}
   }catch(err){
     log(`WARN: 補正を戻す処理でエラー: ${err?.message||err}`);
   }
@@ -14522,7 +14527,7 @@ try{
       }else{
         rec.procPeaks = null;
       }
-      console.log(`[FixPersist] save to rec: ${rec.name||rec.fileName||rec.id} applied=${rec.procFix.applied}`);
+      console.log(`[FixPersist] save to rec(afterFix): ${rec.name||rec.fileName||rec.id} applied=${rec.procFix.applied}`);
     }catch(_){ }
     try{ proComputeAnalysisFromState(rec); }catch(err){ console.warn("[Pro] analysis update failed", rec?.name, err); }
     try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
@@ -14534,7 +14539,7 @@ try{
     }
     render();
   }
-  function proRestoreFixToStateFromRec(rec){
+  function proRestoreFixFromRecToState(rec, tag){
     const fx = rec?.procFix;
     state.procApplied = !!fx?.applied;
     state.procInfo = fx?.info || null;
@@ -14542,9 +14547,9 @@ try{
     if(rec?.procPeaks && state.procApplied){
       state.peaks = rec.procPeaks;
     }
-    console.log(`[FixPersist] restore from rec: ${rec?.name||rec?.fileName||rec?.id} applied=${state.procApplied}`);
+    console.log(`[FixPersist] restore from rec(${tag||""}): ${rec?.name||rec?.fileName||rec?.id} applied=${state.procApplied}`);
   }
-  async function proReapplyFixFromRecIfNeeded(rec){
+  async function proReapplyFixIfNeeded(rec){
     const fx = rec?.procFix;
     if(!fx?.applied) return false;
     const totalDb = fx?.info?.totalDb;
@@ -14565,7 +14570,6 @@ try{
       }
     }
 
-    if(!state.origBuffer) state.origBuffer = src;
     state.buffer = out;
     state.peaks = buildPeaks(state.buffer, 6000);
     state.procApplied = true;
@@ -14576,9 +14580,13 @@ try{
 
     try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(_){}
 
-    try{ if(typeof window.drawAll === "function") window.drawAll(); }catch(_){}
-    try{ if(typeof window.updateButtons === "function") window.updateButtons(); }catch(_){}
-    try{ if(typeof window._scUpdatePreviewAudio === "function") await window._scUpdatePreviewAudio(); }catch(_){}
+    try{
+      if(typeof proComputeAnalysisFromState === "function") proComputeAnalysisFromState(rec);
+      if(typeof proBuildQcResultFromAnalysis === "function" && typeof proApplyQcResult === "function"){
+        const q = proBuildQcResultFromAnalysis(rec);
+        if(q) proApplyQcResult(rec, q);
+      }
+    }catch(_){}
 
     console.log(`[FixPersist] reapply from rec: ${rec?.name||rec?.fileName||rec?.id} totalDb=${totalDb}`);
     return true;
@@ -14967,7 +14975,7 @@ try{
         state.fileName = rec.name;
         state.file = rec.file;
         proApplyStateSnapshot(rec);
-        proRestoreFixToStateFromRec(rec);
+        proRestoreFixFromRecToState(rec, "cache-hit");
         state.scLast = null;
         state.qcHasRun = false;
         state.zoom = 1;
@@ -14981,14 +14989,14 @@ try{
         proApplyEditsToApp(rec, "cache-hit");
       }else if(!allowDecode){
         console.log("[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
-        proRestoreFixToStateFromRec(rec);
+        proRestoreFixFromRecToState(rec, "skip-decode");
         return;
       }else{
         console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
         await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
         project.lastLoadedId = id;
-        proRestoreFixToStateFromRec(rec);
-        try{ await proReapplyFixFromRecIfNeeded(rec); }catch(_){}
+        proRestoreFixFromRecToState(rec, "after-load");
+        try{ await proReapplyFixIfNeeded(rec); }catch(_){}
         proForceRedraw("after-load");
         proApplyEditsToApp(rec, "after-load");
         try{
