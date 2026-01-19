@@ -14232,8 +14232,10 @@ try{
       audioCacheLog("skip oversize", { id: rec.id, name: rec.name, mb: (bytes/1024/1024).toFixed(1) });
       return false;
     }
+    let prevFix = rec.loudnessFix || null;
     if(audioCache.map.has(rec.id)){
       const prev = audioCache.map.get(rec.id);
+      prevFix = prev?.loudnessFix || prevFix || null;
       if(prev && prev.bytes) audioCache.totalBytes = Math.max(0, audioCache.totalBytes - prev.bytes);
       audioCache.map.delete(rec.id);
     }
@@ -14249,6 +14251,7 @@ try{
       peaks,
       bytes,
       usedAt: Date.now(),
+      loudnessFix: prevFix,
     };
     audioCache.map.set(rec.id, entry);
     audioCache.totalBytes += bytes;
@@ -14483,35 +14486,59 @@ try{
     if(!box) return "";
     return Array.from(box.querySelectorAll("div")).map(el=>el.textContent||"").join("\n");
   }
-  function proUpdateAfterFix(rec){
+  function proKeepLoudnessFix(rec, snap){
+    if(!rec) return null;
+    const keep = rec.loudnessFix || rec._stateSnap?.loudnessFix || snap?.loudnessFix || null;
+    if(keep){
+      rec.loudnessFix = keep;
+      if(rec._stateSnap) rec._stateSnap.loudnessFix = keep;
+      if(snap) snap.loudnessFix = keep;
+    }
+    return keep;
+  }
+  function proCommitLoudnessCorrection({fileId, gainDb, buffer}={}){
+    const rec = fileId ? (project.files.find(f=>f.id===fileId) || null) : null;
     if(!rec) return;
-    try{
-      if(state.buffer){
-        rec.fixedAudio = {
-          buffer: state.buffer,
-          peaks: state.peaks,
-          procDataPayload: state.procDataPayload || null,
-          procInfo: state.procInfo || null,
-          origBuffer: state.origBuffer || null,
-        };
-      }
-    }catch(_){ }
+    const cleanGain = (typeof gainDb === "number" && isFinite(gainDb))
+      ? gainDb
+      : (rec.loudnessFix?.gainDb ?? state.procInfo?.gainDb ?? null);
+    const mode = (buffer && buffer.getChannelData) ? "buffer" : "gain";
+    const fixMeta = { v: 1, mode, gainDb: (cleanGain != null ? cleanGain : 0), ts: Date.now() };
+    rec.loudnessFix = fixMeta;
     try{
       const snap = (typeof window.safeCloneLite === "function")
         ? window.safeCloneLite(window.WavCue?.state || null)
         : (window.WavCue?.state || null);
       rec._stateSnap = snap || rec._stateSnap;
+      proKeepLoudnessFix(rec, snap);
     }catch(_){ }
-    try{ proComputeAnalysisFromState(rec); }catch(err){ console.warn("[Pro] analysis update failed", rec?.name, err); }
-    try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
+    if(buffer){
+      try{ audioCacheRemember(rec, buffer, state.peaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
+    }
+    const entry = audioCache.map.get(rec.id);
+    if(entry){
+      entry.loudnessFix = {
+        mode,
+        gainDb: fixMeta.gainDb,
+        buffer: buffer || entry.loudnessFix?.buffer || null,
+      };
+    }
+    console.log("[FixPersist] commit", {
+      fileId: rec.id,
+      mode,
+      gainDb: fixMeta.gainDb,
+      hasCache: !!audioCache.map.get(rec.id)?.loudnessFix,
+      hasRec: !!rec.loudnessFix,
+    });
     try{
+      proComputeAnalysisFromState(rec);
       const qcResult = proBuildQcResultFromAnalysis(rec);
       if(qcResult) proApplyQcResult(rec, qcResult);
       const qcNg = qcResult ? safeExtract(qcResult).ng.length > 0 : false;
       const qcLabel = qcResult ? (qcNg ? "NG" : "OK") : "NG";
-      console.log("[FixPersist] qc", { fileId: rec.id, input: (rec.fixedAudio?.buffer ? "fixed" : "original"), result: qcLabel });
+      const qcInput = (rec.loudnessFix ? "fixed" : "original");
+      console.log("[FixPersist] qc", { fileId: rec.id, input: qcInput, result: qcLabel });
       try{ if(typeof window.updateBadges === "function") window.updateBadges("fix:qcrefresh"); }catch(_){ }
-      console.log("[FixPersist] commit", { fileId: rec.id, hasFixed: !!rec.fixedAudio?.buffer, mode: "buffer", qc: qcLabel });
     }catch(err){
       console.warn("[Pro] qc update failed", rec?.name, err);
     }
@@ -14611,8 +14638,8 @@ try{
   window.__wavcueProGetActiveId = window.__wavcueProGetActiveId || (()=> project.activeId);
   window.__wavcueProGetRecById = window.__wavcueProGetRecById || ((id)=> project.files.find(f=>f.id===id) || null);
   window.__wavcueProAfterFix = window.__wavcueProAfterFix || ((id)=>{
-    const rec = project.files.find(f=>f.id===id) || null;
-    proUpdateAfterFix(rec);
+    const gainDb = state.procInfo?.gainDb ?? null;
+    proCommitLoudnessCorrection({ fileId: id, gainDb, buffer: state.buffer });
   });
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
@@ -14754,6 +14781,7 @@ try{
               const raw = window.WavCue?.state || null;
               stateLike = (typeof window.safeCloneLite === "function") ? window.safeCloneLite(raw) : raw;
               rec._stateSnap = stateLike || null;
+              proKeepLoudnessFix(rec, stateLike);
             }catch(e){
               console.warn("[MIGRATE] state snapshot failed", e);
             }
@@ -14867,6 +14895,26 @@ try{
       return [];
     }
   }
+  async function proApplyGainToBuffer(src, gain){
+    if(!src || !isFinite(gain)) return null;
+    try{
+      const nch = src.numberOfChannels;
+      const len = src.length;
+      const sr = src.sampleRate;
+      const ctx = await ensureAudioCtx();
+      const outBuf = ctx.createBuffer(nch, len, sr);
+      for(let ch=0; ch<nch; ch++){
+        const s = src.getChannelData(ch);
+        const d = outBuf.getChannelData(ch);
+        for(let i=0;i<len;i++){
+          d[i] = _scClamp(s[i] * gain);
+        }
+      }
+      return outBuf;
+    }catch(_){
+      return null;
+    }
+  }
   async function setActiveFile(id, opts){
     try{
       const rec = project.files.find(f=>f.id===id);
@@ -14896,20 +14944,34 @@ try{
       }
 
       const allowDecode = (opts?.allowDecode !== false);
-      const fixedAudio = rec.fixedAudio?.buffer ? rec.fixedAudio : null;
-      const hasFixed = !!fixedAudio;
-      console.log("[FixPersist] restore", { fileId: rec.id, hasFixed, source: hasFixed ? "fixed" : "original" });
-      if(hasFixed){
+      const recFix = rec.loudnessFix || null;
+      const recGainDb = (recFix && isFinite(recFix.gainDb)) ? Number(recFix.gainDb) : null;
+      const cacheEntry = audioCache.map.get(rec.id) || null;
+      const cacheFix = cacheEntry?.loudnessFix || null;
+      let fixedSource = "original";
+      let fixedBuffer = null;
+      if(cacheFix?.mode === "buffer" && cacheFix.buffer){
+        fixedBuffer = cacheFix.buffer;
+        fixedSource = "fixed-buffer";
+      }else if(recGainDb != null && cacheEntry?.buffer){
+        const gain = Math.pow(10, recGainDb/20);
+        fixedBuffer = await proApplyGainToBuffer(cacheEntry.buffer, gain);
+        if(fixedBuffer){
+          cacheEntry.loudnessFix = { mode: "buffer", gainDb: recGainDb, buffer: fixedBuffer };
+          fixedSource = "fixed-from-gain";
+        }
+      }
+      if(fixedBuffer){
         state.fileName = rec.name;
         state.file = rec.file;
         proApplyStateSnapshot(rec);
-        state.buffer = fixedAudio.buffer;
-        state.origBuffer = fixedAudio.origBuffer || fixedAudio.buffer;
-        state.peaks = fixedAudio.peaks || buildPeaks(state.buffer, 6000);
+        state.buffer = fixedBuffer;
+        state.origBuffer = cacheEntry?.buffer || fixedBuffer;
+        state.peaks = buildPeaks(state.buffer, 6000);
         state.sr = state.buffer.sampleRate;
         state.procApplied = true;
-        state.procDataPayload = fixedAudio.procDataPayload || null;
-        state.procInfo = fixedAudio.procInfo || null;
+        state.procDataPayload = null;
+        state.procInfo = { gainDb: (recGainDb ?? 0), tpSafetyDb: 0, totalDb: (recGainDb ?? 0) };
         state.scLast = null;
         state.qcHasRun = !!rec.qcResult;
         state.zoom = 1;
@@ -14918,7 +14980,12 @@ try{
         state.playheadSec = 0;
         state.playStartSec = 0;
         await proEnsureAudioSrc(rec);
-        if(state.procApplied && state.procDataPayload){
+        try{
+          const fmt = _ecParseFmtInfo();
+          const payload = fmt ? _scEncodePcmPayloadFromBuffer(state.buffer, fmt) : null;
+          if(payload) state.procDataPayload = payload;
+        }catch(_){ }
+        if(state.procApplied){
           try{ await _scUpdatePreviewAudio(); }catch(_){ }
         }
         project.lastLoadedId = id;
@@ -14958,8 +15025,35 @@ try{
           }catch(err){
             console.warn("[Pro] audio cache remember failed", rec.name, err);
           }
+          if(recGainDb != null){
+            const gain = Math.pow(10, recGainDb/20);
+            const originalBuffer = state.buffer;
+            const fixedFromGain = await proApplyGainToBuffer(originalBuffer, gain);
+            if(fixedFromGain){
+              state.buffer = fixedFromGain;
+              state.origBuffer = originalBuffer;
+              state.peaks = buildPeaks(state.buffer, 6000);
+              state.sr = state.buffer.sampleRate;
+              state.procApplied = true;
+              state.procDataPayload = null;
+              state.procInfo = { gainDb: recGainDb, tpSafetyDb: 0, totalDb: recGainDb };
+              fixedSource = "fixed-from-gain";
+              try{
+                const fmt = _ecParseFmtInfo();
+                const payload = fmt ? _scEncodePcmPayloadFromBuffer(state.buffer, fmt) : null;
+                if(payload) state.procDataPayload = payload;
+              }catch(_){ }
+              const entryNow = audioCache.map.get(rec.id);
+              if(entryNow){
+                entryNow.loudnessFix = { mode: "buffer", gainDb: recGainDb, buffer: state.buffer };
+              }
+              try{ await _scUpdatePreviewAudio(); }catch(_){ }
+            }
+          }
         }
       }
+      const hasFixed = fixedSource !== "original";
+      console.log("[FixPersist] restore", { fileId: rec.id, hasFixed, source: fixedSource, hasRec: !!rec.loudnessFix });
 
       // 読み込み後に、本体stateからキュー情報を同期（表示用）
       const st = (window.WavCue && window.WavCue.state) ? window.WavCue.state : null;
