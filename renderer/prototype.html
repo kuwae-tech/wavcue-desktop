@@ -12347,7 +12347,7 @@ async function _scRevertAutoFix(){
     try{
       const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
       const rec = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(recId) : null;
-      if(rec) proUpdateAfterFix(rec);
+      if(rec) proUpdateAfterFix(rec, "revert");
       console.log("[FixPersist] revert -> sync rec");
     }catch(_){}
   }catch(err){
@@ -14507,7 +14507,7 @@ try{
     if(!box) return "";
     return Array.from(box.querySelectorAll("div")).map(el=>el.textContent||"").join("\n");
   }
-  function proUpdateAfterFix(rec){
+  function proUpdateAfterFix(rec, reason){
     if(!rec) return;
     try{
       const snap = (typeof window.safeCloneLite === "function")
@@ -14516,18 +14516,23 @@ try{
       rec._stateSnap = snap || rec._stateSnap;
     }catch(_){ }
     try{
-      const applied = !!state.procApplied;
-      const info = (applied && state.procInfo) ? { ...state.procInfo } : null;
-      rec.procFix = { applied, info, updatedAt: Date.now() };
-      if(applied && state.peaks){
-        const bins = Number(state.peaks?.bins ?? state.peaks?.min?.length ?? 0);
-        if(bins > 0 && bins <= 12000){
-          rec.procPeaks = state.peaks;
-        }
-      }else{
+      if(reason === "revert"){
+        rec.procFix = { applied:false, info:null, updatedAt: Date.now() };
         rec.procPeaks = null;
+        console.log(`[FixPersist] save to rec(revert): ${rec.name||rec.fileName||rec.id} applied=false`);
+        return;
       }
-      console.log(`[FixPersist] save to rec(afterFix): ${rec.name||rec.fileName||rec.id} applied=${rec.procFix.applied}`);
+      if(state.procApplied !== true){
+        console.log(`[FixPersist] skip save (not applied): ${rec.name||rec.fileName||rec.id}`);
+        return;
+      }
+      rec.procFix = {
+        applied: true,
+        info: state.procInfo ? { ...state.procInfo } : null,
+        updatedAt: Date.now()
+      };
+      try{ rec.procPeaks = state.peaks; }catch(_){}
+      console.log(`[FixPersist] save to rec(afterFix): ${rec.name||rec.fileName||rec.id} applied=true`);
     }catch(_){ }
     try{ proComputeAnalysisFromState(rec); }catch(err){ console.warn("[Pro] analysis update failed", rec?.name, err); }
     try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
