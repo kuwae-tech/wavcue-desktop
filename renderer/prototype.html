@@ -12319,17 +12319,28 @@ async function _scApplyAutoFix(){
           if(!rec._stateSnap) rec._stateSnap = {};
           rec._stateSnap.fixCommittedDb = totalDb;
           rec.fixCommittedDb = totalDb;
+          try{
+            audioCacheRemember(rec, state.buffer, state.peaks);
+          }catch(err){
+            console.error("[FixCommit] cache update failed", rec?.name || rec?.fileName || rec?.id, err);
+          }
+          try{ proComputeAnalysisFromState(rec); }catch(err){ console.error("[FixCommit] analysis update failed", rec?.name || rec?.fileName || rec?.id, err); }
+          try{
+            const qcResult = proBuildQcResultFromAnalysis(rec);
+            if(qcResult) proApplyQcResult(rec, qcResult);
+          }catch(err){
+            console.error("[FixCommit] qc update failed", rec?.name || rec?.fileName || rec?.id, err);
+          }
           console.log(`[FixCommit] saved fixDb to snapshot: name=${rec.name||rec.fileName||rec.id} fixDb=${totalDb}`);
+          console.log(`[FixCommit] committed: name=${rec.name||rec.fileName||rec.id} totalDb=${totalDb} cacheUpdated=yes`);
         }
       }
-    }catch(_){ }
+    }catch(err){
+      console.error("[FixCommit] commit failed", err);
+    }
     try{
       const name = state.fileName || state.file?.name || "unknown";
-      console.log(`[FixCommit] applied (no-undo): name=${name} totalDb=${totalDb} peaks=rebuilt cache=updated`);
-    }catch(_){ }
-    try{
-      const name = state.fileName || state.file?.name || "unknown";
-      console.log(`[FixCommit] committed via fullLoad route: name=${name}`);
+      console.log(`[FixCommit] applied (no-undo): name=${name} totalDb=${totalDb} peaks=rebuilt`);
     }catch(_){ }
   }finally{
     if(fixProgShown){
@@ -14945,7 +14956,7 @@ try{
         }else{
           await proEnsureAudioSrc(rec);
         }
-        console.log(`[FixPersist] restore: name=${rec?.name||rec?.fileName||rec?.id} hasFixDb=${!!isFinite(fixDb)} fixDb=${isFinite(fixDb) ? fixDb : "na"} cacheHit=true reapply=${didReapply}`);
+        console.log(`[FixPersist] restore: name=${rec?.name||rec?.fileName||rec?.id} applied=${isFinite(fixDb)} totalDb=${isFinite(fixDb) ? fixDb : "na"} cacheFixDb=${isFinite(cacheFixDb) ? cacheFixDb : "na"} cacheHit=true reapply=${didReapply}`);
         state.scLast = null;
         state.qcHasRun = false;
         state.zoom = 1;
@@ -15009,7 +15020,8 @@ try{
             : null;
           state.procDataPayload = null;
         }
-        console.log(`[FixPersist] restore: name=${rec?.name||rec?.fileName||rec?.id} hasFixDb=${!!isFinite(fixDb)} fixDb=${isFinite(fixDb) ? fixDb : "na"} cacheHit=false reapply=${didReapply}`);
+        const cacheFixDb = rec?._audioCacheFixDb;
+        console.log(`[FixPersist] restore: name=${rec?.name||rec?.fileName||rec?.id} applied=${isFinite(fixDb)} totalDb=${isFinite(fixDb) ? fixDb : "na"} cacheFixDb=${isFinite(cacheFixDb) ? cacheFixDb : "na"} cacheHit=false reapply=${didReapply}`);
         proForceRedraw("after-load");
         proApplyEditsToApp(rec, "after-load");
         try{
