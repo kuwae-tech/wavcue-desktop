@@ -14165,6 +14165,9 @@ try{
     try{ console.log(msg); }catch(_){}
   }
   const audioCache = { map: new Map(), totalBytes: 0 };
+  const originalBufferById = new Map();
+  const fixedBufferById = new Map();
+  const pendingFixById = new Map();
   const _getCFG = ()=>{
     return (window.WavCue && window.WavCue.CFG) ? window.WavCue.CFG
       : ((window.BWFJ && window.BWFJ.CFG) ? window.BWFJ.CFG
@@ -14257,7 +14260,7 @@ try{
     audioCache.totalBytes += bytes;
     rec._audioCachePolicy = "cached";
     audioCacheLog("remember", { id: rec.id, name: rec.name, mb: (bytes/1024/1024).toFixed(1) });
-    try{ void applyLoudnessFixToCache(rec.id, "cache:put"); }catch(_){ }
+    try{ putOriginalBuffer(rec.id, buffer, "cache:put"); }catch(_){ }
     return true;
   }
   function audioCacheApply(rec){
@@ -14525,6 +14528,7 @@ try{
     const basePeaks = (baseBuffer && baseBuffer === state.buffer) ? state.peaks : (baseBuffer ? buildPeaks(baseBuffer, 6000) : null);
     if(baseBuffer){
       try{ audioCacheRemember(rec, baseBuffer, basePeaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
+      try{ putOriginalBuffer(rec.id, baseBuffer, "commit"); }catch(_){ }
     }
     const entry = audioCache.map.get(rec.id);
     if(entry){
@@ -14534,12 +14538,26 @@ try{
         buffer: buffer || entry.loudnessFix?.buffer || null,
       };
     }
-    const appliedCache = await applyLoudnessFixToCache(rec.id, "commit");
-    rec.loudnessFixPending = !appliedCache;
+    let appliedCache = false;
+    if(getFixedBuffer(rec.id)){
+      appliedCache = true;
+    }else if(baseBuffer && isFinite(fixMeta.gainDb)){
+      const fixed = await makeFixedBufferFromGain(baseBuffer, fixMeta.gainDb);
+      if(fixed){
+        appliedCache = setFixedBufferForId(rec.id, fixMeta.gainDb, fixed, "commit");
+      }
+    }
+    if(!appliedCache){
+      pendingFixById.set(rec.id, { gainDb: fixMeta.gainDb, mode });
+      rec.loudnessFixPending = true;
+      console.log("[FixPersist] pending-fix-set", { fileId: rec.id, gainDb: fixMeta.gainDb, reason: "commit-noOriginalYet" });
+    }else{
+      rec.loudnessFixPending = false;
+    }
     console.log("[FixPersist] commit", {
       fileId: rec.id,
       gainDb: fixMeta.gainDb,
-      hasCache: !!audioCache.map.get(rec.id)?.loudnessFix?.buffer,
+      hasCache: !!getFixedBuffer(rec.id),
       hasRec: !!rec.loudnessFix,
     });
     try{
@@ -14918,9 +14936,25 @@ try{
     return audioCache.map.get(fileId) || null;
   }
   function getOriginalBufferFromCache(fileId){
+    const direct = originalBufferById.get(fileId) || null;
+    if(direct && direct.getChannelData) return direct;
     const entry = getCacheEntry(fileId);
     const cand = entry?.buffer || entry?.audioBuffer || entry?.ab || entry?.decoded || entry?.decodedBuffer || entry?.srcBuffer || null;
     return (cand && cand.getChannelData) ? cand : null;
+  }
+  function putOriginalBuffer(fileId, audioBuffer, reason){
+    if(!fileId || !audioBuffer || !audioBuffer.getChannelData) return;
+    const hasExisting = originalBufferById.has(fileId);
+    originalBufferById.set(fileId, audioBuffer);
+    console.log("[FixPersist] original-cache-put", {
+      fileId,
+      reason,
+      durationSec: audioBuffer.duration,
+      sampleRate: audioBuffer.sampleRate,
+      channels: audioBuffer.numberOfChannels,
+      hasExisting,
+    });
+    void applyPendingFixIfAny(fileId, "original-cache-put");
   }
   async function makeFixedBufferFromGain(src, gainDb){
     if(!src || !isFinite(gainDb)) return null;
@@ -14943,35 +14977,45 @@ try{
       return null;
     }
   }
-  async function applyLoudnessFixToCache(fileId, reason){
-    const rec = fileId ? (project.files.find(f=>f.id===fileId) || null) : null;
-    if(!rec) return false;
-    const gainDb = (rec.loudnessFix && isFinite(rec.loudnessFix.gainDb)) ? Number(rec.loudnessFix.gainDb) : null;
-    if(gainDb == null) return false;
+  function setFixedBufferForId(fileId, gainDb, fixed, reason){
+    if(!fileId || !fixed) return false;
+    fixedBufferById.set(fileId, fixed);
     const entry = getCacheEntry(fileId);
-    if(entry?.loudnessFix?.buffer){
-      console.log("[FixPersist] applied-cache", { fileId, reason, gainDb, hasCache: true });
-      return true;
+    if(entry){
+      entry.loudnessFix = { mode: "buffer", gainDb, buffer: fixed, updatedAt: Date.now() };
     }
+    console.log("[FixPersist] applied-cache", { fileId, reason, gainDb, hasCache: true, note: "ok" });
+    return true;
+  }
+  function getFixedBuffer(fileId){
+    return fixedBufferById.get(fileId) || getCacheEntry(fileId)?.loudnessFix?.buffer || null;
+  }
+  async function applyPendingFixIfAny(fileId, reason){
+    const pending = pendingFixById.get(fileId) || null;
+    const rec = fileId ? (project.files.find(f=>f.id===fileId) || null) : null;
+    const gainDb = pending?.gainDb ?? (rec?.loudnessFix?.gainDb);
+    if(gainDb == null || !isFinite(gainDb)) return false;
     const original = getOriginalBufferFromCache(fileId);
     if(!original){
       console.log("[FixPersist] applied-cache", { fileId, reason, gainDb, hasCache: false, note: "noOriginalBufferYet" });
       return false;
     }
-    if(!entry) return false;
     const fixed = await makeFixedBufferFromGain(original, gainDb);
     if(fixed){
-      entry.loudnessFix = { mode: "buffer", gainDb, buffer: fixed, updatedAt: Date.now() };
-      console.log("[FixPersist] applied-cache", { fileId, reason, gainDb, hasCache: true });
-      return true;
+      pendingFixById.delete(fileId);
+      const ok = setFixedBufferForId(fileId, gainDb, fixed, reason);
+      if(ok){
+        console.log("[FixPersist] pending-fix-applied", { fileId, gainDb, hasCache: true, fixedLen: fixed.length, reason });
+      }
+      return ok;
     }
     console.log("[FixPersist] applied-cache", { fileId, reason, gainDb, hasCache: false, note: "fixBufferFailed" });
     return false;
   }
   function getBufferForQc(fileId){
-    const entry = getCacheEntry(fileId);
-    if(entry?.loudnessFix?.buffer){
-      return { buffer: entry.loudnessFix.buffer, input: "fixed" };
+    const fixed = getFixedBuffer(fileId);
+    if(fixed){
+      return { buffer: fixed, input: "fixed" };
     }
     const original = getOriginalBufferFromCache(fileId);
     return { buffer: original || state.buffer || null, input: "original" };
@@ -15010,7 +15054,7 @@ try{
       console.log("[FixPersist] restore-check", {
         fileId: rec.id,
         hasRec: !!rec.loudnessFix,
-        hasCache: !!audioCache.map.get(rec.id)?.loudnessFix?.buffer,
+        hasCache: !!getFixedBuffer(rec.id),
       });
       const applyFixedState = async (buffer, source)=>{
         const entry = audioCache.map.get(rec.id) || null;
@@ -15047,6 +15091,7 @@ try{
       const cacheHit = audioCacheApply(rec);
       if(cacheHit){
         await applyFixedState(state.buffer, "original");
+        try{ putOriginalBuffer(rec.id, state.buffer, "restore:cache-hit"); }catch(_){ }
       }else if(!allowDecode){
         console.log("[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
         return;
@@ -15061,19 +15106,19 @@ try{
         }catch(err){
           console.warn("[Pro] audio cache remember failed", rec.name, err);
         }
+        try{ putOriginalBuffer(rec.id, state.buffer, "restore:after-load"); }catch(_){ }
       }
-      const appliedCache = await applyLoudnessFixToCache(rec.id, "restore");
-      const cacheEntry = getCacheEntry(rec.id);
-      const fixedBuffer = cacheEntry?.loudnessFix?.buffer || null;
+      await applyPendingFixIfAny(rec.id, "restore");
+      const fixedBuffer = getFixedBuffer(rec.id);
       const finalSource = fixedBuffer
-        ? (cacheEntry?.loudnessFix?.updatedAt ? "fixed-from-gain" : "fixed-buffer")
+        ? "fixed"
         : (rec.loudnessFix ? "original(pending-fix)" : "original");
       const hasFixed = !!fixedBuffer;
       if(fixedBuffer){
         await applyFixedState(fixedBuffer, "fixed-buffer");
       }
       console.log("[FixPersist] restore-applied", { fileId: rec.id, hasFixed, source: finalSource });
-      if(appliedCache && fixedBuffer){
+      if(fixedBuffer){
         try{
           proComputeAnalysisFromState(rec);
           const qcResult = proBuildQcResultFromAnalysis(rec);
