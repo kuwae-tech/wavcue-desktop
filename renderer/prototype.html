@@ -12319,18 +12319,33 @@ async function _scApplyAutoFix(){
           if(!rec._stateSnap) rec._stateSnap = {};
           rec._stateSnap.fixCommittedDb = totalDb;
           rec.fixCommittedDb = totalDb;
+          let cacheOk = "NO";
+          let analysisOk = "NO";
+          let qcOk = "NO";
           try{
-            audioCacheRemember(rec, state.buffer, state.peaks);
+            if(typeof window.audioCacheRemember === "function"){
+              window.audioCacheRemember(rec, state.buffer, state.peaks);
+              cacheOk = "OK";
+            }
           }catch(err){
             console.error("[FixCommit] cache update failed", rec?.name || rec?.fileName || rec?.id, err);
           }
-          try{ proComputeAnalysisFromState(rec); }catch(err){ console.error("[FixCommit] analysis update failed", rec?.name || rec?.fileName || rec?.id, err); }
           try{
-            const qcResult = proBuildQcResultFromAnalysis(rec);
-            if(qcResult) proApplyQcResult(rec, qcResult);
+            if(typeof window.proComputeAnalysisFromState === "function"){
+              window.proComputeAnalysisFromState(rec);
+              analysisOk = "OK";
+            }
+          }catch(err){ console.error("[FixCommit] analysis update failed", rec?.name || rec?.fileName || rec?.id, err); }
+          try{
+            if(typeof window.proBuildQcResultFromAnalysis === "function"){
+              const qcResult = window.proBuildQcResultFromAnalysis(rec);
+              if(qcResult) proApplyQcResult(rec, qcResult);
+              qcOk = "OK";
+            }
           }catch(err){
             console.error("[FixCommit] qc update failed", rec?.name || rec?.fileName || rec?.id, err);
           }
+          console.log(`[FixCommit] post-commit hooks: cacheRemember=${cacheOk} computeAnalysis=${analysisOk} buildQc=${qcOk}`);
           console.log(`[FixCommit] saved fixDb to snapshot: name=${rec.name||rec.fileName||rec.id} fixDb=${totalDb}`);
           console.log(`[FixCommit] committed: name=${rec.name||rec.fileName||rec.id} totalDb=${totalDb} cacheUpdated=yes`);
         }
@@ -14289,6 +14304,36 @@ try{
     rec._audioCacheFixDb = entry.fixCommittedDb;
     audioCacheLog("apply", { id: rec.id, name: rec.name });
     return true;
+  }
+  if(typeof window !== "undefined" && typeof window.audioCacheRemember !== "function"){
+    window.audioCacheRemember = (...args)=>{
+      if(typeof audioCacheRemember === "function") return audioCacheRemember(...args);
+      if(typeof window.audioCacheRememberForFile === "function") return window.audioCacheRememberForFile(...args);
+      if(typeof window.audioCacheRememberArtifacts === "function") return window.audioCacheRememberArtifacts(...args);
+      if(typeof window.audioCacheSet === "function") return window.audioCacheSet(...args);
+      console.warn("[FixCommit] audioCacheRemember shim missing");
+      return null;
+    };
+  }
+  if(typeof window !== "undefined" && typeof window.proComputeAnalysisFromState !== "function"){
+    window.proComputeAnalysisFromState = (...args)=>{
+      if(typeof proComputeAnalysisFromState === "function") return proComputeAnalysisFromState(...args);
+      if(typeof window.proComputeAnalysis === "function") return window.proComputeAnalysis(...args);
+      if(typeof window.proComputeAnalysisForFile === "function") return window.proComputeAnalysisForFile(...args);
+      if(typeof window.proAnalyze === "function") return window.proAnalyze(...args);
+      console.warn("[FixCommit] proComputeAnalysisFromState shim missing");
+      return null;
+    };
+  }
+  if(typeof window !== "undefined" && typeof window.proBuildQcResultFromAnalysis !== "function"){
+    window.proBuildQcResultFromAnalysis = (...args)=>{
+      if(typeof proBuildQcResultFromAnalysis === "function") return proBuildQcResultFromAnalysis(...args);
+      if(typeof window.proBuildQcResult === "function") return window.proBuildQcResult(...args);
+      if(typeof window.buildQcResult === "function") return window.buildQcResult(...args);
+      if(typeof window.proBuildQc === "function") return window.proBuildQc(...args);
+      console.warn("[FixCommit] proBuildQcResultFromAnalysis shim missing");
+      return null;
+    };
   }
   function audioCacheHas(rec){
     if(!rec) return false;
