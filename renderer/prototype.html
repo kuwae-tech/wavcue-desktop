@@ -8859,9 +8859,28 @@ async function exportWav(){
       plstChunk = built.plstChunk;
     }
 
-    // data: only replace when auto-level fix was applied (PCM bytes are still PCM16)
-    const dataBuf = (state.procApplied && state.procDataPayload)
-      ? _makeChunk("data", state.procDataPayload)
+    // data: replace when auto-level fix was applied (PCM bytes are still PCM16)
+    let procPayload = null;
+    if(state.procApplied){
+      if(state.procDataPayload){
+        procPayload = state.procDataPayload;
+      }else{
+        try{
+          const fmt = _ecParseFmtInfo();
+          if(!fmt || !state.buffer) throw new Error("fmt or buffer missing");
+          procPayload = _scEncodePcmPayloadFromBuffer(state.buffer, fmt);
+          if(!procPayload) throw new Error("payload encode failed");
+          console.log("[FixPersist] export payload generated: ok");
+        }catch(e){
+          console.log("[FixPersist] export payload generated: fail", e);
+          window.safeToast && window.safeToast("補正済み書き出し用PCM生成に失敗しました","ng");
+          log(`WARN: 補正済み書き出し用PCM生成に失敗しました: ${e?.message||e}`);
+          return;
+        }
+      }
+    }
+    const dataBuf = (state.procApplied && procPayload)
+      ? _makeChunk("data", procPayload)
       : null;
 
     const replacements = {
@@ -8883,7 +8902,7 @@ async function exportWav(){
       // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
       log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
       const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
-      const pcmPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
+      const pcmPayload = (state.procApplied && procPayload) ? procPayload : state.srcDataPayload;
       const dataBuf2 = _makeChunk("data", pcmPayload);
       const parts = [
         new Uint8Array(bextBuf),
@@ -14491,6 +14510,20 @@ try{
         : (window.WavCue?.state || null);
       rec._stateSnap = snap || rec._stateSnap;
     }catch(_){ }
+    try{
+      const applied = !!state.procApplied;
+      const info = (applied && state.procInfo) ? { ...state.procInfo } : null;
+      rec.procFix = { applied, info, updatedAt: Date.now() };
+      if(applied && state.peaks){
+        const bins = Number(state.peaks?.bins ?? state.peaks?.min?.length ?? 0);
+        if(bins > 0 && bins <= 12000){
+          rec.procPeaks = state.peaks;
+        }
+      }else{
+        rec.procPeaks = null;
+      }
+      console.log(`[FixPersist] save to rec: ${rec.name||rec.fileName||rec.id} applied=${rec.procFix.applied}`);
+    }catch(_){ }
     try{ proComputeAnalysisFromState(rec); }catch(err){ console.warn("[Pro] analysis update failed", rec?.name, err); }
     try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
     try{
@@ -14500,6 +14533,55 @@ try{
       console.warn("[Pro] qc update failed", rec?.name, err);
     }
     render();
+  }
+  function proRestoreFixToStateFromRec(rec){
+    const fx = rec?.procFix;
+    state.procApplied = !!fx?.applied;
+    state.procInfo = fx?.info || null;
+    state.procDataPayload = null;
+    if(rec?.procPeaks && state.procApplied){
+      state.peaks = rec.procPeaks;
+    }
+    console.log(`[FixPersist] restore from rec: ${rec?.name||rec?.fileName||rec?.id} applied=${state.procApplied}`);
+  }
+  async function proReapplyFixFromRecIfNeeded(rec){
+    const fx = rec?.procFix;
+    if(!fx?.applied) return false;
+    const totalDb = fx?.info?.totalDb;
+    if(!isFinite(totalDb)) return false;
+    if(!state.buffer) return false;
+
+    const total = Math.pow(10, totalDb/20);
+    const ctx = await ensureAudioCtx();
+    const src = state.buffer;
+    const out = ctx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
+
+    for(let ch=0; ch<src.numberOfChannels; ch++){
+      const s = src.getChannelData(ch);
+      const d = out.getChannelData(ch);
+      for(let i=0;i<src.length;i++){
+        const v = s[i] * total;
+        d[i] = (v>1?1:(v<-1?-1:v));
+      }
+    }
+
+    if(!state.origBuffer) state.origBuffer = src;
+    state.buffer = out;
+    state.peaks = buildPeaks(state.buffer, 6000);
+    state.procApplied = true;
+    state.procInfo = fx.info || null;
+    state.procDataPayload = null;
+
+    rec.procPeaks = state.peaks;
+
+    try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(_){}
+
+    try{ if(typeof window.drawAll === "function") window.drawAll(); }catch(_){}
+    try{ if(typeof window.updateButtons === "function") window.updateButtons(); }catch(_){}
+    try{ if(typeof window._scUpdatePreviewAudio === "function") await window._scUpdatePreviewAudio(); }catch(_){}
+
+    console.log(`[FixPersist] reapply from rec: ${rec?.name||rec?.fileName||rec?.id} totalDb=${totalDb}`);
+    return true;
   }
   function proGetAppCues(){
     const st = window.WavCue?.state;
@@ -14885,9 +14967,7 @@ try{
         state.fileName = rec.name;
         state.file = rec.file;
         proApplyStateSnapshot(rec);
-        state.procApplied = false;
-        state.procDataPayload = null;
-        state.procInfo = null;
+        proRestoreFixToStateFromRec(rec);
         state.scLast = null;
         state.qcHasRun = false;
         state.zoom = 1;
@@ -14901,11 +14981,14 @@ try{
         proApplyEditsToApp(rec, "cache-hit");
       }else if(!allowDecode){
         console.log("[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
+        proRestoreFixToStateFromRec(rec);
         return;
       }else{
         console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
         await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
         project.lastLoadedId = id;
+        proRestoreFixToStateFromRec(rec);
+        try{ await proReapplyFixFromRecIfNeeded(rec); }catch(_){}
         proForceRedraw("after-load");
         proApplyEditsToApp(rec, "after-load");
         try{
