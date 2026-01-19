@@ -14546,7 +14546,7 @@ try{
     };
   }
   function proApplyQcResult(rec, qcResult){
-    applyQcResultToFile(rec, qcResult);
+    applyQcResultToRec(rec, qcResult, { source: "single" });
     if(project.activeId === rec.id && qcResult){
       window.__wavcueLastQc = {
         at: Date.now(),
@@ -14788,18 +14788,51 @@ try{
     });
     return reasons.length ? reasons.join("\n") : "未チェック/理由なし";
   }
-  function applyQcResultToFile(file, qcResult){
-    if(!file) return;
+  function getRecQcState(rec){
+    const qcResult = rec?.qcResult || null;
     if(!qcResult){
-      file.status.qc = "unverified";
-      file.status.qcReason = null;
-      file.qcResult = null;
-      return;
+      return { status: "unverified", reason: null, ng: [] };
     }
     const { ng } = safeExtract(qcResult);
-    file.status.qc = ng.length ? "ng" : "ok";
-    file.status.qcReason = qcReasonText(qcResult);
-    file.qcResult = qcResult;
+    return {
+      status: ng.length ? "ng" : "ok",
+      reason: qcReasonText(qcResult),
+      ng,
+    };
+  }
+  function applyQcResultToRec(rec, qcResult, opts){
+    if(!rec) return;
+    if(!qcResult){
+      rec.status.qc = "unverified";
+      rec.status.qcReason = null;
+      rec.qcResult = null;
+    }else{
+      const { status, reason, ng } = getRecQcState({ qcResult });
+      rec.status.qc = status;
+      rec.status.qcReason = reason;
+      rec.qcResult = qcResult;
+      if(opts?.source === "bulk"){
+        console.log(`[QC][apply] fileId=${rec.id} ok=${ng.length === 0} field=qcResult`);
+      }
+    }
+  }
+  function syncActiveQcFromRec(rec){
+    if(!rec){
+      state.qcHasRun = false;
+      window.__wavcueLastQc = null;
+      return;
+    }
+    if(rec.qcResult){
+      window.__wavcueLastQc = {
+        at: Date.now(),
+        fileKey: String(rec.name || ""),
+        result: rec.qcResult,
+      };
+      state.qcHasRun = true;
+    }else{
+      state.qcHasRun = false;
+      window.__wavcueLastQc = null;
+    }
   }
   async function addFiles(fileList){
     try{
@@ -15114,6 +15147,7 @@ try{
         // attachCount は null のままでOK
       }
 
+      syncActiveQcFromRec(rec);
     }catch(err){
       console.error("[Pro] setActiveFile error", err);
       if (typeof window.diagErr === "function") window.diagErr("[ACTIVE]", "error", err);
@@ -15126,10 +15160,11 @@ try{
   }
   function matchesFilter(file){
     const st = project.filter.status;
+    const qcState = getRecQcState(file).status;
     if(st==='all') return true;
-    if(st==='unverified') return file.status.qc==='unverified';
-    if(st==='ok') return file.status.qc==='ok';
-    if(st==='ng') return file.status.qc==='ng';
+    if(st==='unverified') return qcState==='unverified';
+    if(st==='ok') return qcState==='ok';
+    if(st==='ng') return qcState==='ng';
     if(st==='edited') return !!file.status.edited;
     if(st==='exported') return !!file.status.exported;
     return true;
@@ -15194,6 +15229,7 @@ try{
     updateJobUI();
     showJob(true);
 
+    let qcUpdatedRows = 0;
     for(const id of targets){
       if(job.cancel) break;
       const f = project.files.find(x=>x.id===id);
@@ -15233,9 +15269,10 @@ try{
             throw new Error("QC失敗: 結果取得できず（__wavcueLastQc 未更新の可能性）");
           }
 
-          applyQcResultToFile(f, qcResult);
+          applyQcResultToRec(f, qcResult, { source: "bulk" });
+          qcUpdatedRows += 1;
 
-          if(!f.status || f.status.qc === "unverified"){
+          if(getRecQcState(f).status === "unverified"){
             throw new Error("QC失敗: バッジ更新できず（apply後も未のまま）");
           }
         }
@@ -15244,7 +15281,7 @@ try{
           f.status.exported = true;
         }
         job.ok++;
-        logJob(`成功: ${f.name} (${(f.status?.qc||'unverified').toUpperCase()})`);
+        logJob(`成功: ${f.name} (${getRecQcState(f).status.toUpperCase()})`);
       }catch(e){
         job.failed.push(id);
         logJob(`失敗: ${f.name} / ${e?.message || e}`);
@@ -15256,6 +15293,11 @@ try{
     }
 
     logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
+    if(type==='qc'){
+      console.log(`[QC][bulk] done updatedRows=${qcUpdatedRows}`);
+      render();
+      if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("qc:bulk");
+    }
     job.running = false;
     updateJobUI();
     render();
@@ -15393,8 +15435,9 @@ try{
       const cls = ['proFileRow'];
       if(f.id===project.activeId) cls.push('active');
       if(project.selectedIds.has(f.id)) cls.push('selected');
-      const statusText = (f.status.qc==='ok') ? 'OK' : (f.status.qc==='ng' ? 'NG' : '未');
-      const statusClass = (f.status.qc==='ok') ? 'ok' : (f.status.qc==='ng' ? 'ng' : 'unverified');
+      const qcState = getRecQcState(f).status;
+      const statusText = (qcState==='ok') ? 'OK' : (qcState==='ng' ? 'NG' : '未');
+      const statusClass = (qcState==='ok') ? 'ok' : (qcState==='ng' ? 'ng' : 'unverified');
       const cueCount = Array.isArray(f.cues) ? f.cues.length : 0;
       const attCount = Number.isFinite(f.attachCount)
         ? f.attachCount
