@@ -12176,7 +12176,7 @@ async function _scUpdatePreviewAudio(){
   }
 }
 
-async function _scApplyAutoFix(){
+  async function _scApplyAutoFix(){
   if(!state.buffer){
     const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
     const rec = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(recId) : null;
@@ -12288,7 +12288,7 @@ async function _scApplyAutoFix(){
     try{
       const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
       if(activeId && typeof window.__wavcueProAfterFix === "function"){
-        window.__wavcueProAfterFix(activeId);
+        window.__wavcueProAfterFix(activeId, { before: curLufs, target: preset.targetLufs, computedGainDb: totalDb });
       }
     }catch(_){ }
   }finally{
@@ -14496,12 +14496,20 @@ try{
     }
     return keep;
   }
-  function proCommitLoudnessCorrection({fileId, gainDb, buffer}={}){
+  function proCommitLoudnessCorrection({fileId, gainDb, buffer, before, target}={}){
     const rec = fileId ? (project.files.find(f=>f.id===fileId) || null) : null;
     if(!rec) return;
-    const cleanGain = (typeof gainDb === "number" && isFinite(gainDb))
+    const computedGain = (typeof gainDb === "number" && isFinite(gainDb))
       ? gainDb
-      : (rec.loudnessFix?.gainDb ?? state.procInfo?.gainDb ?? null);
+      : (state.procInfo?.totalDb ?? state.procInfo?.gainDb ?? rec.loudnessFix?.gainDb ?? null);
+    const cleanGain = (computedGain != null && Math.abs(computedGain) < 0.01) ? 0 : computedGain;
+    console.log("[FixPersist] gain-debug", {
+      fileId: rec.id,
+      before: (typeof before === "number" && isFinite(before)) ? before : undefined,
+      target: (typeof target === "number" && isFinite(target)) ? target : undefined,
+      computedGainDb: computedGain,
+      savedGainDb: cleanGain,
+    });
     const mode = (buffer && buffer.getChannelData) ? "buffer" : "gain";
     const fixMeta = { v: 1, mode, gainDb: (cleanGain != null ? cleanGain : 0), ts: Date.now() };
     rec.loudnessFix = fixMeta;
@@ -14637,9 +14645,15 @@ try{
   window.updateBadges = window.updateBadges || proUpdateBadges;
   window.__wavcueProGetActiveId = window.__wavcueProGetActiveId || (()=> project.activeId);
   window.__wavcueProGetRecById = window.__wavcueProGetRecById || ((id)=> project.files.find(f=>f.id===id) || null);
-  window.__wavcueProAfterFix = window.__wavcueProAfterFix || ((id)=>{
-    const gainDb = state.procInfo?.gainDb ?? null;
-    proCommitLoudnessCorrection({ fileId: id, gainDb, buffer: state.buffer });
+  window.__wavcueProAfterFix = window.__wavcueProAfterFix || ((id, meta={})=>{
+    const gainDb = meta?.computedGainDb ?? state.procInfo?.totalDb ?? state.procInfo?.gainDb ?? null;
+    proCommitLoudnessCorrection({
+      fileId: id,
+      gainDb,
+      buffer: state.buffer,
+      before: meta?.before,
+      target: meta?.target,
+    });
   });
   function proForceRedraw(reason){
     if(reason) console.log(`[Pro] forceRedraw(${reason})`);
@@ -14943,9 +14957,9 @@ try{
         return;
       }
 
-      const allowDecode = (opts?.allowDecode !== false);
       const recFix = rec.loudnessFix || null;
       const recGainDb = (recFix && isFinite(recFix.gainDb)) ? Number(recFix.gainDb) : null;
+      const allowDecode = (opts?.allowDecode !== false) || (recGainDb != null);
       const cacheEntry = audioCache.map.get(rec.id) || null;
       const cacheFix = cacheEntry?.loudnessFix || null;
       let fixedSource = "original";
