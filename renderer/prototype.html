@@ -12313,6 +12313,15 @@ async function _scApplyAutoFix(){
       if(activeId && typeof window.__wavcueProAfterFix === "function"){
         window.__wavcueProAfterFix(activeId);
       }
+      if(activeId && typeof window.__wavcueProGetRecById === "function"){
+        const rec = window.__wavcueProGetRecById(activeId);
+        if(rec){
+          if(!rec._stateSnap) rec._stateSnap = {};
+          rec._stateSnap.fixCommittedDb = totalDb;
+          rec.fixCommittedDb = totalDb;
+          console.log(`[FixCommit] saved fixDb to snapshot: name=${rec.name||rec.fileName||rec.id} fixDb=${totalDb}`);
+        }
+      }
     }catch(_){ }
     try{
       const name = state.fileName || state.file?.name || "unknown";
@@ -14244,11 +14253,15 @@ try{
       buffer,
       peaks,
       bytes,
+      fixCommittedDb: (rec && isFinite(rec._stateSnap?.fixCommittedDb))
+        ? rec._stateSnap.fixCommittedDb
+        : (rec && isFinite(rec.fixCommittedDb) ? rec.fixCommittedDb : null),
       usedAt: Date.now(),
     };
     audioCache.map.set(rec.id, entry);
     audioCache.totalBytes += bytes;
     rec._audioCachePolicy = "cached";
+    rec._audioCacheFixDb = entry.fixCommittedDb;
     audioCacheLog("remember", { id: rec.id, name: rec.name, mb: (bytes/1024/1024).toFixed(1) });
     return true;
   }
@@ -14262,6 +14275,7 @@ try{
     state.peaks = entry.peaks;
     state.sr = entry.buffer.sampleRate;
     rec._audioCachePolicy = "cached";
+    rec._audioCacheFixDb = entry.fixCommittedDb;
     audioCacheLog("apply", { id: rec.id, name: rec.name });
     return true;
   }
@@ -14490,6 +14504,11 @@ try{
     try{
       rec._procApplied = !!state.procApplied;
       rec._procInfo = state.procInfo ? { ...state.procInfo } : null;
+      if(isFinite(state.procInfo?.totalDb)){
+        if(!rec._stateSnap) rec._stateSnap = {};
+        rec._stateSnap.fixCommittedDb = state.procInfo.totalDb;
+        rec.fixCommittedDb = state.procInfo.totalDb;
+      }
     }catch(_){ }
     try{ proComputeAnalysisFromState(rec); }catch(err){ console.warn("[Pro] analysis update failed", rec?.name, err); }
     try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(err){ console.warn("[Pro] audio cache update failed", rec?.name, err); }
@@ -14885,18 +14904,40 @@ try{
         state.fileName = rec.name;
         state.file = rec.file;
         proApplyStateSnapshot(rec);
-        state.procApplied = !!rec._procApplied;
-        state.procInfo = rec._procInfo ? { ...rec._procInfo } : null;
+        const fixDb = rec?._stateSnap?.fixCommittedDb ?? rec?.fixCommittedDb;
+        const cacheFixDb = rec?._audioCacheFixDb;
+        let didReapply = false;
+        if(isFinite(fixDb) && state.buffer && cacheFixDb !== fixDb){
+          try{
+            const total = Math.pow(10, fixDb/20);
+            const ctx = await ensureAudioCtx();
+            const src = state.buffer;
+            const out = ctx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
+            for(let ch=0; ch<src.numberOfChannels; ch++){
+              const s = src.getChannelData(ch);
+              const d = out.getChannelData(ch);
+              for(let i=0;i<src.length;i++){
+                d[i] = _scClamp(s[i] * total);
+              }
+            }
+            state.buffer = out;
+            state.peaks = buildPeaks(state.buffer, 6000);
+            audioCacheRemember(rec, state.buffer, state.peaks);
+            didReapply = true;
+          }catch(_){}
+        }
+        state.procApplied = isFinite(fixDb);
+        state.procInfo = isFinite(fixDb)
+          ? { ...(rec._procInfo || {}), totalDb: fixDb }
+          : null;
         state.procDataPayload = null;
-        let payloadOk = false;
-        if(state.procApplied){
+        if(isFinite(fixDb)){
           try{
             const fmt = _ecParseFmtInfo();
             if(fmt && state.buffer){
               const payload = _scEncodePcmPayloadFromBuffer(state.buffer, fmt);
               if(payload){
                 state.procDataPayload = payload;
-                payloadOk = true;
               }
             }
             if(typeof window._scUpdatePreviewAudio === "function") await window._scUpdatePreviewAudio();
@@ -14904,8 +14945,7 @@ try{
         }else{
           await proEnsureAudioSrc(rec);
         }
-        const totalDb = state.procInfo?.totalDb;
-        console.log(`[FixPersist] restore(cache-hit): ${rec?.name||rec?.fileName||rec?.id} applied=${state.procApplied} totalDb=${isFinite(totalDb) ? totalDb : "na"} payload=${payloadOk ? "yes" : "no"}`);
+        console.log(`[FixPersist] restore: name=${rec?.name||rec?.fileName||rec?.id} hasFixDb=${!!isFinite(fixDb)} fixDb=${isFinite(fixDb) ? fixDb : "na"} cacheHit=true reapply=${didReapply}`);
         state.scLast = null;
         state.qcHasRun = false;
         state.zoom = 1;
@@ -14918,54 +14958,58 @@ try{
         proApplyEditsToApp(rec, "cache-hit");
       }else if(!allowDecode){
         console.log("[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
-        state.procApplied = !!rec._procApplied;
-        state.procInfo = rec._procInfo ? { ...rec._procInfo } : null;
+        const fixDb = rec?._stateSnap?.fixCommittedDb ?? rec?.fixCommittedDb;
+        state.procApplied = isFinite(fixDb);
+        state.procInfo = isFinite(fixDb)
+          ? { ...(rec._procInfo || {}), totalDb: fixDb }
+          : null;
         state.procDataPayload = null;
         return;
       }else{
         console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
         await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
         project.lastLoadedId = id;
-        let reapplied = false;
-        if(rec?._procApplied && state.buffer){
-          const totalDb = rec?._procInfo?.totalDb;
-          if(isFinite(totalDb)){
-            const total = Math.pow(10, totalDb/20);
-            const ctx = await ensureAudioCtx();
-            const src = state.buffer;
-            if(!state.origBuffer) state.origBuffer = src;
-            const out = ctx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
-            for(let ch=0; ch<src.numberOfChannels; ch++){
-              const s = src.getChannelData(ch);
-              const d = out.getChannelData(ch);
-              for(let i=0;i<src.length;i++){
-                d[i] = _scClamp(s[i] * total);
-              }
+        const fixDb = rec?._stateSnap?.fixCommittedDb ?? rec?.fixCommittedDb;
+        let didReapply = false;
+        if(isFinite(fixDb) && state.buffer){
+          const total = Math.pow(10, fixDb/20);
+          const ctx = await ensureAudioCtx();
+          const src = state.buffer;
+          if(!state.origBuffer) state.origBuffer = src;
+          const out = ctx.createBuffer(src.numberOfChannels, src.length, src.sampleRate);
+          for(let ch=0; ch<src.numberOfChannels; ch++){
+            const s = src.getChannelData(ch);
+            const d = out.getChannelData(ch);
+            for(let i=0;i<src.length;i++){
+              d[i] = _scClamp(s[i] * total);
             }
-            state.buffer = out;
-            state.procApplied = true;
-            state.procInfo = rec._procInfo ? { ...rec._procInfo } : null;
-            state.procDataPayload = null;
-            try{
-              const fmt = _ecParseFmtInfo();
-              if(fmt){
-                const payload = _scEncodePcmPayloadFromBuffer(state.buffer, fmt);
-                if(payload) state.procDataPayload = payload;
-              }
-            }catch(_){}
-            state.peaks = buildPeaks(state.buffer, 6000);
-            try{ if(typeof window._scUpdatePreviewAudio === "function") await window._scUpdatePreviewAudio(); }catch(_){}
-            try{ proUpdateAfterFix(rec); }catch(_){}
-            reapplied = true;
           }
-        }
-        if(!reapplied){
-          state.procApplied = !!rec._procApplied;
-          state.procInfo = rec._procInfo ? { ...rec._procInfo } : null;
+          state.buffer = out;
+          state.procApplied = true;
+          state.procInfo = isFinite(fixDb)
+            ? { ...(rec._procInfo || {}), totalDb: fixDb }
+            : null;
+          state.procDataPayload = null;
+          try{
+            const fmt = _ecParseFmtInfo();
+            if(fmt){
+              const payload = _scEncodePcmPayloadFromBuffer(state.buffer, fmt);
+              if(payload) state.procDataPayload = payload;
+            }
+          }catch(_){}
+          state.peaks = buildPeaks(state.buffer, 6000);
+          try{ if(typeof window._scUpdatePreviewAudio === "function") await window._scUpdatePreviewAudio(); }catch(_){}
+          try{ proUpdateAfterFix(rec); }catch(_){}
+          audioCacheRemember(rec, state.buffer, state.peaks);
+          didReapply = true;
+        }else{
+          state.procApplied = isFinite(fixDb);
+          state.procInfo = isFinite(fixDb)
+            ? { ...(rec._procInfo || {}), totalDb: fixDb }
+            : null;
           state.procDataPayload = null;
         }
-        const totalDb = rec?._procInfo?.totalDb;
-        console.log(`[FixPersist] restore(after-load): ${rec?.name||rec?.fileName||rec?.id} applied=${!!rec?._procApplied} totalDb=${isFinite(totalDb) ? totalDb : "na"} reapplied=${reapplied ? "yes" : "no"}`);
+        console.log(`[FixPersist] restore: name=${rec?.name||rec?.fileName||rec?.id} hasFixDb=${!!isFinite(fixDb)} fixDb=${isFinite(fixDb) ? fixDb : "na"} cacheHit=false reapply=${didReapply}`);
         proForceRedraw("after-load");
         proApplyEditsToApp(rec, "after-load");
         try{
