@@ -621,24 +621,27 @@
     width:min(980px, calc(100% - 24px));
   }
   dialog::backdrop{background:rgba(2,6,23,.60);backdrop-filter: blur(6px)}
-  .modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);position:relative;padding-right:48px}
-  .dlgHead{position:relative;padding-right:48px}
+  .modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);position:relative}
+  .dlgHead{position:relative}
+  .dialogShell .modalHead,
+  .dialogShell .dlgHead{padding-right:52px}
+  .dialogShell .modalBody{padding-right:52px}
+  .dialogShellBare{padding-top:36px;padding-right:36px}
   .modalCloseBtn{
     position:absolute;
-    top:8px;
-    right:10px;
-    width:30px;
-    height:30px;
-    border-radius:10px;
-    border:1px solid rgba(255,255,255,0.18);
-    background:rgba(255,255,255,0.08);
+    top:6px;
+    right:6px;
+    width:32px;
+    height:32px;
+    border-radius:8px;
+    border:1px solid rgba(255,255,255,0.14);
+    background:rgba(15,23,42,0.75);
     color:var(--text);
     font-size:18px;
     line-height:1;
     cursor:pointer;
   }
   .modalCloseBtn:hover{ background:rgba(255,255,255,0.16); }
-  .modalCloseBtn.isFloating{ top:10px; right:10px; }
   .modalBody{padding:12px 14px}
   .modalGrid{display:grid;grid-template-columns: 1fr 1fr;gap:12px}
   .settingsDialog{
@@ -2685,13 +2688,26 @@ body, #appRoot, .appRoot, .mainLayout{
   display:grid;
   grid-template-columns:minmax(200px, 260px) minmax(0,1fr);
   gap:12px;
+  height:100%;
+}
+.proHistoryDialog{
+  width:min(1120px, 96vw);
+  height:min(720px, 90vh);
+  display:flex;
+  flex-direction:column;
+}
+.proHistoryDialog .modalBody{
+  flex:1 1 auto;
+  min-height:0;
+  overflow:hidden;
 }
 .proHistoryList{
   border:1px solid rgba(255,255,255,0.12);
   border-radius:14px;
   padding:8px;
   background:rgba(8,12,20,0.4);
-  max-height:62vh;
+  max-height:none;
+  height:100%;
   overflow:auto;
   display:grid;
   gap:8px;
@@ -2840,14 +2856,31 @@ body, #appRoot, .appRoot, .mainLayout{
 .proHistoryDialog .proJobPanel{
   position:static;
   width:100%;
+  height:100%;
   max-height:none;
   background:transparent;
   border:none;
   box-shadow:none;
   padding:0;
+  display:flex;
+  flex-direction:column;
+  min-height:0;
 }
 .proHistoryDialog .proJobPanelHeader{ margin-bottom:10px; }
-.proHistoryDialog .proJobLog{ height: min(360px, 50vh); }
+.proHistoryDialog .proJobLog{ flex:1 1 auto; min-height:160px; height:auto; }
+.proJobExportList{
+  border:1px solid rgba(255,255,255,0.12);
+  border-radius:10px;
+  background:rgba(255,255,255,0.03);
+  padding:8px 10px;
+  font-size:12px;
+  max-height:120px;
+  overflow:auto;
+  display:grid;
+  gap:6px;
+  margin-bottom:8px;
+}
+.proJobExportItem{ white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ngDetailList{ display:grid; gap:10px; }
 .ngDetailCard{
   border:1px solid rgba(255,255,255,0.12);
@@ -3547,7 +3580,7 @@ body, #appRoot, .appRoot, .mainLayout{
         </select>
       </div>
       <div id="proJobMini" class="proJobMini" title="履歴">
-        <span id="proJobMiniText">—</span>
+        <span id="proJobMiniText">履歴</span>
       </div>
     </div>
   </div>
@@ -3575,7 +3608,6 @@ body, #appRoot, .appRoot, .mainLayout{
             <div class="proJobHeaderBtns">
               <button id="proJobCopy" class="btnMini">コピー</button>
               <button id="proJobClear" class="btnMini">クリア</button>
-              <button id="proJobExpand" class="btnMini">拡大</button>
               <button id="proJobClose" class="btnMini">閉じる</button>
             </div>
           </div>
@@ -3593,6 +3625,7 @@ body, #appRoot, .appRoot, .mainLayout{
           </div>
 
           <div id="proJobFailList" class="proJobFailList"></div>
+          <div id="proJobExportList" class="proJobExportList" style="display:none"></div>
 
           <div id="proJobLog" class="proJobLog"></div>
 
@@ -4231,24 +4264,26 @@ function _dialogMarkDirty(e){
 }
 function _wireDialogShell(dlg){
   if(!dlg || dlg.dataset.shellWired === "1") return;
+  if(dlg.classList.contains("toastLayer")) return;
   dlg.dataset.shellWired = "1";
+  dlg.classList.add("dialogShell");
   const head = dlg.querySelector(".modalHead, .dlgHead");
-  if(head && !head.querySelector(".modalCloseBtn")){
+  if(!head){
+    dlg.classList.add("dialogShellBare");
+  }
+  if(!dlg.querySelector(".modalCloseBtn")){
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "modalCloseBtn";
     btn.setAttribute("aria-label", "閉じる");
     btn.textContent = "×";
     btn.addEventListener("click", ()=> _dialogCloseWithGuard(dlg));
-    head.appendChild(btn);
-  }else if(!head && !dlg.querySelector(".modalCloseBtn")){
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "modalCloseBtn isFloating";
-    btn.setAttribute("aria-label", "閉じる");
-    btn.textContent = "×";
-    btn.addEventListener("click", ()=> _dialogCloseWithGuard(dlg));
     dlg.appendChild(btn);
+  }
+  if(dlg.dataset.closeLogged !== "1"){
+    dlg.dataset.closeLogged = "1";
+    const name = dlg.id || dlg.getAttribute("aria-label") || (dlg.className || "dialog");
+    console.log(`[UI] closeBtn layout modal=${name}`);
   }
   dlg.addEventListener("click", (e)=>{ if(e.target === dlg) _dialogCloseWithGuard(dlg); });
   dlg.addEventListener("cancel", (e)=>{ e.preventDefault(); _dialogCloseWithGuard(dlg); });
@@ -15526,6 +15561,9 @@ try{
   function filtered(){
     return project.files.filter(matchesFilter);
   }
+  function getVisibleFileIds(){
+    return filtered().map(f => f.id).filter(Boolean);
+  }
   function historyTypeLabel(type){
     return type === "qc" ? "一括チェック" : "一括書き出し";
   }
@@ -15581,6 +15619,7 @@ try{
     const logEl = $("proJobLog");
     const failEl = $("proJobFailBadge");
     const failList = $("proJobFailList");
+    const exportList = $("proJobExportList");
     if(!entry){
       if(titleEl) titleEl.textContent = "詳細ログ";
       if(nowEl) nowEl.textContent = "—";
@@ -15590,6 +15629,7 @@ try{
       if(logEl) logEl.innerHTML = "";
       if(failList) failList.innerHTML = "";
       if(failEl) failEl.textContent = "—";
+      if(exportList) exportList.style.display = "none";
       return;
     }
     if(titleEl){
@@ -15640,6 +15680,17 @@ try{
         });
       }
     }
+    if(exportList){
+      if(entry.type === "export" && Array.isArray(entry.exportedNames) && entry.exportedNames.length){
+        exportList.style.display = "grid";
+        exportList.innerHTML = entry.exportedNames.map(name=>(
+          `<div class="proJobExportItem">${esc(name)}</div>`
+        )).join("");
+      }else{
+        exportList.style.display = "none";
+        exportList.innerHTML = "";
+      }
+    }
     const retryBtn = $("proJobRetryFailed");
     const cancelBtn = $("proJobCancel");
     if(retryBtn) retryBtn.disabled = !entry.failedIds?.length || entry.running;
@@ -15653,6 +15704,11 @@ try{
       renderHistoryList();
       renderHistoryDetail();
       try{ dlg.showModal(); }catch(_){ dlg.open = true; }
+      requestAnimationFrame(()=>{
+        const r = dlg.getBoundingClientRect();
+        const entriesCount = historyEntries().length;
+        console.log(`[History] open size=${Math.round(r.width)},${Math.round(r.height)} entries=${entriesCount}`);
+      });
     }else{
       _dialogCloseWithGuard(dlg);
     }
@@ -15669,7 +15725,7 @@ try{
   }
   function updateJobUI(now){
     const mini = $('proJobMiniText');
-    if(mini) mini.textContent = job.running ? `${job.done}/${job.total}` : '—';
+    if(mini) mini.textContent = job.running ? `${job.done}/${job.total}` : '履歴';
     if(history.active){
       history.active.done = job.done;
       history.active.ok = job.ok;
@@ -15679,10 +15735,17 @@ try{
     renderHistoryList();
     renderHistoryDetail();
   }
-  async function runJob(type, ids){
-    const targets = Array.isArray(ids) ? ids : [];
+  async function runJob(type, idsOverride){
+    const usingOverride = Array.isArray(idsOverride);
+    const targets = usingOverride ? idsOverride : getVisibleFileIds();
+    const filterOn = project.filter.status && project.filter.status !== "all";
+    console.log(`[Bulk] target=${usingOverride ? "override" : "visible"} count=${targets.length} filter=${filterOn ? "on" : "off"} action=${type==="qc" ? "QC" : "EXPORT"}`);
     if(!targets.length){
       logJob("対象件数: 0");
+      try{
+        if(typeof toast === "function") toast("対象ファイルがありません", "warn");
+        else alert("対象ファイルがありません");
+      }catch(_){}
       return;
     }
     job.running = true;
@@ -15699,6 +15762,7 @@ try{
       ok: 0,
       done: 0,
       failedIds: [],
+      exportedNames: [],
       logLines: [],
       startedAt: Date.now(),
       running: true,
@@ -15766,6 +15830,7 @@ try{
           if(type==='export'){
             await doFinalExport();
             f.status.exported = true;
+            historyEntry.exportedNames.push(f.name || "exported");
           }
           job.ok++;
           logJob(`成功: ${f.name} (${getRecQcState(f).status.toUpperCase()})`);
@@ -15807,12 +15872,7 @@ try{
     }
   }
   function idsSelectedOrActive(){
-    // 仕様統一：一括処理は「現在リストに表示されているファイル全て（フィルタ反映）」を対象にする
-    const all = (project.files || [])
-      .filter(matchesFilter)
-      .map(f => f.id)
-      .filter(Boolean);
-    return all;
+    return getVisibleFileIds();
   }
   function setPopoverContent(title, bodyNode){
     const titleEl = $('proPopTitle');
@@ -16026,8 +16086,8 @@ try{
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
 
-    $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc', idsSelectedOrActive()));
-    $('proBtnBatchExport')?.addEventListener('click', ()=> runJob('export', idsSelectedOrActive()));
+    $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc'));
+    $('proBtnBatchExport')?.addEventListener('click', ()=> runJob('export'));
     $('proBtnHistory')?.addEventListener('click', ()=> showJob(true));
 
     $('proJobMini')?.addEventListener('click', ()=> showJob(true));
@@ -16048,13 +16108,6 @@ try{
         entry.logLines = [];
       }
       logJob("クリアしました");
-    });
-    $('proJobExpand')?.addEventListener('click', ()=>{
-      const p = $('proJobPanel');
-      if(!p) return;
-      p.classList.toggle("isExpanded");
-      const b = $('proJobExpand');
-      if(b) b.textContent = p.classList.contains("isExpanded") ? "縮小" : "拡大";
     });
     $('proJobCancel')?.addEventListener('click', ()=> { job.cancel=true; logJob('停止要求'); });
     $('proJobRetryFailed')?.addEventListener('click', ()=>{
