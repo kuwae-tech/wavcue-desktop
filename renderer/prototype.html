@@ -2712,8 +2712,11 @@ body, #appRoot, .appRoot, .mainLayout{
 .proHistoryDialog{
   width:min(1120px, 96vw);
   height:min(720px, 90vh);
-  display:flex;
+  display:none;
   flex-direction:column;
+}
+.proHistoryDialog[open]{
+  display:flex;
 }
 .proHistoryDialog .modalBody{
   flex:1 1 auto;
