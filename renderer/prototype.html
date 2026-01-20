@@ -7113,24 +7113,35 @@ function logCueRenderMarkers(fileId, cueCount){
 }
 
 function drawWaveform(){
-  const W = wave.getBoundingClientRect().width;
-  const H = wave.getBoundingClientRect().height;
+  const cv = wave;
+  const ctx = wctx;
+  const W = cv.getBoundingClientRect().width;
+  const H = cv.getBoundingClientRect().height;
 
-  wctx.clearRect(0,0,W,H);
-  wctx.fillStyle = "rgba(0,0,0,.10)";
-  wctx.fillRect(0,0,W,H);
+  const bgColor = "rgba(0,0,0,.10)";
+  try{
+    if(ctx.setTransform) ctx.setTransform(1,0,0,1,0,0);
+  }catch(_){}
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(0, 0, cv.width, cv.height);
+  try{
+    if(debugRightEdgeEnabled()){
+      console.log("[WAVE][hardClear] w=", cv.width, "h=", cv.height);
+    }
+  }catch(_){}
 
-  wctx.strokeStyle = "rgba(148,163,184,.10)";
-  wctx.lineWidth = 1;
+  ctx.strokeStyle = "rgba(148,163,184,.10)";
+  ctx.lineWidth = 1;
   for(let i=1;i<6;i++){
     const y = (H*i)/6;
-    wctx.beginPath(); wctx.moveTo(0,y); wctx.lineTo(W,y); wctx.stroke();
+    ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(W,y); ctx.stroke();
   }
 
   if(!state.buffer || !state.peaks){
-    wctx.fillStyle = "rgba(229,231,235,.55)";
-    wctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
-    wctx.fillText("WAV を読み込んでください（ドラッグ&ドロップ可）", 12, 22);
+    ctx.fillStyle = "rgba(229,231,235,.55)";
+    ctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+    ctx.fillText("WAV を読み込んでください（ドラッグ&ドロップ可）", 12, 22);
     return;
   }
 
@@ -7148,26 +7159,26 @@ function drawWaveform(){
   const b0 = Math.floor(visStart * bins);
   const b1 = Math.ceil(visEnd * bins);
 
-  wctx.strokeStyle = "rgba(126,231,162,.85)";
-  wctx.lineWidth = 1;
-  wctx.beginPath();
+  ctx.strokeStyle = "rgba(126,231,162,.85)";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
   for(let i=b0;i<=b1;i++){
     const t = i / bins;
     const x = (t * totalW) - state.scrollPx;
     if(x< -2 || x>W+2) continue;
     const mn = state.peaks.min[i] || 0;
     const mx = state.peaks.max[i] || 0;
-    wctx.moveTo(x, mid + mn*amp);
-    wctx.lineTo(x, mid + mx*amp);
+    ctx.moveTo(x, mid + mn*amp);
+    ctx.lineTo(x, mid + mx*amp);
   }
-  wctx.stroke();
+  ctx.stroke();
 
   // playhead
   const phSec = currentPlayheadSec();
   const xPh = ((phSec / state.buffer.duration) * totalW) - state.scrollPx;
-  wctx.strokeStyle = "rgba(56,189,248,.95)";
-  wctx.lineWidth = 2;
-  wctx.beginPath(); wctx.moveTo(xPh, 0); wctx.lineTo(xPh, H); wctx.stroke();
+  ctx.strokeStyle = "rgba(56,189,248,.95)";
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(xPh, 0); ctx.lineTo(xPh, H); ctx.stroke();
 
   // cues
   const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -7181,16 +7192,16 @@ function drawWaveform(){
     const isST = c.label==="BC$STANDBY";
     const isEN = c.label==="BC$END";
     const cueColor = isST ? "rgba(126,231,162,.95)" : isEN ? "rgba(251,191,36,.95)" : "rgba(229,231,235,.70)";
-    wctx.strokeStyle = cueColor;
-    wctx.lineWidth = 2;
+    ctx.strokeStyle = cueColor;
+    ctx.lineWidth = 2;
     console.log("[CUE][line]", "name=", String(c.label ?? ""), "x=", x, "color=", cueColor);
-    wctx.beginPath(); wctx.moveTo(x, 0); wctx.lineTo(x, H); wctx.stroke();
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
 
-    wctx.fillStyle = "rgba(0,0,0,.45)";
+    ctx.fillStyle = "rgba(0,0,0,.45)";
     // Label box: flip to left side if it would overflow the waveform area
-    wctx.font = "11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+    ctx.font = "11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
     const label = String(c.label ?? "");
-    const tw = Math.ceil(wctx.measureText(label).width);
+    const tw = Math.ceil(ctx.measureText(label).width);
     const boxW = clamp(tw + 16, 64, 200);
     let boxX = x + 4;
     if(boxX + boxW > W - 6){
@@ -7198,10 +7209,12 @@ function drawWaveform(){
     }
     boxX = clamp(boxX, 6, W - 6 - boxW);
 
-    wctx.fillRect(boxX, 8, boxW, 18);
-    wctx.fillStyle = "rgba(229,231,235,.88)";
-    wctx.fillText(label, boxX + 8, 21);
+    ctx.fillRect(boxX, 8, boxW, 18);
+    ctx.fillStyle = "rgba(229,231,235,.88)";
+    ctx.fillText(label, boxX + 8, 21);
   }
+  ctx.fillStyle = bgColor;
+  ctx.fillRect(cv.width - 1, 0, 1, cv.height);
 }
 
 function cueHitTest(xPx){
