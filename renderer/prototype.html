@@ -191,6 +191,12 @@
     touch-action:none;
     cursor:crosshair;
   }
+  #cueCanvas{
+    position:absolute;left:0;top:0;
+    width:100% !important;height:100% !important;
+    display:block;
+    pointer-events:none;
+  }
   .waveHud{
     position:absolute;left:10px;top:10px;
     display:flex;gap:8px;flex-wrap:wrap;align-items:center;
@@ -2706,8 +2712,11 @@ body, #appRoot, .appRoot, .mainLayout{
 .proHistoryDialog{
   width:min(1120px, 96vw);
   height:min(720px, 90vh);
-  display:flex;
+  display:none;
   flex-direction:column;
+}
+.proHistoryDialog[open]{
+  display:flex;
 }
 .proHistoryDialog .modalBody{
   flex:1 1 auto;
@@ -3574,7 +3583,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
+<div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <button id="proBtnBatchCheck" class="btn">一括チェック</button>
@@ -4225,6 +4234,7 @@ const state = {
   pdfAttach: null,        // legacy alias: selected attachment (auto-maintained)
   pdfViewUrl: null,
   cueRenderLog: { fileId: null, cueCount: null },
+  activeFileId: null,
   ui: { isLoadingWav: false },
 };
 
@@ -6861,6 +6871,8 @@ window.renderCueList = window.renderCueList || renderCues;
 /* Canvas drawing */
 const wave = $("wave");
 const wctx = wave.getContext("2d");
+const cueCanvas = $("cueCanvas");
+const cueCtx = cueCanvas ? cueCanvas.getContext("2d") : null;
 
 function resizeCanvas(elOrId){
   const el = (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId;
@@ -6897,6 +6909,7 @@ function resizeCanvas(elOrId){
 }
 function resizeAll(){
   resizeCanvas($("wave"));
+  resizeCanvas($("cueCanvas"));
   resizeCanvas($("meterCanvas"));
   resizeCanvas($("imagerCanvas"));
 }
@@ -6924,7 +6937,18 @@ function _uiLogWaveLayout(tag){
   }catch(_){}
 }
 
-function clearCueLayerOnSwitch(fileId, cueCount){
+function clearCanvasFull(cv){
+  if(!cv || !cv.getContext) return;
+  const ctx = cv.getContext("2d");
+  if(!ctx) return;
+  const w = Math.max(1, cv.width || 1);
+  const h = Math.max(1, cv.height || 1);
+  ctx.save();
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(-2, -2, w + 4, h + 4);
+  ctx.restore();
+}
+function clearCueLayerOnSwitch(fileId, cueCount, reason){
   try{
     const domLayers = [
       "#cueMarkerLayer",
@@ -6950,26 +6974,16 @@ function clearCueLayerOnSwitch(fileId, cueCount){
       window.cueOverlayCanvas,
     ].filter(Boolean);
     canvasLayers.forEach((cv)=>{
-      if(cv && cv.getContext){
-        const ctx = cv.getContext("2d");
-        if(ctx) ctx.clearRect(0,0,cv.width, cv.height);
-        cv.width = cv.width;
-      }
+      clearCanvasFull(cv);
     });
 
     const waveCanvas = $("wave");
-    if(waveCanvas && waveCanvas.getContext){
-      const rect = waveCanvas.getBoundingClientRect();
-      const w = Math.max(1, rect.width || waveCanvas.width || 1);
-      const h = Math.max(1, rect.height || waveCanvas.height || 1);
-      const ctx = waveCanvas.getContext("2d");
-      if(ctx) ctx.clearRect(0,0,w,h);
-    }
+    clearCanvasFull(waveCanvas);
   }catch(e){
     try{ console.warn("[CUE] clearCueLayerOnSwitch failed (ignored)", e); }catch(_){}
   }
   try{
-    console.log("[CUE] clearLayer onSwitch", { fileId, cueCount });
+    console.log("[CUE] clearLayer onSwitch", { fileId, cueCount, reason });
     console.log("[CUE][clear]", "fileId=", fileId, "done");
   }catch(_){}
 }
@@ -6980,6 +6994,57 @@ function logCueRenderMarkers(fileId, cueCount){
   try{
     console.log("[CUE] renderMarkers", { fileId, cueCount });
   }catch(_){}
+}
+
+function renderMarkers(fileId, cues){
+  const activeFileId = state.activeFileId || null;
+  const cueCount = Array.isArray(cues) ? cues.length : 0;
+  if(!fileId || (activeFileId && fileId !== activeFileId)){
+    clearCueLayerOnSwitch(fileId, cueCount);
+    return;
+  }
+  try{
+    console.log("[CUE][render]", "fileId=", fileId, "activeFileId=", activeFileId, "cueCount=", cueCount);
+  }catch(_){}
+  logCueRenderMarkers(fileId, cueCount);
+  if(!state.buffer || !cueCtx) return;
+
+  const W = wave.getBoundingClientRect().width;
+  const H = wave.getBoundingClientRect().height;
+  const totalW = W * Math.max(1, state.zoom);
+  const cueNames = (Array.isArray(cues) ? cues : []).map(c=> (c?.name || c?.dwName || c?.label || ""));
+
+  try{
+    console.log("[CUE][render]", "cueNames=", cueNames);
+  }catch(_){}
+  clearCanvasFull(cueCanvas);
+  for(const c of cues){
+    const x = ((c.sec / state.buffer.duration) * totalW) - state.scrollPx;
+    if(x<-20 || x>W+20) continue;
+    const isST = c.label==="BC$STANDBY";
+    const isEN = c.label==="BC$END";
+    const cueColor = isST ? "rgba(126,231,162,.95)" : isEN ? "rgba(251,191,36,.95)" : "rgba(229,231,235,.70)";
+    cueCtx.strokeStyle = cueColor;
+    cueCtx.lineWidth = 2;
+    console.log("[CUE][line]", "name=", String(c.label ?? ""), "x=", x, "color=", cueColor);
+    cueCtx.beginPath(); cueCtx.moveTo(x, 0); cueCtx.lineTo(x, H); cueCtx.stroke();
+
+    cueCtx.fillStyle = "rgba(0,0,0,.45)";
+    // Label box: flip to left side if it would overflow the waveform area
+    cueCtx.font = "11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+    const label = String(c.label ?? "");
+    const tw = Math.ceil(cueCtx.measureText(label).width);
+    const boxW = clamp(tw + 16, 64, 200);
+    let boxX = x + 4;
+    if(boxX + boxW > W - 6){
+      boxX = x - 4 - boxW; // flip to left
+    }
+    boxX = clamp(boxX, 6, W - 6 - boxW);
+
+    cueCtx.fillRect(boxX, 8, boxW, 18);
+    cueCtx.fillStyle = "rgba(229,231,235,.88)";
+    cueCtx.fillText(label, boxX + 8, 21);
+  }
 }
 
 function drawWaveform(){
@@ -7001,6 +7066,7 @@ function drawWaveform(){
     wctx.fillStyle = "rgba(229,231,235,.55)";
     wctx.font = "12px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
     wctx.fillText("WAV を読み込んでください（ドラッグ&ドロップ可）", 12, 22);
+    clearCanvasFull(cueCanvas);
     return;
   }
 
@@ -7041,37 +7107,7 @@ function drawWaveform(){
 
   // cues
   const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-  const cueCount = Array.isArray(state.cues) ? state.cues.length : 0;
-  const cueNames = (Array.isArray(state.cues) ? state.cues : []).map(c=> (c?.name || c?.dwName || c?.label || ""));
-  console.log("[CUE][render]", "fileId=", activeId, "cueNames=", cueNames, "cueCount=", cueCount);
-  logCueRenderMarkers(activeId, cueCount);
-  for(const c of state.cues){
-    const x = ((c.sec / state.buffer.duration) * totalW) - state.scrollPx;
-    if(x<-20 || x>W+20) continue;
-    const isST = c.label==="BC$STANDBY";
-    const isEN = c.label==="BC$END";
-    const cueColor = isST ? "rgba(126,231,162,.95)" : isEN ? "rgba(251,191,36,.95)" : "rgba(229,231,235,.70)";
-    wctx.strokeStyle = cueColor;
-    wctx.lineWidth = 2;
-    console.log("[CUE][line]", "name=", String(c.label ?? ""), "x=", x, "color=", cueColor);
-    wctx.beginPath(); wctx.moveTo(x, 0); wctx.lineTo(x, H); wctx.stroke();
-
-    wctx.fillStyle = "rgba(0,0,0,.45)";
-    // Label box: flip to left side if it would overflow the waveform area
-    wctx.font = "11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
-    const label = String(c.label ?? "");
-    const tw = Math.ceil(wctx.measureText(label).width);
-    const boxW = clamp(tw + 16, 64, 200);
-    let boxX = x + 4;
-    if(boxX + boxW > W - 6){
-      boxX = x - 4 - boxW; // flip to left
-    }
-    boxX = clamp(boxX, 6, W - 6 - boxW);
-
-    wctx.fillRect(boxX, 8, boxW, 18);
-    wctx.fillStyle = "rgba(229,231,235,.88)";
-    wctx.fillText(label, boxX + 8, 21);
-  }
+  renderMarkers(activeId, state.cues || []);
 }
 
 function cueHitTest(xPx){
@@ -15474,10 +15510,11 @@ try{
       }
 
       project.activeId = id;
+      state.activeFileId = id;
       const switchCueCount = Array.isArray(rec.cues) ? rec.cues.length : 0;
       try{
         if(typeof clearCueLayerOnSwitch === "function"){
-          clearCueLayerOnSwitch(rec.id, switchCueCount);
+          clearCueLayerOnSwitch(rec.id, switchCueCount, "active.switch");
         }
       }catch(e){
         console.warn("[ACTIVE] clearCueLayerOnSwitch threw (ignored)", e);
@@ -15792,16 +15829,17 @@ try{
     if(!dlg) return;
     const next = (open===undefined) ? !dlg.open : open;
     if(next){
+      if(dlg.parentElement !== document.body) document.body.appendChild(dlg);
       renderHistoryList();
       renderHistoryDetail();
-      try{ dlg.showModal(); }catch(_){ dlg.open = true; }
+      try{ dlg.showModal(); }catch(_){ dlg.setAttribute("open", ""); }
       requestAnimationFrame(()=>{
         const r = dlg.getBoundingClientRect();
         const entriesCount = historyEntries().length;
         console.log(`[History] open size=${Math.round(r.width)},${Math.round(r.height)} entries=${entriesCount}`);
       });
     }else{
-      _dialogCloseWithGuard(dlg);
+      try{ dlg.close(); }catch(_){ dlg.removeAttribute("open"); }
     }
   }
   function logJob(s, level){
