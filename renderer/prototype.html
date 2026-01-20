@@ -6926,16 +6926,36 @@ function _uiLogWaveLayout(tag){
 
 function clearCueLayerOnSwitch(fileId, cueCount){
   try{
-    const cont = document.querySelector("#cueMarkerLayer")
-      || document.querySelector(".cue-marker-layer")
-      || window.cueMarkerLayerEl;
-    if(cont && cont.innerHTML !== undefined) cont.innerHTML = "";
-
-    const cueCanvas = document.getElementById("cueCanvas") || window.cueCanvas;
-    if(cueCanvas && cueCanvas.getContext){
-      const ctx = cueCanvas.getContext("2d");
-      if(ctx) ctx.clearRect(0,0,cueCanvas.width, cueCanvas.height);
+    const domLayers = [
+      "#cueMarkerLayer",
+      ".cue-marker-layer",
+      "#cueLabelLayer",
+      ".cue-label-layer",
+      "#cueRangeLayer",
+      ".cue-range-layer",
+    ];
+    domLayers.forEach((sel)=>{
+      const cont = document.querySelector(sel);
+      if(cont && cont.innerHTML !== undefined) cont.innerHTML = "";
+    });
+    if(window.cueMarkerLayerEl && window.cueMarkerLayerEl.innerHTML !== undefined){
+      window.cueMarkerLayerEl.innerHTML = "";
     }
+
+    const canvasLayers = [
+      document.getElementById("cueCanvas"),
+      document.getElementById("overlayCanvas"),
+      document.getElementById("cueOverlayCanvas"),
+      window.cueCanvas,
+      window.cueOverlayCanvas,
+    ].filter(Boolean);
+    canvasLayers.forEach((cv)=>{
+      if(cv && cv.getContext){
+        const ctx = cv.getContext("2d");
+        if(ctx) ctx.clearRect(0,0,cv.width, cv.height);
+        cv.width = cv.width;
+      }
+    });
 
     const waveCanvas = $("wave");
     if(waveCanvas && waveCanvas.getContext){
@@ -6950,6 +6970,7 @@ function clearCueLayerOnSwitch(fileId, cueCount){
   }
   try{
     console.log("[CUE] clearLayer onSwitch", { fileId, cueCount });
+    console.log("[CUE][clear]", "fileId=", fileId, "done");
   }catch(_){}
 }
 
@@ -7021,14 +7042,18 @@ function drawWaveform(){
   // cues
   const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
   const cueCount = Array.isArray(state.cues) ? state.cues.length : 0;
+  const cueNames = (Array.isArray(state.cues) ? state.cues : []).map(c=> (c?.name || c?.dwName || c?.label || ""));
+  console.log("[CUE][render]", "fileId=", activeId, "cueNames=", cueNames, "cueCount=", cueCount);
   logCueRenderMarkers(activeId, cueCount);
   for(const c of state.cues){
     const x = ((c.sec / state.buffer.duration) * totalW) - state.scrollPx;
     if(x<-20 || x>W+20) continue;
     const isST = c.label==="BC$STANDBY";
     const isEN = c.label==="BC$END";
-    wctx.strokeStyle = isST ? "rgba(126,231,162,.95)" : isEN ? "rgba(251,191,36,.95)" : "rgba(229,231,235,.70)";
+    const cueColor = isST ? "rgba(126,231,162,.95)" : isEN ? "rgba(251,191,36,.95)" : "rgba(229,231,235,.70)";
+    wctx.strokeStyle = cueColor;
     wctx.lineWidth = 2;
+    console.log("[CUE][line]", "name=", String(c.label ?? ""), "x=", x, "color=", cueColor);
     wctx.beginPath(); wctx.moveTo(x, 0); wctx.lineTo(x, H); wctx.stroke();
 
     wctx.fillStyle = "rgba(0,0,0,.45)";
