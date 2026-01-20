@@ -3577,7 +3577,7 @@ body, #appRoot, .appRoot, .mainLayout{
           <option value="unverified">未確認</option>
           <option value="ok">規格OK</option>
           <option value="ng">規格NG</option>
-          <option value="edited">編集あり</option>
+          <option value="unexported">未書き出し</option>
           <option value="exported">書き出し済み</option>
         </select>
       </div>
@@ -3822,7 +3822,7 @@ body, #appRoot, .appRoot, .mainLayout{
 </div>
 <div class="scTopRow">
 <span class="muted scPresetLbl" style="font-size:12px">プリセット</span>
-<select aria-label="局別プリセット（編集・保存可）" class="btnSel" id="sc_preset"></select>
+<select aria-label="局別プリセット（編集・保存可）" class="btnSel" data-no-dirty="1" id="sc_preset"></select>
 <button class="btn" id="sc_run" style="padding:8px 12px;border-radius:999px" type="button">チェック</button>
 </div>
 </div>
@@ -15557,7 +15557,7 @@ try{
     if(st==='unverified') return qcState==='unverified';
     if(st==='ok') return qcState==='ok';
     if(st==='ng') return qcState==='ng';
-    if(st==='edited') return !!file.status.edited;
+    if(st==='unexported') return !file.status.exported;
     if(st==='exported') return !!file.status.exported;
     return true;
   }
@@ -16109,7 +16109,11 @@ try{
     }catch(_){}
     window.__wavcueProAddFiles = addFiles;
 
-    $('proFilterStatus')?.addEventListener('change', (e)=>{ project.filter.status = e.target.value||'all'; render(); });
+    $('proFilterStatus')?.addEventListener('change', (e)=>{
+      project.filter.status = e.target.value||'all';
+      render();
+      console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
+    });
 
     $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc'));
     $('proBtnBatchExport')?.addEventListener('click', ()=> runJob('export'));
