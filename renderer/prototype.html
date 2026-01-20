@@ -4475,6 +4475,8 @@ const _prog = (()=> {
 
   return { show, hide, set, step, run, yield:_yieldUI };
 })();
+try{ globalThis._prog = _prog; }catch(_){}
+try{ window._prog = _prog; }catch(_){}
 
 function _readFileArrayBufferWithProgress(file, onProg){
   return new Promise((resolve, reject)=>{
@@ -15905,6 +15907,15 @@ try{
     const safeExt = ext || ".wav";
     return `${safeBase}${safeExt}`;
   }
+  function _getProg(){
+    try{
+      if(typeof globalThis !== "undefined" && globalThis._prog) return globalThis._prog;
+    }catch(_){}
+    try{
+      if(typeof window !== "undefined" && window._prog) return window._prog;
+    }catch(_){}
+    return null;
+  }
   async function pickBulkExportFolder(){
     if(project.bulkExportFolder) return project.bulkExportFolder;
     if(!window.wavcue?.pickExportFolder){
@@ -15949,196 +15960,202 @@ try{
     throw new Error("同名ファイルが多すぎます");
   }
   async function runJob(type, idsOverride){
-    const usingOverride = Array.isArray(idsOverride);
-    const targets = usingOverride ? idsOverride : getVisibleFileIds();
-    const filterOn = project.filter.status && project.filter.status !== "all";
-    console.log(`[Bulk] target=${usingOverride ? "override" : "visible"} count=${targets.length} filter=${filterOn ? "on" : "off"} action=${type==="qc" ? "QC" : "EXPORT"}`);
-    if(!targets.length){
-      logJob("対象件数: 0");
-      try{
-        if(typeof toast === "function") toast("対象ファイルがありません", "warn");
-        else alert("対象ファイルがありません");
-      }catch(_){}
-      return;
-    }
-    let exportFolder = null;
-    if(type === "export"){
-      exportFolder = await pickBulkExportFolder();
-      if(!exportFolder){
-        logJob("一括書き出しをキャンセルしました。");
+    const prog = _getProg();
+    console.log(`[BulkExport] uiProg=${!!prog}`);
+    try{
+      const usingOverride = Array.isArray(idsOverride);
+      const targets = usingOverride ? idsOverride : getVisibleFileIds();
+      const filterOn = project.filter.status && project.filter.status !== "all";
+      console.log(`[Bulk] target=${usingOverride ? "override" : "visible"} count=${targets.length} filter=${filterOn ? "on" : "off"} action=${type==="qc" ? "QC" : "EXPORT"}`);
+      if(!targets.length){
+        logJob("対象件数: 0");
         try{
-          if(typeof toast === "function") toast("一括書き出しをキャンセルしました", "warn");
+          if(typeof toast === "function") toast("対象ファイルがありません", "warn");
+          else alert("対象ファイルがありません");
         }catch(_){}
         return;
       }
-      console.log(`[BulkExport] start total=${targets.length} folder=${exportFolder}`);
-    }
-    job.running = true;
-    job.cancel=false;
-    job.failed=[];
-    job.done=0;
-    job.total=targets.length;
-    job.ok=0;
-
-    const historyEntry = {
-      id: uid(),
-      type,
-      total: targets.length,
-      okCount: 0,
-      ngCount: 0,
-      failCount: 0,
-      done: 0,
-      failedIds: [],
-      exportedNames: [],
-      logLines: [],
-      startedAt: Date.now(),
-      running: true,
-      nowText: "",
-    };
-    history.active = historyEntry;
-    history.selectedId = historyEntry.id;
-    renderHistoryList();
-    renderHistoryDetail();
-
-    logJob(`対象件数: ${targets.length}`);
-    logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
-    updateJobUI();
-    if(type === "export"){
-      _prog.show("一括書き出し中…", `0/${targets.length}`);
-    }else{
-      bulkOverlay.start(type, targets.length);
-    }
-
-    let qcUpdatedRows = 0;
-    try{
-      let index = 0;
-      for(const id of targets){
-        if(job.cancel) break;
-        const f = project.files.find(x=>x.id===id);
-        if(!f) continue;
-        try{
-          index += 1;
-          logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
-          await setActiveFile(id, {force:true});
-          updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
-          if(type === "export"){
-            const pct = job.total ? (job.done / job.total) : 0;
-            _prog.set(pct, "一括書き出し中…", `${index}/${job.total} ${f.name || ""}`);
-          }else{
-            bulkOverlay.update(job.done, job.total, f.name);
-          }
-          if(type==='qc'){
-            const st = window.WavCue?.state;
-            if(!st || !st.buffer){
-              throw new Error("QC失敗: AudioBuffer未準備（ロード未完了の可能性）");
-            }
-
-            // QC実行：例外は握りつぶさずログ化して失敗扱い
-            try{
-              const runQc = (typeof window._scRunMeasureAndRender === "function") ? window._scRunMeasureAndRender : null;
-              if(!runQc){
-                throw new Error("QC失敗: window._scRunMeasureAndRender が未定義です（公開漏れ）");
-              }
-              runQc({ switchToResults:false });
-            }catch(e){
-              const msg = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
-              logJob(`QC例外: ${f.name} / ${msg}`, "bad");
-              throw new Error("QC失敗: 実行中に例外が発生しました（詳細はログ/console）");
-            }
-
-            // QC結果取得：取れなければ失敗（成功扱いにしない）
-            const qcResult =
-              (typeof window.getLastQcForCurrentFile === "function")
-                ? window.getLastQcForCurrentFile()
-                : ((typeof getLastQcForCurrentFile === "function")
-                  ? getLastQcForCurrentFile()
-                  : (window.__wavcueLastQc?.result || null));
-
-            if(!qcResult){
-              throw new Error("QC失敗: 結果取得できず（__wavcueLastQc 未更新の可能性）");
-            }
-
-            applyQcResultToRec(f, qcResult, { source: "bulk" });
-            qcUpdatedRows += 1;
-
-            const qcState = getRecQcState(f).status;
-            if(qcState === "ok") historyEntry.okCount += 1;
-            if(qcState === "ng") historyEntry.ngCount += 1;
-
-            if(qcState === "unverified"){
-              throw new Error("QC失敗: バッジ更新できず（apply後も未のまま）");
-            }
-          }
-          if(type==='export'){
-            const fileLabel = f.name || state.fileName || "export.wav";
-            console.log(`[BulkExport] (${index}/${targets.length}) begin name=${fileLabel}`);
-            const exportBytes = await buildExportWavBytes();
-            const writeRes = await writeExportToFolder(exportBytes, exportFolder, fileLabel);
-            f.status.exported = true;
-            historyEntry.exportedNames.push(writeRes.fileName || fileLabel);
-            console.log(`[BulkExport] (${index}/${targets.length}) success name=${writeRes.fileName || fileLabel}`);
-            f.status.exported = true;
-          }
-          job.ok++;
-          if(type === "qc"){
-            logJob(`判定: ${f.name} (${getRecQcState(f).status.toUpperCase()})`);
-          }else{
-            logJob(`成功: ${f.name}`);
-          }
-        }catch(e){
-          job.failed.push(id);
-          historyEntry.failCount += 1;
-          const failMsg = e?.message || e;
-          logJob(`失敗: ${f.name} / ${failMsg}`);
-          if(type === "export"){
-            console.log(`[BulkExport] (${index}/${targets.length}) fail name=${f.name} reason=${failMsg}`);
-          }
-        }finally{
-          job.done++;
-          updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
-          if(type === "export"){
-            const pct = job.total ? (job.done / job.total) : 0;
-            _prog.set(pct, "一括書き出し中…", `${Math.min(index, job.total)}/${job.total} ${f.name || ""}`);
-          }else{
-            bulkOverlay.update(job.done, job.total, f.name);
-          }
-          render();
+      let exportFolder = null;
+      if(type === "export"){
+        exportFolder = await pickBulkExportFolder();
+        if(!exportFolder){
+          logJob("一括書き出しをキャンセルしました。");
+          try{
+            if(typeof toast === "function") toast("一括書き出しをキャンセルしました", "warn");
+          }catch(_){}
+          return;
         }
+        console.log(`[BulkExport] start total=${targets.length} folder=${exportFolder}`);
       }
-    }finally{
-      logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
-      if(type==='qc'){
-        console.log(`[QC][bulk] done updatedRows=${qcUpdatedRows}`);
-        render();
-        if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("qc:bulk");
-      }
-      job.running = false;
-      updateJobUI();
-      render();
+      job.running = true;
+      job.cancel=false;
+      job.failed=[];
+      job.done=0;
+      job.total=targets.length;
+      job.ok=0;
 
-      const status = job.cancel ? "cancel" : (job.failed.length ? "fail" : "success");
-      if(type === "export"){
-        _prog.hide();
-        console.log(`[BulkExport] done ok=${job.ok} fail=${job.failed.length}`);
-      }else{
-        bulkOverlay.end(type, status);
-      }
-      historyEntry.running = false;
-      historyEntry.endedAt = Date.now();
-      if(type === "export"){
-        historyEntry.okCount = job.ok;
-        historyEntry.ngCount = job.failed.length;
-      }
-      historyEntry.failCount = job.failed.length;
-      historyEntry.done = job.done;
-      historyEntry.failedIds = job.failed.slice();
-      historyEntry.nowText = esc(job.cancel ? "キャンセル" : "完了");
-      history.entries.unshift(historyEntry);
-      history.active = null;
+      const historyEntry = {
+        id: uid(),
+        type,
+        total: targets.length,
+        okCount: 0,
+        ngCount: 0,
+        failCount: 0,
+        done: 0,
+        failedIds: [],
+        exportedNames: [],
+        logLines: [],
+        startedAt: Date.now(),
+        running: true,
+        nowText: "",
+      };
+      history.active = historyEntry;
       history.selectedId = historyEntry.id;
-      console.log(`[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.okCount} ng=${historyEntry.ngCount} fail=${historyEntry.failCount}`);
       renderHistoryList();
       renderHistoryDetail();
+
+      logJob(`対象件数: ${targets.length}`);
+      logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
+      updateJobUI();
+      if(type === "export"){
+        if(prog) prog.show("一括書き出し中…", `0/${targets.length}`);
+      }else{
+        bulkOverlay.start(type, targets.length);
+      }
+
+      let qcUpdatedRows = 0;
+      try{
+        let index = 0;
+        for(const id of targets){
+          if(job.cancel) break;
+          const f = project.files.find(x=>x.id===id);
+          if(!f) continue;
+          try{
+            index += 1;
+            logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
+            await setActiveFile(id, {force:true});
+            updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
+            if(type === "export"){
+              const pct = job.total ? (job.done / job.total) : 0;
+              if(prog) prog.set(pct, "一括書き出し中…", `${index}/${job.total} ${f.name || ""}`);
+            }else{
+              bulkOverlay.update(job.done, job.total, f.name);
+            }
+            if(type==='qc'){
+              const st = window.WavCue?.state;
+              if(!st || !st.buffer){
+                throw new Error("QC失敗: AudioBuffer未準備（ロード未完了の可能性）");
+              }
+
+              // QC実行：例外は握りつぶさずログ化して失敗扱い
+              try{
+                const runQc = (typeof window._scRunMeasureAndRender === "function") ? window._scRunMeasureAndRender : null;
+                if(!runQc){
+                  throw new Error("QC失敗: window._scRunMeasureAndRender が未定義です（公開漏れ）");
+                }
+                runQc({ switchToResults:false });
+              }catch(e){
+                const msg = (e && (e.stack || e.message)) ? (e.stack || e.message) : String(e);
+                logJob(`QC例外: ${f.name} / ${msg}`, "bad");
+                throw new Error("QC失敗: 実行中に例外が発生しました（詳細はログ/console）");
+              }
+
+              // QC結果取得：取れなければ失敗（成功扱いにしない）
+              const qcResult =
+                (typeof window.getLastQcForCurrentFile === "function")
+                  ? window.getLastQcForCurrentFile()
+                  : ((typeof getLastQcForCurrentFile === "function")
+                    ? getLastQcForCurrentFile()
+                    : (window.__wavcueLastQc?.result || null));
+
+              if(!qcResult){
+                throw new Error("QC失敗: 結果取得できず（__wavcueLastQc 未更新の可能性）");
+              }
+
+              applyQcResultToRec(f, qcResult, { source: "bulk" });
+              qcUpdatedRows += 1;
+
+              const qcState = getRecQcState(f).status;
+              if(qcState === "ok") historyEntry.okCount += 1;
+              if(qcState === "ng") historyEntry.ngCount += 1;
+
+              if(qcState === "unverified"){
+                throw new Error("QC失敗: バッジ更新できず（apply後も未のまま）");
+              }
+            }
+            if(type==='export'){
+              const fileLabel = f.name || state.fileName || "export.wav";
+              console.log(`[BulkExport] (${index}/${targets.length}) begin name=${fileLabel}`);
+              const exportBytes = await buildExportWavBytes();
+              const writeRes = await writeExportToFolder(exportBytes, exportFolder, fileLabel);
+              f.status.exported = true;
+              historyEntry.exportedNames.push(writeRes.fileName || fileLabel);
+              console.log(`[BulkExport] (${index}/${targets.length}) success name=${writeRes.fileName || fileLabel}`);
+              f.status.exported = true;
+            }
+            job.ok++;
+            if(type === "qc"){
+              logJob(`判定: ${f.name} (${getRecQcState(f).status.toUpperCase()})`);
+            }else{
+              logJob(`成功: ${f.name}`);
+            }
+          }catch(e){
+            job.failed.push(id);
+            historyEntry.failCount += 1;
+            const failMsg = e?.message || e;
+            logJob(`失敗: ${f.name} / ${failMsg}`);
+            if(type === "export"){
+              console.log(`[BulkExport] (${index}/${targets.length}) fail name=${f.name} reason=${failMsg}`);
+            }
+          }finally{
+            job.done++;
+            updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
+            if(type === "export"){
+              const pct = job.total ? (job.done / job.total) : 0;
+              if(prog) prog.set(pct, "一括書き出し中…", `${Math.min(index, job.total)}/${job.total} ${f.name || ""}`);
+            }else{
+              bulkOverlay.update(job.done, job.total, f.name);
+            }
+            render();
+          }
+        }
+      }finally{
+        logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
+        if(type==='qc'){
+          console.log(`[QC][bulk] done updatedRows=${qcUpdatedRows}`);
+          render();
+          if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("qc:bulk");
+        }
+        job.running = false;
+        updateJobUI();
+        render();
+
+        const status = job.cancel ? "cancel" : (job.failed.length ? "fail" : "success");
+        if(type === "export"){
+          if(prog) prog.hide();
+          console.log(`[BulkExport] done ok=${job.ok} fail=${job.failed.length}`);
+        }else{
+          bulkOverlay.end(type, status);
+        }
+        historyEntry.running = false;
+        historyEntry.endedAt = Date.now();
+        if(type === "export"){
+          historyEntry.okCount = job.ok;
+          historyEntry.ngCount = job.failed.length;
+        }
+        historyEntry.failCount = job.failed.length;
+        historyEntry.done = job.done;
+        historyEntry.failedIds = job.failed.slice();
+        historyEntry.nowText = esc(job.cancel ? "キャンセル" : "完了");
+        history.entries.unshift(historyEntry);
+        history.active = null;
+        history.selectedId = historyEntry.id;
+        console.log(`[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.okCount} ng=${historyEntry.ngCount} fail=${historyEntry.failCount}`);
+        renderHistoryList();
+        renderHistoryDetail();
+      }
+    }finally{
+      if(prog) prog.hide();
     }
   }
   function idsSelectedOrActive(){
