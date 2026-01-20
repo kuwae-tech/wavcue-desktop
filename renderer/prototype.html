@@ -2446,7 +2446,6 @@ header.wc-titlebar,
   align-items: center !important;
 
   overflow: visible !important;
-  padding-top: 2px !important; /* hover時の上切れ回避の“逃げ” */
   padding-bottom: 2px !important; /* 1px丸め対策の“逃げ” */
 }
 
@@ -2483,7 +2482,9 @@ body,
   #appHeader .btn:hover,
   .headerBar .btn:hover,
   .topHeader .btn:hover{
-    transform: translateY(-0.5px);
+    transform: translateY(0);
+    filter: brightness(1.08);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06), 0 8px 18px rgba(0,0,0,.38);
   }
 }
 /* ===== Electron drag region hardening ===== */
@@ -6925,15 +6926,28 @@ function _uiLogWaveLayout(tag){
 
 function clearCueLayerOnSwitch(fileId, cueCount){
   try{
-    const canvas = $("wave");
-    if(canvas){
-      const rect = canvas.getBoundingClientRect();
-      const w = Math.max(1, rect.width || canvas.width || 1);
-      const h = Math.max(1, rect.height || canvas.height || 1);
-      const ctx = canvas.getContext("2d");
+    const cont = document.querySelector("#cueMarkerLayer")
+      || document.querySelector(".cue-marker-layer")
+      || window.cueMarkerLayerEl;
+    if(cont && cont.innerHTML !== undefined) cont.innerHTML = "";
+
+    const cueCanvas = document.getElementById("cueCanvas") || window.cueCanvas;
+    if(cueCanvas && cueCanvas.getContext){
+      const ctx = cueCanvas.getContext("2d");
+      if(ctx) ctx.clearRect(0,0,cueCanvas.width, cueCanvas.height);
+    }
+
+    const waveCanvas = $("wave");
+    if(waveCanvas && waveCanvas.getContext){
+      const rect = waveCanvas.getBoundingClientRect();
+      const w = Math.max(1, rect.width || waveCanvas.width || 1);
+      const h = Math.max(1, rect.height || waveCanvas.height || 1);
+      const ctx = waveCanvas.getContext("2d");
       if(ctx) ctx.clearRect(0,0,w,h);
     }
-  }catch(_){}
+  }catch(e){
+    try{ console.warn("[CUE] clearCueLayerOnSwitch failed (ignored)", e); }catch(_){}
+  }
   try{
     console.log("[CUE] clearLayer onSwitch", { fileId, cueCount });
   }catch(_){}
@@ -15436,7 +15450,13 @@ try{
 
       project.activeId = id;
       const switchCueCount = Array.isArray(rec.cues) ? rec.cues.length : 0;
-      clearCueLayerOnSwitch(rec.id, switchCueCount);
+      try{
+        if(typeof clearCueLayerOnSwitch === "function"){
+          clearCueLayerOnSwitch(rec.id, switchCueCount);
+        }
+      }catch(e){
+        console.warn("[ACTIVE] clearCueLayerOnSwitch threw (ignored)", e);
+      }
       render();
 
       // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
