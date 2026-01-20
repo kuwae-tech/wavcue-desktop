@@ -6983,6 +6983,12 @@ function logCueRenderMarkers(fileId, cueCount){
 }
 
 function drawWaveform(){
+  const dpr = window.devicePixelRatio || 1;
+  try{
+    if(wctx && wctx.setTransform){
+      wctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+  }catch(_){}
   const W = wave.getBoundingClientRect().width;
   const H = wave.getBoundingClientRect().height;
 
