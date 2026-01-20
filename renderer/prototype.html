@@ -4251,6 +4251,125 @@ const CMCD_FIXED_SLOTS = [[0, 2], [2, 16], [18, 16], [34, 24], [58, 16], [74, 16
 const $ = (id)=> document.getElementById(id);
 
 /* ===============================
+   Right edge debug (opt-in)
+================================ */
+
+const DEBUG_RIGHT_EDGE_ENABLED = (()=> {
+  try{
+    if(String(window.location?.search || "").includes("debugRightEdge=1")) return true;
+  }catch(_){}
+  try{
+    if(String(window.localStorage?.getItem("DEBUG_RIGHT_EDGE") || "") === "1") return true;
+  }catch(_){}
+  return false;
+})();
+
+function debugRightEdgeEnabled(){
+  return !!DEBUG_RIGHT_EDGE_ENABLED;
+}
+
+function sampleRightEdge(canvas, label){
+  if(!debugRightEdgeEnabled() || !canvas || !canvas.getContext) return;
+  const ctx = canvas.getContext("2d");
+  if(!ctx) return;
+  const w = canvas.width || 0;
+  const h = canvas.height || 0;
+  if(w <= 0 || h <= 0) return;
+  const x = Math.max(0, w - 1);
+  const ys = [0, h * 0.25, h * 0.5, h * 0.75, h - 1]
+    .map((y)=> Math.min(h - 1, Math.max(0, Math.round(y))));
+  const seen = new Set();
+  for(const y of ys){
+    if(seen.has(y)) continue;
+    seen.add(y);
+    let rgba = null;
+    try{
+      const data = ctx.getImageData(x, y, 1, 1).data;
+      rgba = { r: data[0], g: data[1], b: data[2], a: data[3] };
+    }catch(_){
+      continue;
+    }
+    if(rgba && rgba.a > 0){
+      console.log(`[RightEdge][sample] label=${label} x=${x} y=${y} rgba=(${rgba.r},${rgba.g},${rgba.b},${rgba.a})`);
+    }
+  }
+}
+
+function collectRightEdgeCanvases(){
+  const list = [];
+  const push = (label, el)=>{
+    if(!el || !el.getContext) return;
+    if(list.some((item)=> item.el === el)) return;
+    list.push({ label, el });
+  };
+  push("wave", $("wave"));
+  push("meterCanvas", $("meterCanvas"));
+  push("imagerCanvas", $("imagerCanvas"));
+  push("cueCanvas", document.getElementById("cueCanvas") || window.cueCanvas);
+  push("overlayCanvas", document.getElementById("overlayCanvas") || window.overlayCanvas);
+  push("cueOverlayCanvas", document.getElementById("cueOverlayCanvas") || window.cueOverlayCanvas);
+  push("gridCanvas", document.getElementById("gridCanvas") || window.gridCanvas);
+  document.querySelectorAll("canvas").forEach((el)=>{
+    if(list.some((item)=> item.el === el)) return;
+    const label = el.id ? `canvas#${el.id}` : (el.className ? `canvas.${String(el.className)}` : "canvas");
+    push(label, el);
+  });
+  return list;
+}
+
+function applyRightEdgeOutlines(canvases){
+  if(!debugRightEdgeEnabled()) return;
+  const colorMap = [
+    { key: "wave", color: "cyan" },
+    { key: "cue", color: "magenta" },
+    { key: "overlay", color: "yellow" },
+    { key: "grid", color: "lime" },
+    { key: "meter", color: "orange" },
+    { key: "imager", color: "dodgerblue" },
+  ];
+  canvases.forEach(({ label, el })=>{
+    const key = String(label).toLowerCase();
+    const match = colorMap.find((entry)=> key.includes(entry.key));
+    const color = match ? match.color : "red";
+    el.style.outline = `1px solid ${color}`;
+    el.style.outlineOffset = "-1px";
+  });
+}
+
+function logRightEdgeCanvasInfo(canvases, dpr){
+  canvases.forEach(({ label, el })=>{
+    const rect = el.getBoundingClientRect();
+    const cssWxH = `${Math.round(rect.width)}x${Math.round(rect.height)}`;
+    const pxWxH = `${el.width || 0}x${el.height || 0}`;
+    const id = el.id || "";
+    const cls = el.className ? String(el.className) : "";
+    console.log(`[RightEdge][canvas] label=${label} id=${id} class=${cls} cssWxH=${cssWxH} pxWxH=${pxWxH} dpr=${dpr}`);
+  });
+}
+
+function logRightEdgeCss(selector, el){
+  if(!el) return;
+  const cs = window.getComputedStyle(el);
+  const borderRight = `${cs.borderRightWidth} ${cs.borderRightStyle} ${cs.borderRightColor}`;
+  const outline = cs.outline;
+  const boxShadow = cs.boxShadow;
+  console.log(`[RightEdge][css] selector=${selector} borderRight=${borderRight} outline=${outline} boxShadow=${boxShadow}`);
+}
+
+function debugRightEdgeReport(reason, fileId){
+  if(!debugRightEdgeEnabled()) return;
+  const dpr = window.devicePixelRatio || 1;
+  console.log(`[RightEdge][${reason}] fileId=${fileId ?? "?"} dpr=${dpr}`);
+  const canvases = collectRightEdgeCanvases();
+  logRightEdgeCanvasInfo(canvases, dpr);
+  applyRightEdgeOutlines(canvases);
+  canvases.forEach(({ label, el })=> sampleRightEdge(el, label));
+  logRightEdgeCss("#waveBox", document.getElementById("waveBox"));
+  logRightEdgeCss(".waveWrap", document.querySelector(".waveWrap"));
+  logRightEdgeCss(".workTop", document.querySelector(".workTop"));
+}
+
+/* ===============================
    MODAL SHELL (outside click + x + dirty confirm)
 ================================ */
 const _dialogDirtyText = "変更内容が保存されていません。閉じますか？";
@@ -13209,6 +13328,12 @@ window.addEventListener("resize", ()=>{
     });
   }catch(_){}
   _uiLogWaveLayout("window:resize:end");
+  if(debugRightEdgeEnabled()){
+    const activeId = (typeof window.__wavcueProGetActiveId === "function")
+      ? window.__wavcueProGetActiveId()
+      : (window.project?.activeId ?? project?.activeId ?? null);
+    requestAnimationFrame(()=> debugRightEdgeReport("afterResize", activeId));
+  }
 });
 
 function init(){
@@ -15632,6 +15757,9 @@ try{
       if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch");
       console.log("[Pro] setActiveFile done", id);
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id }));
+      if(debugRightEdgeEnabled()){
+        requestAnimationFrame(()=> debugRightEdgeReport("afterSwitch", id));
+      }
     }
   }
   function matchesFilter(file){
