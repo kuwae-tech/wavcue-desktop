@@ -2434,10 +2434,10 @@ header.wc-titlebar,
 }
 
 /* Header container: never shrink, never clip */
-.appHeader,
-#appHeader,
-.headerBar,
-.topHeader{
+  .appHeader,
+  #appHeader,
+  .headerBar,
+  .topHeader{
   height: var(--wavcue-header-h) !important;
   min-height: var(--wavcue-header-h) !important;
   max-height: var(--wavcue-header-h) !important;
@@ -2446,6 +2446,7 @@ header.wc-titlebar,
   align-items: center !important;
 
   overflow: visible !important;
+  padding-top: 2px !important; /* hover時の上切れ回避の“逃げ” */
   padding-bottom: 2px !important; /* 1px丸め対策の“逃げ” */
 }
 
@@ -2476,6 +2477,14 @@ body,
   height: 100% !important;
   align-items: center !important;
   overflow: visible !important;
+}
+@media (prefers-reduced-motion: no-preference){
+  .appHeader .btn:hover,
+  #appHeader .btn:hover,
+  .headerBar .btn:hover,
+  .topHeader .btn:hover{
+    transform: translateY(-0.5px);
+  }
 }
 /* ===== Electron drag region hardening ===== */
 .appHeader,
@@ -4214,6 +4223,7 @@ const state = {
   attachSel: 0,
   pdfAttach: null,        // legacy alias: selected attachment (auto-maintained)
   pdfViewUrl: null,
+  cueRenderLog: { fileId: null, cueCount: null },
   ui: { isLoadingWav: false },
 };
 
@@ -6913,6 +6923,30 @@ function _uiLogWaveLayout(tag){
   }catch(_){}
 }
 
+function clearCueLayerOnSwitch(fileId, cueCount){
+  try{
+    const canvas = $("wave");
+    if(canvas){
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.max(1, rect.width || canvas.width || 1);
+      const h = Math.max(1, rect.height || canvas.height || 1);
+      const ctx = canvas.getContext("2d");
+      if(ctx) ctx.clearRect(0,0,w,h);
+    }
+  }catch(_){}
+  try{
+    console.log("[CUE] clearLayer onSwitch", { fileId, cueCount });
+  }catch(_){}
+}
+
+function logCueRenderMarkers(fileId, cueCount){
+  if(state.cueRenderLog?.fileId === fileId && state.cueRenderLog?.cueCount === cueCount) return;
+  state.cueRenderLog = { fileId, cueCount };
+  try{
+    console.log("[CUE] renderMarkers", { fileId, cueCount });
+  }catch(_){}
+}
+
 function drawWaveform(){
   const W = wave.getBoundingClientRect().width;
   const H = wave.getBoundingClientRect().height;
@@ -6971,6 +7005,9 @@ function drawWaveform(){
   wctx.beginPath(); wctx.moveTo(xPh, 0); wctx.lineTo(xPh, H); wctx.stroke();
 
   // cues
+  const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+  const cueCount = Array.isArray(state.cues) ? state.cues.length : 0;
+  logCueRenderMarkers(activeId, cueCount);
   for(const c of state.cues){
     const x = ((c.sec / state.buffer.duration) * totalW) - state.scrollPx;
     if(x<-20 || x>W+20) continue;
@@ -15398,6 +15435,8 @@ try{
       }
 
       project.activeId = id;
+      const switchCueCount = Array.isArray(rec.cues) ? rec.cues.length : 0;
+      clearCueLayerOnSwitch(rec.id, switchCueCount);
       render();
 
       // すでに同じIDが読み込まれていて、forceでないなら再ロードしない
