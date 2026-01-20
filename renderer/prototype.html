@@ -9125,71 +9125,165 @@ function logExportPreflight(){
   }
 }
 
-async function exportWav(){
+async function buildExportWavBytes(){
   if(!state.buffer || !state.srcFmtPayload || !state.srcDataPayload){
     log("WARN: 先にWAVを読み込んでください。（読み込み直後に書き出し可能です）");
-    return;
+    const err = new Error("書き出し前提データがありません");
+    err.silent = true;
+    throw err;
+  }
+  log("INFO: 書き出し開始");
+  try{ logExportPreflight(); }catch(_){ }
+
+  // JPPA-1-2018: cue-point max 99 / NOTE label uniqueness
+  const __cues = Array.isArray(state.cues) ? state.cues : [];
+  if(__cues.length > 99){
+    window.safeToast && window.safeToast("CUEは最大99件です（規格）","ng");
+    log(`WARN: CUE数が上限（99）を超えています: ${__cues.length}件`);
+    const err = new Error("CUE数が規格上限を超えています");
+    err.silent = true;
+    throw err;
   }
   try{
-    log("INFO: 書き出し開始");
-    try{ logExportPreflight(); }catch(_){ }
-
-    // JPPA-1-2018: cue-point max 99 / NOTE label uniqueness
-    const __cues = Array.isArray(state.cues) ? state.cues : [];
-    if(__cues.length > 99){
-      window.safeToast && window.safeToast("CUEは最大99件です（規格）","ng");
-      log(`WARN: CUE数が上限（99）を超えています: ${__cues.length}件`);
-      return;
+    const norm = (s)=> String(s||"").trim().replace(/\s+/g, "").toUpperCase();
+    const notes = __cues.map(c=> norm(c && c.label)).filter(t=> /^BC\$NOTE\d+$/.test(t));
+    const seen = new Set();
+    const dups = [];
+    for(const t of notes){ if(seen.has(t)) dups.push(t); else seen.add(t); }
+    if(dups.length){
+      window.safeToast && window.safeToast("NOTEラベルが重複しています（規格）","ng");
+      log(`WARN: NOTEラベル重複: ${Array.from(new Set(dups)).join(", ")}`);
+      const err = new Error("NOTEラベルが重複しています");
+      err.silent = true;
+      throw err;
     }
-    try{
-      const norm = (s)=> String(s||"").trim().replace(/\s+/g, "").toUpperCase();
-      const notes = __cues.map(c=> norm(c && c.label)).filter(t=> /^BC\$NOTE\d+$/.test(t));
-      const seen = new Set();
-      const dups = [];
-      for(const t of notes){ if(seen.has(t)) dups.push(t); else seen.add(t); }
-      if(dups.length){
-        window.safeToast && window.safeToast("NOTEラベルが重複しています（規格）","ng");
-        log(`WARN: NOTEラベル重複: ${Array.from(new Set(dups)).join(", ")}`);
-        return;
-      }
-    }catch(_){ }
+  }catch(err){
+    if(err?.silent) throw err;
+  }
 
-    // BWF-J: Linear PCM only
-    try{
-      const pcm = detectPcmFromFmtPayload(state.srcFmtPayload);
-      if(!pcm.ok){
-        window.safeToast && window.safeToast("非PCM形式は現在未対応です","ng");
-        log(`WARN: 非PCM/未対応: ${pcm.reason}`);
-        return;
-      }
-    }catch(_){ }
-
-    // Label encoding strict check（Shift-JIS/CP932）
-    try{
-      const bad = [];
-      for(const c of __cues){
-        const s = (c && c.label != null) ? String(c.label) : "";
-        if(!s) continue;
-        const enc = cp932EncodeEx(s + "\0");
-        if(enc && enc.hadReplace){
-          bad.push(s);
-          if(bad.length >= 3) break;
-        }
-      }
-      if(bad.length){
-        window.safeToast && window.safeToast("ラベルにShift-JIS非対応文字が含まれます（書き出し不可）","ng");
-        log(`WARN: ラベルShift-JIS非対応: ${bad.slice(0,2).join(" / ")}${bad.length>2?" ...":""}`);
-        return;
-      }
-    }catch(err){
-      window.safeToast && window.safeToast("ラベル文字の検査に失敗しました（書き出し不可）","ng");
-      log(`WARN: ラベル検査失敗: ${String(err&&err.message||err)}`);
-      return;
+  // BWF-J: Linear PCM only
+  try{
+    const pcm = detectPcmFromFmtPayload(state.srcFmtPayload);
+    if(!pcm.ok){
+      window.safeToast && window.safeToast("非PCM形式は現在未対応です","ng");
+      log(`WARN: 非PCM/未対応: ${pcm.reason}`);
+      const err = new Error("非PCM形式は未対応です");
+      err.silent = true;
+      throw err;
     }
+  }catch(err){
+    if(err?.silent) throw err;
+  }
 
+  // Label encoding strict check（Shift-JIS/CP932）
+  try{
+    const bad = [];
+    for(const c of __cues){
+      const s = (c && c.label != null) ? String(c.label) : "";
+      if(!s) continue;
+      const enc = cp932EncodeEx(s + "\0");
+      if(enc && enc.hadReplace){
+        bad.push(s);
+        if(bad.length >= 3) break;
+      }
+    }
+    if(bad.length){
+      window.safeToast && window.safeToast("ラベルにShift-JIS非対応文字が含まれます（書き出し不可）","ng");
+      log(`WARN: ラベルShift-JIS非対応: ${bad.slice(0,2).join(" / ")}${bad.length>2?" ...":""}`);
+      const err = new Error("ラベルにShift-JIS非対応文字が含まれます");
+      err.silent = true;
+      throw err;
+    }
+  }catch(err){
+    if(err?.silent) throw err;
+    window.safeToast && window.safeToast("ラベル文字の検査に失敗しました（書き出し不可）","ng");
+    log(`WARN: ラベル検査失敗: ${String(err&&err.message||err)}`);
+    const fail = new Error("ラベル検査に失敗しました");
+    fail.silent = true;
+    throw fail;
+  }
 
+  // --- build replacements (editable chunks only) ---
+  const bextBuf = buildBextChunk();                        // bext (version preserved)
+  const cmcdBuf = buildCmcdChunkFixed2048();               // cmcd (fixed 2048)
 
-    let __exportOK = false;
+  // cue / plst / LIST(adtl) (ファイル添付は LIST/adtl/file)
+  // Hybrid: when ONLY moving existing cues (no add/remove/label change, no attachment),
+  // patch the source 'cue ' chunk values in-place. Otherwise rebuild cue/LIST as before.
+  let srcAbForBuild = state.srcAb;
+  let cueChunk = null, listChunk = null, plstChunk = null;
+
+  const hasAttach = Array.isArray(state.attachments) && state.attachments.some(a=>a && a.bytes && a.bytes.length);
+  const sigNow = cueSig(state.cues);
+  const canInPlaceMove =
+    !hasAttach &&
+    !!state.srcAb &&
+    !!state.cuePatchMeta &&
+    !!state.loadedCueSig &&
+    (sigNow === state.loadedCueSig);
+
+  if(canInPlaceMove){
+    // Patch the existing 'cue ' chunk(s) sample offsets (no size/order changes)
+    srcAbForBuild = applyCueInPlacePatch(state.srcAb, state.cuePatchMeta, state.cues, ((state.fileSr && isFinite(state.fileSr)) ? state.fileSr : state.buffer.sampleRate));
+    cueChunk = null;
+    listChunk = null;
+    // plst は規格互換のため再生成（BC$NOTE除外 / 全BC$）
+    try{ plstChunk = buildCueChunks(state.buffer, state.cues).plstChunk; }catch(_){ plstChunk = null; }
+    log("INFO: CUEは元チャンクを更新（移動のみ / ハイブリッド）");
+    if(plstChunk) log("INFO: plstを再生成（BC$NOTE除外 / 全BC$）");
+  }else{
+    const built = buildCueChunks(state.buffer, state.cues);
+    cueChunk = built.cueChunk;
+    listChunk = built.listChunk;
+    plstChunk = built.plstChunk;
+  }
+
+  // data: only replace when auto-level fix was applied (PCM bytes are still PCM16)
+  const dataBuf = (state.procApplied && state.procDataPayload)
+    ? _makeChunk("data", state.procDataPayload)
+    : null;
+
+  const replacements = {
+    bextBuf: (bextBuf instanceof Uint8Array) ? bextBuf : new Uint8Array(bextBuf),
+    cmcdBuf: (cmcdBuf instanceof Uint8Array) ? cmcdBuf : new Uint8Array(cmcdBuf),
+    cueBuf:  cueChunk ? ((cueChunk instanceof Uint8Array) ? cueChunk : new Uint8Array(cueChunk)) : null,
+    plstBuf: plstChunk ? ((plstChunk instanceof Uint8Array) ? plstChunk : new Uint8Array(plstChunk)) : null,
+    listBuf: listChunk ? ((listChunk instanceof Uint8Array) ? listChunk : new Uint8Array(listChunk)) : null,
+    dataBuf: dataBuf, // Uint8Array from _makeChunk, or null
+    fmtBuf:  null,    // keep original 'fmt ' as-is
+  };;
+
+  // --- chunk-level rebuild (pass-through iXML + unknown chunks) ---
+  let blob = null;
+  const chunks = state.srcChunks || parseRiffChunks(state.srcAb);
+  if(state.srcAb && chunks && Array.isArray(chunks) && chunks.length){
+    blob = rebuildWaveFromOriginal(srcAbForBuild || state.srcAb, chunks, replacements);
+  }else{
+    // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
+    log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
+    const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
+    const pcmPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
+    const dataBuf2 = _makeChunk("data", pcmPayload);
+    const parts = [
+      new Uint8Array(bextBuf),
+      fmtBuf,
+      dataBuf2,
+      new Uint8Array(cmcdBuf),
+      new Uint8Array(cueChunk),
+      ...(plstChunk ? [new Uint8Array(plstChunk)] : []),
+      new Uint8Array(listChunk),
+    ];
+    const outAb = _buildCanonicalWavFromParts(parts);
+    blob = new Blob([outAb], {type:"audio/wav"});
+  }
+
+  const exportBytes = new Uint8Array(await blob.arrayBuffer());
+  return exportBytes;
+}
+
+async function exportWav(){
+  let __exportOK = false;
+  try{
     let __exportBarShown = false;
     const __ensureExportBar = (sub)=>{
       if(__exportBarShown) return;
@@ -9212,80 +9306,9 @@ async function exportWav(){
     const base = _baseNameNoExt((state.fileName && String(state.fileName).trim()) ? state.fileName : "output.wav");
     const suggested = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
     const backupBase = _sanitizeFileSegment(base);
-// --- build replacements (editable chunks only) ---
     _prog.set(0.18, "書き出し中…", "チャンク生成中");
-    const bextBuf = buildBextChunk();                        // bext (version preserved)
-    const cmcdBuf = buildCmcdChunkFixed2048();               // cmcd (fixed 2048)
-
-    // cue / plst / LIST(adtl) (ファイル添付は LIST/adtl/file)
-    // Hybrid: when ONLY moving existing cues (no add/remove/label change, no attachment),
-    // patch the source 'cue ' chunk values in-place. Otherwise rebuild cue/LIST as before.
-    let srcAbForBuild = state.srcAb;
-    let cueChunk = null, listChunk = null, plstChunk = null;
-
-    const hasAttach = Array.isArray(state.attachments) && state.attachments.some(a=>a && a.bytes && a.bytes.length);
-    const sigNow = cueSig(state.cues);
-    const canInPlaceMove =
-      !hasAttach &&
-      !!state.srcAb &&
-      !!state.cuePatchMeta &&
-      !!state.loadedCueSig &&
-      (sigNow === state.loadedCueSig);
-
-    if(canInPlaceMove){
-      // Patch the existing 'cue ' chunk(s) sample offsets (no size/order changes)
-      srcAbForBuild = applyCueInPlacePatch(state.srcAb, state.cuePatchMeta, state.cues, ((state.fileSr && isFinite(state.fileSr)) ? state.fileSr : state.buffer.sampleRate));
-      cueChunk = null;
-      listChunk = null;
-      // plst は規格互換のため再生成（BC$NOTE除外 / 全BC$）
-      try{ plstChunk = buildCueChunks(state.buffer, state.cues).plstChunk; }catch(_){ plstChunk = null; }
-      log("INFO: CUEは元チャンクを更新（移動のみ / ハイブリッド）");
-      if(plstChunk) log("INFO: plstを再生成（BC$NOTE除外 / 全BC$）");
-    }else{
-      const built = buildCueChunks(state.buffer, state.cues);
-      cueChunk = built.cueChunk;
-      listChunk = built.listChunk;
-      plstChunk = built.plstChunk;
-    }
-
-    // data: only replace when auto-level fix was applied (PCM bytes are still PCM16)
-    const dataBuf = (state.procApplied && state.procDataPayload)
-      ? _makeChunk("data", state.procDataPayload)
-      : null;
-
-    const replacements = {
-      bextBuf: (bextBuf instanceof Uint8Array) ? bextBuf : new Uint8Array(bextBuf),
-      cmcdBuf: (cmcdBuf instanceof Uint8Array) ? cmcdBuf : new Uint8Array(cmcdBuf),
-      cueBuf:  cueChunk ? ((cueChunk instanceof Uint8Array) ? cueChunk : new Uint8Array(cueChunk)) : null,
-      plstBuf: plstChunk ? ((plstChunk instanceof Uint8Array) ? plstChunk : new Uint8Array(plstChunk)) : null,
-      listBuf: listChunk ? ((listChunk instanceof Uint8Array) ? listChunk : new Uint8Array(listChunk)) : null,
-      dataBuf: dataBuf, // Uint8Array from _makeChunk, or null
-      fmtBuf:  null,    // keep original 'fmt ' as-is
-    };;
-
-    // --- chunk-level rebuild (pass-through iXML + unknown chunks) ---
-    let blob = null;
-    const chunks = state.srcChunks || parseRiffChunks(state.srcAb);
-    if(state.srcAb && chunks && Array.isArray(chunks) && chunks.length){
-      blob = rebuildWaveFromOriginal(srcAbForBuild || state.srcAb, chunks, replacements);
-    }else{
-      // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
-      log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
-      const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
-      const pcmPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
-      const dataBuf2 = _makeChunk("data", pcmPayload);
-      const parts = [
-        new Uint8Array(bextBuf),
-        fmtBuf,
-        dataBuf2,
-        new Uint8Array(cmcdBuf),
-        new Uint8Array(cueChunk),
-        ...(plstChunk ? [new Uint8Array(plstChunk)] : []),
-        new Uint8Array(listChunk),
-      ];
-      const outAb = _buildCanonicalWavFromParts(parts);
-      blob = new Blob([outAb], {type:"audio/wav"});
-    }
+    const exportBytes = await buildExportWavBytes();
+    const blob = new Blob([exportBytes], {type:"audio/wav"});
 
     const _saveRes = await _saveBlobWithFallback(blob, suggested, (phase)=>{
       try{
@@ -9569,6 +9592,9 @@ async function exportWav(){
 
     log("OK: 書き出し完了");
   }catch(e){
+    if(e?.silent){
+      return;
+    }
     log(`ERROR: Export failed: ${e?.name||"Error"} ${e?.message||""}`);
     if(e?.stack) log(String(e.stack).slice(0, 4000));
     if(!(e && e.name==="AbortError")){
@@ -14586,7 +14612,8 @@ try{
     filter:{status:'all'},
     lastClickIndex:null,
     popover:{openType:null, openFileId:null, anchorEl:null},
-    historyTriggerLogged:false
+    historyTriggerLogged:false,
+    bulkExportFolder:null
   };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
   const history = { entries:[], active:null, selectedId:null };
@@ -15859,6 +15886,7 @@ try{
       history.active.done = job.done;
       if(history.active.type === "export"){
         history.active.okCount = job.ok;
+        history.active.ngCount = job.failed.length;
       }
       history.active.failCount = job.failed.length;
       history.active.failedIds = job.failed.slice();
@@ -15866,6 +15894,59 @@ try{
     }
     renderHistoryList();
     renderHistoryDetail();
+  }
+  function normalizeExportFileName(name){
+    const raw = String(name || "").trim();
+    const baseName = (raw ? raw.split(/[\\/]/).pop() : "") || "output.wav";
+    const extMatch = baseName.match(/\.[^.]+$/);
+    const ext = (extMatch && extMatch[0]) ? extMatch[0] : ".wav";
+    const base = extMatch ? baseName.slice(0, -ext.length) : baseName;
+    const safeBase = _sanitizeFileSegment(base || "output");
+    const safeExt = ext || ".wav";
+    return `${safeBase}${safeExt}`;
+  }
+  async function pickBulkExportFolder(){
+    if(project.bulkExportFolder) return project.bulkExportFolder;
+    if(!window.wavcue?.pickExportFolder){
+      throw new Error("pickExportFolder is unavailable.");
+    }
+    const res = await window.wavcue.pickExportFolder();
+    if(res?.canceled){
+      return null;
+    }
+    if(res?.folderPath){
+      project.bulkExportFolder = res.folderPath;
+      return res.folderPath;
+    }
+    return null;
+  }
+  async function writeExportToFolder(bytes, folderPath, name){
+    if(!window.wavcue?.writeFileBase64){
+      throw new Error("writeFileBase64 is unavailable.");
+    }
+    const normalized = normalizeExportFileName(name);
+    const extMatch = normalized.match(/\.[^.]+$/);
+    const ext = (extMatch && extMatch[0]) ? extMatch[0] : ".wav";
+    const base = extMatch ? normalized.slice(0, -ext.length) : normalized;
+    const dataBase64 = _base64FromUint8(bytes);
+    const MAX_TRIES = 1000;
+    for(let i=0; i<MAX_TRIES; i++){
+      const suffix = i === 0 ? "" : `_${i}`;
+      const fileName = `${base}${suffix}${ext}`;
+      const res = await window.wavcue.writeFileBase64({
+        folderPath,
+        fileName,
+        dataBase64,
+      });
+      if(res?.ok){
+        return { fileName, filePath: res.filePath || "" };
+      }
+      if(res?.error && /EEXIST/i.test(res.error)){
+        continue;
+      }
+      throw new Error(res?.error || "write failed");
+    }
+    throw new Error("同名ファイルが多すぎます");
   }
   async function runJob(type, idsOverride){
     const usingOverride = Array.isArray(idsOverride);
@@ -15879,6 +15960,18 @@ try{
         else alert("対象ファイルがありません");
       }catch(_){}
       return;
+    }
+    let exportFolder = null;
+    if(type === "export"){
+      exportFolder = await pickBulkExportFolder();
+      if(!exportFolder){
+        logJob("一括書き出しをキャンセルしました。");
+        try{
+          if(typeof toast === "function") toast("一括書き出しをキャンセルしました", "warn");
+        }catch(_){}
+        return;
+      }
+      console.log(`[BulkExport] start total=${targets.length} folder=${exportFolder}`);
     }
     job.running = true;
     job.cancel=false;
@@ -15910,19 +16003,30 @@ try{
     logJob(`対象件数: ${targets.length}`);
     logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
     updateJobUI();
-    bulkOverlay.start(type, targets.length);
+    if(type === "export"){
+      _prog.show("一括書き出し中…", `0/${targets.length}`);
+    }else{
+      bulkOverlay.start(type, targets.length);
+    }
 
     let qcUpdatedRows = 0;
     try{
+      let index = 0;
       for(const id of targets){
         if(job.cancel) break;
         const f = project.files.find(x=>x.id===id);
         if(!f) continue;
         try{
+          index += 1;
           logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
           await setActiveFile(id, {force:true});
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
-          bulkOverlay.update(job.done, job.total, f.name);
+          if(type === "export"){
+            const pct = job.total ? (job.done / job.total) : 0;
+            _prog.set(pct, "一括書き出し中…", `${index}/${job.total} ${f.name || ""}`);
+          }else{
+            bulkOverlay.update(job.done, job.total, f.name);
+          }
           if(type==='qc'){
             const st = window.WavCue?.state;
             if(!st || !st.buffer){
@@ -15966,9 +16070,14 @@ try{
             }
           }
           if(type==='export'){
-            await doFinalExport();
+            const fileLabel = f.name || state.fileName || "export.wav";
+            console.log(`[BulkExport] (${index}/${targets.length}) begin name=${fileLabel}`);
+            const exportBytes = await buildExportWavBytes();
+            const writeRes = await writeExportToFolder(exportBytes, exportFolder, fileLabel);
             f.status.exported = true;
-            historyEntry.exportedNames.push(f.name || "exported");
+            historyEntry.exportedNames.push(writeRes.fileName || fileLabel);
+            console.log(`[BulkExport] (${index}/${targets.length}) success name=${writeRes.fileName || fileLabel}`);
+            f.status.exported = true;
           }
           job.ok++;
           if(type === "qc"){
@@ -15979,11 +16088,20 @@ try{
         }catch(e){
           job.failed.push(id);
           historyEntry.failCount += 1;
-          logJob(`失敗: ${f.name} / ${e?.message || e}`);
+          const failMsg = e?.message || e;
+          logJob(`失敗: ${f.name} / ${failMsg}`);
+          if(type === "export"){
+            console.log(`[BulkExport] (${index}/${targets.length}) fail name=${f.name} reason=${failMsg}`);
+          }
         }finally{
           job.done++;
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
-          bulkOverlay.update(job.done, job.total, f.name);
+          if(type === "export"){
+            const pct = job.total ? (job.done / job.total) : 0;
+            _prog.set(pct, "一括書き出し中…", `${Math.min(index, job.total)}/${job.total} ${f.name || ""}`);
+          }else{
+            bulkOverlay.update(job.done, job.total, f.name);
+          }
           render();
         }
       }
@@ -15999,12 +16117,17 @@ try{
       render();
 
       const status = job.cancel ? "cancel" : (job.failed.length ? "fail" : "success");
-      bulkOverlay.end(type, status);
+      if(type === "export"){
+        _prog.hide();
+        console.log(`[BulkExport] done ok=${job.ok} fail=${job.failed.length}`);
+      }else{
+        bulkOverlay.end(type, status);
+      }
       historyEntry.running = false;
       historyEntry.endedAt = Date.now();
       if(type === "export"){
         historyEntry.okCount = job.ok;
-        historyEntry.ngCount = 0;
+        historyEntry.ngCount = job.failed.length;
       }
       historyEntry.failCount = job.failed.length;
       historyEntry.done = job.done;
