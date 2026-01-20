@@ -607,6 +607,9 @@
   dialog#chunkDialog #logBox2{
     height: auto;
   }
+  dialog#chunkDialog .modalHead{
+    border-bottom:none;
+  }
   /* --- /ChunkDialog patch --- */
 
   /* ===== /ChunkDialog ===== */
@@ -3566,7 +3569,6 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="proFileDockLeft">
       <button id="proBtnBatchCheck" class="btn">一括チェック</button>
       <button id="proBtnBatchExport" class="btn">まとめて書き出し</button>
-      <button id="proBtnHistory" class="btn">履歴</button>
     </div>
     <div class="proFileDockRight">
       <div class="proFilterWrap">
@@ -14471,7 +14473,8 @@ try{
     selectedIds:new Set(),
     filter:{status:'all'},
     lastClickIndex:null,
-    popover:{openType:null, openFileId:null, anchorEl:null}
+    popover:{openType:null, openFileId:null, anchorEl:null},
+    historyTriggerLogged:false
   };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
   const history = { entries:[], active:null, selectedId:null };
@@ -15584,8 +15587,8 @@ try{
       history.selectedId = entries[0].id;
     }
     listEl.innerHTML = entries.map(entry=>{
-      const ngCount = entry.failedIds?.length || 0;
-      const okCount = entry.ok || 0;
+      const ngCount = entry.ngCount || 0;
+      const okCount = entry.okCount || 0;
       const total = entry.total || 0;
       const badgeClass = ngCount ? "ng" : "ok";
       const status = entry.running ? "進行中" : "完了";
@@ -15638,13 +15641,16 @@ try{
     }
     const done = entry.done || 0;
     const total = entry.total || 0;
+    const okCount = entry.okCount || 0;
+    const ngCount = entry.ngCount || 0;
+    const failCount = entry.failCount || 0;
     const pct = total ? Math.round((done/total)*100) : 0;
     if(nowEl) nowEl.innerHTML = entry.nowText ? entry.nowText : (entry.running ? "処理中…" : "—");
     if(countEl) countEl.textContent = `${done}/${total}`;
-    if(statEl) statEl.textContent = `OK:${entry.ok || 0} / 失敗:${entry.failedIds?.length || 0}`;
+    if(statEl) statEl.textContent = `OK:${okCount} / NG:${ngCount} / 失敗:${failCount}`;
     if(bar) bar.style.width = `${pct}%`;
     if(failEl){
-      if(entry.failedIds?.length){
+      if(failCount){
         failEl.textContent = "失敗あり";
         failEl.classList.add("isFail");
       }else{
@@ -15691,6 +15697,7 @@ try{
         exportList.innerHTML = "";
       }
     }
+    console.log(`[History] render entry id=${entry.id} ok=${okCount} ng=${ngCount} fail=${failCount}`);
     const retryBtn = $("proJobRetryFailed");
     const cancelBtn = $("proJobCancel");
     if(retryBtn) retryBtn.disabled = !entry.failedIds?.length || entry.running;
@@ -15728,7 +15735,10 @@ try{
     if(mini) mini.textContent = job.running ? `${job.done}/${job.total}` : '履歴';
     if(history.active){
       history.active.done = job.done;
-      history.active.ok = job.ok;
+      if(history.active.type === "export"){
+        history.active.okCount = job.ok;
+      }
+      history.active.failCount = job.failed.length;
       history.active.failedIds = job.failed.slice();
       if(now != null) history.active.nowText = esc(now);
     }
@@ -15759,7 +15769,9 @@ try{
       id: uid(),
       type,
       total: targets.length,
-      ok: 0,
+      okCount: 0,
+      ngCount: 0,
+      failCount: 0,
       done: 0,
       failedIds: [],
       exportedNames: [],
@@ -15823,7 +15835,11 @@ try{
             applyQcResultToRec(f, qcResult, { source: "bulk" });
             qcUpdatedRows += 1;
 
-            if(getRecQcState(f).status === "unverified"){
+            const qcState = getRecQcState(f).status;
+            if(qcState === "ok") historyEntry.okCount += 1;
+            if(qcState === "ng") historyEntry.ngCount += 1;
+
+            if(qcState === "unverified"){
               throw new Error("QC失敗: バッジ更新できず（apply後も未のまま）");
             }
           }
@@ -15833,9 +15849,14 @@ try{
             historyEntry.exportedNames.push(f.name || "exported");
           }
           job.ok++;
-          logJob(`成功: ${f.name} (${getRecQcState(f).status.toUpperCase()})`);
+          if(type === "qc"){
+            logJob(`判定: ${f.name} (${getRecQcState(f).status.toUpperCase()})`);
+          }else{
+            logJob(`成功: ${f.name}`);
+          }
         }catch(e){
           job.failed.push(id);
+          historyEntry.failCount += 1;
           logJob(`失敗: ${f.name} / ${e?.message || e}`);
         }finally{
           job.done++;
@@ -15859,14 +15880,18 @@ try{
       bulkOverlay.end(type, status);
       historyEntry.running = false;
       historyEntry.endedAt = Date.now();
-      historyEntry.ok = job.ok;
+      if(type === "export"){
+        historyEntry.okCount = job.ok;
+        historyEntry.ngCount = 0;
+      }
+      historyEntry.failCount = job.failed.length;
       historyEntry.done = job.done;
       historyEntry.failedIds = job.failed.slice();
       historyEntry.nowText = esc(job.cancel ? "キャンセル" : "完了");
       history.entries.unshift(historyEntry);
       history.active = null;
       history.selectedId = historyEntry.id;
-      console.log(`[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.ok} ng=${historyEntry.failedIds.length} id=${historyEntry.id}`);
+      console.log(`[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.okCount} ng=${historyEntry.ngCount} fail=${historyEntry.failCount}`);
       renderHistoryList();
       renderHistoryDetail();
     }
@@ -16088,10 +16113,13 @@ try{
 
     $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc'));
     $('proBtnBatchExport')?.addEventListener('click', ()=> runJob('export'));
-    $('proBtnHistory')?.addEventListener('click', ()=> showJob(true));
 
     $('proJobMini')?.addEventListener('click', ()=> showJob(true));
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
+    if(!project.historyTriggerLogged){
+      project.historyTriggerLogged = true;
+      console.log("[UI] historyTrigger=rightOnly");
+    }
     $('proJobCopy')?.addEventListener('click', async ()=>{
       try{
         const txt = $('proJobLog')?.innerText || "";
