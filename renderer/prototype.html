@@ -6862,6 +6862,136 @@ window.renderCueList = window.renderCueList || renderCues;
 const wave = $("wave");
 const wctx = wave.getContext("2d");
 
+function debugRightEdgeEnabled(){
+  if(typeof location !== "undefined" && typeof location.search === "string" && location.search.includes("debugRightEdge=1")) return true;
+  try{
+    if(typeof localStorage !== "undefined" && localStorage.getItem("DEBUG_RIGHT_EDGE") === "1") return true;
+  }catch(_){}
+  return false;
+}
+
+function syncCanvasToCSS(canvas){
+  try{
+    if(!canvas || !canvas.getBoundingClientRect) return { dpr: 1, w: 0, h: 0 };
+    const r = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    const w = Math.max(1, Math.round(r.width * dpr));
+    const h = Math.max(1, Math.round(r.height * dpr));
+    if(canvas.width !== w) canvas.width = w;
+    if(canvas.height !== h) canvas.height = h;
+    return { dpr, w, h };
+  }catch(_){
+    return { dpr: window.devicePixelRatio || 1, w: canvas?.width || 0, h: canvas?.height || 0 };
+  }
+}
+
+function hardClearCanvas(canvas){
+  try{
+    const ctx = canvas?.getContext?.("2d");
+    if(!ctx) return;
+    if(ctx.setTransform) ctx.setTransform(1,0,0,1,0,0);
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }catch(_){}
+}
+
+function prepareCueOverlayCanvases(){
+  try{
+    const list = [
+      document.getElementById("cueCanvas"),
+      document.getElementById("overlayCanvas"),
+      document.getElementById("cueOverlayCanvas"),
+      window.cueCanvas,
+      window.cueOverlayCanvas,
+    ].filter(Boolean);
+    const seen = new Set();
+    list.forEach((cv)=>{
+      if(!cv || seen.has(cv)) return;
+      seen.add(cv);
+      try{
+        syncCanvasToCSS(cv);
+        hardClearCanvas(cv);
+      }catch(_){}
+    });
+  }catch(_){}
+}
+
+function sampleRightEdge(canvas, label){
+  try{
+    if(!canvas || !canvas.getContext) return;
+    const ctx = canvas.getContext("2d");
+    if(!ctx) return;
+    const w = canvas.width | 0;
+    const h = canvas.height | 0;
+    if(w < 1 || h < 1) return;
+    const x = Math.max(0, w - 1);
+    const ys = [
+      0,
+      Math.floor(h * 0.25),
+      Math.floor(h * 0.5),
+      Math.floor(h * 0.75),
+      h - 1,
+    ];
+    ys.forEach((rawY)=>{
+      const y = clamp(rawY, 0, Math.max(0, h - 1));
+      const data = ctx.getImageData(x, y, 1, 1).data;
+      const r = data[0] ?? 0;
+      const g = data[1] ?? 0;
+      const b = data[2] ?? 0;
+      const a = data[3] ?? 0;
+      if(a > 0){
+        console.log(`[RightEdge][hit] label=${label} y=${y} rgba=(${r},${g},${b},${a})`);
+      }
+    });
+  }catch(e){
+    try{ console.warn("[RightEdge] sample failed (ignored)", { label, error: e }); }catch(_){}
+  }
+}
+
+function debugRightEdgeReport(reason, fileId){
+  try{
+    const dpr = window.devicePixelRatio || 1;
+    console.log(`[RightEdge][${reason}] fileId=${fileId} dpr=${dpr}`);
+    const candidates = [
+      { label: "wave", el: document.getElementById("wave") },
+      { label: "cueCanvas", el: document.getElementById("cueCanvas") },
+      { label: "overlayCanvas", el: document.getElementById("overlayCanvas") },
+      { label: "cueOverlayCanvas", el: document.getElementById("cueOverlayCanvas") },
+      { label: "cueCanvas(win)", el: window.cueCanvas },
+      { label: "cueOverlayCanvas(win)", el: window.cueOverlayCanvas },
+      { label: "meterCanvas", el: document.getElementById("meterCanvas") },
+      { label: "imagerCanvas", el: document.getElementById("imagerCanvas") },
+    ];
+    const seen = new Set();
+    candidates.forEach((item)=>{
+      const cv = item?.el;
+      if(!cv || seen.has(cv) || !cv.getBoundingClientRect) return;
+      seen.add(cv);
+      const r = cv.getBoundingClientRect();
+      const cssWxH = `${Math.round(r.width)}x${Math.round(r.height)}`;
+      const pxWxH = `${cv.width}x${cv.height}`;
+      console.log(`[RightEdge][canvas] label=${item.label} cssWxH=${cssWxH} pxWxH=${pxWxH}`);
+      sampleRightEdge(cv, item.label);
+    });
+    const waveBox = document.getElementById("waveBox") || document.querySelector(".waveBox");
+    if(waveBox){
+      const cs = window.getComputedStyle(waveBox);
+      if(cs){
+        console.log(`[RightEdge][css] borderRight=${cs.borderRight} outline=${cs.outline} boxShadow=${cs.boxShadow}`);
+        const borderVisible = (cs.borderRightWidth && cs.borderRightWidth !== "0px");
+        const outlineVisible = (cs.outlineStyle && cs.outlineStyle !== "none");
+        if(borderVisible || outlineVisible){
+          try{
+            waveBox.style.borderRight = "none";
+            waveBox.style.outline = "none";
+          }catch(_){}
+        }
+      }
+    }
+  }catch(e){
+    try{ console.warn("[RightEdge] report failed (ignored)", e); }catch(_){}
+  }
+}
+
 function resizeCanvas(elOrId){
   const el = (typeof elOrId === "string") ? document.getElementById(elOrId) : elOrId;
   if(!el) return;
@@ -7522,6 +7652,7 @@ function _forceWaveRedraw(){
 }
 
 function drawAll(){
+  try{ prepareCueOverlayCanvases(); }catch(_){}
   drawWaveform();
   drawAnalyzers();
   $("timeHud").textContent = fmtTime(currentPlayheadSec());
@@ -13141,6 +13272,14 @@ function installViewportWatch(){
         resizeAll();
         drawAll();
         _uiLogWaveLayout(`resizeKick:${phase}`);
+        if(debugRightEdgeEnabled()){
+          try{
+            const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+            debugRightEdgeReport("afterResize", activeId);
+          }catch(e){
+            console.warn("[RightEdge] afterResize failed (ignored)", e);
+          }
+        }
       }catch(e){
         console.warn("[UI][resizeKick] failed", phase, e);
       }
@@ -13209,6 +13348,16 @@ window.addEventListener("resize", ()=>{
     });
   }catch(_){}
   _uiLogWaveLayout("window:resize:end");
+  try{
+    if(debugRightEdgeEnabled()){
+      try{
+        const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
+        debugRightEdgeReport("afterResize", activeId);
+      }catch(e){
+        console.warn("[RightEdge] afterResize failed (ignored)", e);
+      }
+    }
+  }catch(_){}
 });
 
 function init(){
@@ -15629,6 +15778,11 @@ try{
       if (typeof window.diagErr === "function") window.diagErr("[ACTIVE]", "error", err);
     }finally{
       render();
+      try{
+        if(debugRightEdgeEnabled()){
+          try{ debugRightEdgeReport("afterSwitch", id); }catch(e){ console.warn("[RightEdge] afterSwitch failed (ignored)", e); }
+        }
+      }catch(_){}
       if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch");
       console.log("[Pro] setActiveFile done", id);
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id }));
