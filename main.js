@@ -648,39 +648,6 @@ ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) =>
   }
 });
 
-ipcMain.handle('export:pick-folder', async () => {
-  try {
-    const { canceled, filePaths } = await dialog.showOpenDialog({
-      title: '書き出し先フォルダを選択',
-      properties: ['openDirectory', 'createDirectory'],
-    });
-    return {
-      canceled,
-      folderPath: !canceled && filePaths && filePaths.length > 0 ? filePaths[0] : null,
-    };
-  } catch (error) {
-    return { canceled: true, error: String(error?.message || error) };
-  }
-});
-
-ipcMain.handle('export:write-file-base64', async (_event, payload) => {
-  try {
-    const dataBase64 = payload?.dataBase64;
-    const filePath = payload?.filePath
-      || (payload?.folderPath && payload?.fileName ? path.join(payload.folderPath, payload.fileName) : null);
-    if (!filePath || !dataBase64) {
-      return { ok: false, error: 'Missing filePath or dataBase64.' };
-    }
-    const buf = Buffer.from(dataBase64, 'base64');
-    await fs.writeFile(filePath, buf, { flag: 'wx' });
-    return { ok: true, filePath };
-  } catch (error) {
-    const code = error?.code ? String(error.code) : '';
-    const message = error?.message || String(error);
-    return { ok: false, error: code ? `${code}: ${message}` : message };
-  }
-});
-
 ipcMain.handle('export:save-backup-report', async (_event, payload) => {
   try {
     const exportDataBase64 = payload?.exportDataBase64 || payload?.backupDataBase64;

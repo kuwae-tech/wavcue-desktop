@@ -116,8 +116,6 @@ contextBridge.exposeInMainWorld('wavcue', {
   runCompleteCleanup: () => ipcRenderer.invoke('settings:run-complete-cleanup'),
   getBackupStatus: () => ipcRenderer.invoke('settings:get-backup-status'),
   saveExportFile: (payload) => ipcRenderer.invoke('export:saveFile', payload),
-  pickExportFolder: () => ipcRenderer.invoke('export:pick-folder'),
-  writeFileBase64: (payload) => ipcRenderer.invoke('export:write-file-base64', payload),
   saveBackupReport: (payload) => ipcRenderer.invoke('export:save-backup-report', payload),
   winMinimize: () => ipcRenderer.send('window:minimize'),
   winToggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
