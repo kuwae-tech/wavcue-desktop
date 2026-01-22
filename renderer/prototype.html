@@ -4329,7 +4329,7 @@ if(document.readyState === "loading"){
 /* ===============================
    PROGRESS (Load / Export)
 ================================ */
-const _prog = (()=> {
+window._prog = window._prog || (()=> {
   let ov=null, msg=null, sub=null, pctEl=null, bar=null, hint=null, cancelBtn=null;
   let token = 0;
   let visible = false;
@@ -6369,25 +6369,25 @@ async function loadFile(file){
     const ctx = await ensureAudioCtx();
     let __loadOK = false;
     const __loadCtrl = new AbortController();
-    _prog.show("読み込み中…","ファイルを読み取り中", __loadCtrl);
+    getProg().show("読み込み中…","ファイルを読み取り中", __loadCtrl);
     const __sig = __loadCtrl.signal;
     let ab;
     try{
       ab = await _readFileArrayBufferWithProgress(file, (r)=>{
-        if(r==null) _prog.set(null, "読み込み中…", "ファイルを読み取り中");
-        else _prog.set(0.05 + r*0.55, "読み込み中…", `ファイルを読み取り中（${Math.round(r*100)}%）`);
+        if(r==null) getProg().set(null, "読み込み中…", "ファイルを読み取り中");
+        else getProg().set(0.05 + r*0.55, "読み込み中…", `ファイルを読み取り中（${Math.round(r*100)}%）`);
       });
     }catch(err){
-      _prog.hide();
+      getProg().hide();
       throw err;
     }
-    _prog.set(0.60, "読み込み中…", "解析");
+    getProg().set(0.60, "読み込み中…", "解析");
     // early container validation
     const cinfo = detectWavContainer(ab);
     if(!cinfo.ok){
       throw new Error(`非対応/破損の可能性: ${cinfo.reason}`);
     }
-    _prog.set(0.64, "読み込み中…", "解析→CUE");
+    getProg().set(0.64, "読み込み中…", "解析→CUE");
   /* PDF_ATTACH_LOAD_HOOK */
   try{
     const list = pdfFindAllInWav(ab);
@@ -6496,7 +6496,7 @@ state.srcChunks = parseRiffChunks(ab);
 
     
     // --- Read existing CUEs BEFORE decodeAudioData (avoid detached ArrayBuffer) ---
-    try{ _prog.set(0.72, "読み込み中…", "CUE解析"); }catch(_){}
+    try{ getProg().set(0.72, "読み込み中…", "CUE解析"); }catch(_){}
     const cueSr = (state.fileSr && isFinite(state.fileSr)) ? state.fileSr : 48000;
     let existing = [];
     try{
@@ -6518,7 +6518,7 @@ state.srcChunks = parseRiffChunks(ab);
     }
 
     // --- decode for waveform/analyzer (use copy to keep srcAb intact) ---
-    try{ _prog.set(null, "読み込み中…", "波形準備（デコード）"); }catch(_){}
+    try{ getProg().set(null, "読み込み中…", "波形準備（デコード）"); }catch(_){}
     const buf = await new Promise((resolve,reject)=> ctx.decodeAudioData(ab.slice(0), resolve, reject));
     state.buffer = buf;
     state.sr = buf.sampleRate;
@@ -6530,12 +6530,12 @@ state.srcChunks = parseRiffChunks(ab);
     state.scrollPx = 0;
     state.playheadSec = 0;
 
-    try{ _prog.set(0.86, "読み込み中…", "波形生成"); }catch(_){}
+    try{ getProg().set(0.86, "読み込み中…", "波形生成"); }catch(_){}
     state.peaks = await buildPeaksAsync(buf, 6000, __sig, (r)=>{
-      try{ _prog.set(0.86 + r*0.10, "読み込み中…", "波形生成"); }catch(_){ }
+      try{ getProg().set(0.86 + r*0.10, "読み込み中…", "波形生成"); }catch(_){ }
     });
     _ensureNotCancelled(__sig);
-    try{ _prog.set(0.97, "読み込み中…", "UI反映"); }catch(_){ }
+    try{ getProg().set(0.97, "読み込み中…", "UI反映"); }catch(_){ }
 
     // Clamp cue positions with the true decoded duration
     try{
@@ -6581,11 +6581,11 @@ state.srcChunks = parseRiffChunks(ab);
     // Always close the overlay (and show 100% only when success)
     try{
       if(__loadOK){
-        _prog.set(1, "読み込み中…", "完了");
-        await _prog.yield();
+        getProg().set(1, "読み込み中…", "完了");
+        await getProg().yield();
       }
     }catch(_){}
-    try{ _prog.hide(); }catch(_){}
+    try{ getProg().hide(); }catch(_){}
     if(state.ui) state.ui.isLoadingWav = false;
   }
 }
@@ -9125,6 +9125,15 @@ function logExportPreflight(){
   }
 }
 
+function getProg(){
+  const p = (typeof window !== "undefined") ? window._prog : null;
+  if(p && typeof p.show==="function" && typeof p.hide==="function" && typeof p.set==="function") return p;
+  // 進捗UIが無くても処理を止めない（bulkの中断防止）
+  return {
+    show(){}, hide(){}, set(){},
+    setText(){}, setLabel(){}, setSub(){}, setDetail(){}
+  };
+}
 function _exportMakeError(message, silent){
   const err = new Error(message);
   if(silent) err.silent = true;
@@ -9203,7 +9212,7 @@ async function exportOneWithSave(options){
     const __ensureExportBar = (sub)=>{
       if(!progressEnabled) return;
       if(__exportBarShown) return;
-      _prog.show("書き出し中…", sub || "書き込み中…");
+      getProg().show("書き出し中…", sub || "書き込み中…");
       __exportBarShown = true;
     };
 
@@ -9226,7 +9235,7 @@ async function exportOneWithSave(options){
     const base = _baseNameNoExt(fallbackName || suggested || "output.wav");
     const backupBase = _sanitizeFileSegment(base);
 // --- build replacements (editable chunks only) ---
-    if(progressEnabled) _prog.set(0.18, "書き出し中…", "チャンク生成中");
+    if(progressEnabled) getProg().set(0.18, "書き出し中…", "チャンク生成中");
     const bextBuf = buildBextChunk();                        // bext (version preserved)
     const cmcdBuf = buildCmcdChunkFixed2048();               // cmcd (fixed 2048)
 
@@ -9305,20 +9314,20 @@ async function exportOneWithSave(options){
         if(!progressEnabled) return;
         if(phase==="picker_open"){
           // 保存先選択中はバーを出さない（要望）
-          if(__exportBarShown){ _prog.hide(); __exportBarShown = false; }
+          if(__exportBarShown){ getProg().hide(); __exportBarShown = false; }
         }else if(phase==="picked"){
           __ensureExportBar("書き込み準備…");
-          _prog.set(0.86, "書き出し中…", "保存先確定…");
+          getProg().set(0.86, "書き出し中…", "保存先確定…");
         }else if(phase==="writing"){
           __ensureExportBar("書き込み中…");
-          _prog.set(0.92, "書き出し中…", "書き込み中…");
+          getProg().set(0.92, "書き出し中…", "書き込み中…");
         }else if(phase==="download_start"){
           __ensureExportBar("ダウンロード開始…");
-          _prog.set(0.90, "書き出し中…", "ダウンロード開始…");
+          getProg().set(0.90, "書き出し中…", "ダウンロード開始…");
         }else if(phase==="done"){
-          if(__exportBarShown) _prog.set(0.96, "書き出し中…", "保存後処理…");
+          if(__exportBarShown) getProg().set(0.96, "書き出し中…", "保存後処理…");
         }else if(phase==="cancel"){
-          if(__exportBarShown){ _prog.hide(); __exportBarShown = false; }
+          if(__exportBarShown){ getProg().hide(); __exportBarShown = false; }
         }
       }catch(_){}
     });
@@ -9593,11 +9602,11 @@ async function exportOneWithSave(options){
   }finally{
     try{
       if(progressEnabled && __exportOK){
-        _prog.set(1, "書き出し中…", "完了");
-        await _prog.yield();
+        getProg().set(1, "書き出し中…", "完了");
+        await getProg().yield();
       }
     }catch(_){}
-    try{ if(progressEnabled) _prog.hide(); }catch(_){}
+    try{ if(progressEnabled) getProg().hide(); }catch(_){}
   }
 }
 
@@ -12618,7 +12627,7 @@ async function _scApplyAutoFix(){
 
   const fixCtrl = new AbortController();
   let fixProgShown = false;
-  try{ _prog.show("補正中…", "補正を実行中", fixCtrl); fixProgShown = true; }catch(_){ }
+  try{ getProg().show("補正中…", "補正を実行中", fixCtrl); fixProgShown = true; }catch(_){ }
 
   try{
     const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -12778,7 +12787,7 @@ async function _scApplyAutoFix(){
   }
 
     // re-measure
-    try{ _prog.set(null, "補正中…", "解析中…"); }catch(_){ }
+    try{ getProg().set(null, "補正中…", "解析中…"); }catch(_){ }
     _scRunMeasureAndRender();
 
     try{
@@ -12792,7 +12801,7 @@ async function _scApplyAutoFix(){
     }catch(_){ }
   }finally{
     if(fixProgShown){
-      try{ _prog.hide(); }catch(_){ }
+      try{ getProg().hide(); }catch(_){ }
     }
   }
 }
@@ -14554,9 +14563,9 @@ try{
     // already-declared functions/objects in a grouped way for easier discovery.
     modules: Object.freeze({
       progress: Object.freeze({
-        show: _prog.show,
-        set: _prog.set,
-        hide: _prog.hide,
+        show: getProg().show,
+        set: getProg().set,
+        hide: getProg().hide,
       }),
 
       riff: Object.freeze({
@@ -16017,6 +16026,7 @@ try{
       }catch(_){}
       return;
     }
+    console.log("[BulkExport] start", { total: targets.length, target: "visible-filtered" });
     let exportTarget = null;
     let exportFolderLabel = "";
     if(type === "export"){
@@ -16066,7 +16076,7 @@ try{
     logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
     updateJobUI();
     if(type === "export"){
-      _prog.show("一括書き出し中…", `0/${targets.length}`);
+      getProg().show("一括書き出し中…", `0/${targets.length}`);
     }else{
       bulkOverlay.start(type, targets.length);
     }
@@ -16085,7 +16095,7 @@ try{
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
           if(type === "export"){
             const pct = job.total ? (job.done / job.total) : 0;
-            _prog.set(pct, "一括書き出し中…", `${index}/${job.total} ${f.name || ""}`);
+            getProg().set(pct, "一括書き出し中…", `${index}/${job.total} ${f.name || ""}`);
           }else{
             bulkOverlay.update(job.done, job.total, f.name);
           }
@@ -16155,6 +16165,7 @@ try{
           historyEntry.failCount += 1;
           const failMsg = e?.message || e;
           logJob(`失敗: ${f.name} / ${failMsg}`);
+          console.error("[BulkExport] failed", { fileId: f?.id, name: f?.name, err: String(e), stack: e?.stack });
           if(type === "export"){
             console.log(`[BulkExport] (${index}/${targets.length}) fail name=${f.name} reason=${failMsg}`);
           }
@@ -16163,7 +16174,7 @@ try{
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
           if(type === "export"){
             const pct = job.total ? (job.done / job.total) : 0;
-            _prog.set(pct, "一括書き出し中…", `${Math.min(index, job.total)}/${job.total} ${f.name || ""}`);
+            getProg().set(pct, "一括書き出し中…", `${Math.min(index, job.total)}/${job.total} ${f.name || ""}`);
           }else{
             bulkOverlay.update(job.done, job.total, f.name);
           }
@@ -16183,11 +16194,11 @@ try{
 
       const status = job.cancel ? "cancel" : (job.failed.length ? "fail" : "success");
       if(type === "export"){
-        _prog.hide();
+        getProg().hide();
         console.log(`[BulkExport] done ok=${job.ok} fail=${job.failed.length}`);
-      }else{
-        bulkOverlay.end(type, status);
+        console.log("[BulkExport] done", { total: job.total, ok: job.ok, ng: job.failed.length, fail: job.failed.length });
       }
+      bulkOverlay.end(type, status);
       historyEntry.running = false;
       historyEntry.endedAt = Date.now();
       if(type === "export"){
@@ -16204,6 +16215,8 @@ try{
       console.log(`[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.okCount} ng=${historyEntry.ngCount} fail=${historyEntry.failCount}`);
       renderHistoryList();
       renderHistoryDetail();
+      getProg().hide();
+      bulkOverlay.end(type, status);
     }
   }
   function idsSelectedOrActive(){
@@ -16425,8 +16438,12 @@ try{
       console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
     });
 
-    $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc'));
-    $('proBtnBatchExport')?.addEventListener('click', ()=> runJob('export'));
+    $('proBtnBatchCheck')?.addEventListener('click', ()=> {
+      runJob('qc').catch((e)=> console.error("[BulkExport] runJob error", e));
+    });
+    $('proBtnBatchExport')?.addEventListener('click', ()=> {
+      runJob('export').catch((e)=> console.error("[BulkExport] runJob error", e));
+    });
 
     $('proJobMini')?.addEventListener('click', ()=> showJob(true));
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
