@@ -4329,7 +4329,7 @@ if(document.readyState === "loading"){
 /* ===============================
    PROGRESS (Load / Export)
 ================================ */
-const _prog = window._prog || (()=> {
+const _prog = (()=> {
   let ov=null, msg=null, sub=null, pctEl=null, bar=null, hint=null, cancelBtn=null;
   let token = 0;
   let visible = false;
@@ -4476,20 +4476,6 @@ const _prog = window._prog || (()=> {
   return { show, hide, set, step, run, yield:_yieldUI };
 })();
 window._prog = _prog;
-try {
-  if (typeof globalThis !== 'undefined') globalThis._prog = _prog;
-  if (typeof window !== 'undefined') window._prog = _prog;
-
-  // backward-compat: 一括側が getProg() / _getProg() を呼ぶビルドがある
-  if (typeof globalThis.getProg !== 'function') {
-    globalThis.getProg = () => (globalThis._prog || null);
-  }
-  if (typeof globalThis._getProg !== 'function') {
-    globalThis._getProg = globalThis.getProg;
-  }
-} catch (e) {
-  // ignore
-}
 
 function _readFileArrayBufferWithProgress(file, onProg){
   return new Promise((resolve, reject)=>{
@@ -9139,11 +9125,9 @@ function logExportPreflight(){
     log("WARN: チャンク解析が不完全 → 未知チャンク保持が保証できません（フォールバック再構築の可能性）");
   }
 }
-
 function getProg(){
   const p = (typeof window !== "undefined") ? window._prog : null;
   if(p && typeof p.show==="function" && typeof p.hide==="function" && typeof p.set==="function") return p;
-  // 進捗UIが無くても処理を止めない（bulkの中断防止）
   return {
     show(){}, hide(){}, set(){}, yield: async()=>{},
     setText(){}, setLabel(){}, setSub(){}, setDetail(){}
@@ -9245,7 +9229,6 @@ function buildExportReportJson(params){
   lines.push("WavCue Export Report");
   lines.push(`Date: ${new Date().toString()}`);
   lines.push(`Source: ${String(state.fileName||"")}`);
-  // Output filename: pickerなら実際に確定した名前（handle.name）を優先。downloadはユーザーが保存ダイアログで変更し得るため、名称は省略する。
   const _outMode = String(saveRes?.mode||"");
   let _outName = "";
   if(_outMode === "ipc"){
@@ -9279,9 +9262,6 @@ function buildExportReportJson(params){
     lines.push("");
     verifyDiffLines.forEach(l=> lines.push(l));
   }
-  // =========================
-  // QC / CMCD snapshot for team sharing
-  // =========================
   try{
     const qc = (typeof getLastQcForCurrentFile === "function") ? getLastQcForCurrentFile() : (window.__wavcueLastQc?.result || null);
     const qcHas = !!qc;
@@ -9327,7 +9307,7 @@ function buildExportReportJson(params){
       lines.push("- Items: （詳細なし）");
     }
   }catch(e){
-    try{ lines.push(""); lines.push("QC (規格チェック)"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){}
+    try{ lines.push(""); lines.push("QC (規格チェック)"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){ }
   }
 
   try{
@@ -9341,7 +9321,7 @@ function buildExportReportJson(params){
     lines.push(`- Applied: ${cmcdApplied ? "YES" : "NO"}`);
     lines.push(`- Preset: ${cmcdPresetName}${cmcdPresetId ? ` (id: ${cmcdPresetId})` : ""}`);
   }catch(e){
-    try{ lines.push(""); lines.push("CMCD"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){}
+    try{ lines.push(""); lines.push("CMCD"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){ }
   }
   lines.push("");
   lines.push("Log (tail)");
@@ -9423,7 +9403,6 @@ async function _exportOneWithSaveImpl(options){
     log("INFO: 書き出し開始");
     try{ logExportPreflight(); }catch(_){ }
 
-    // JPPA-1-2018: cue-point max 99 / NOTE label uniqueness
     const __cues = Array.isArray(state.cues) ? state.cues : [];
     if(__cues.length > 99){
       window.safeToast && window.safeToast("CUEは最大99件です（規格）","ng");
@@ -9443,7 +9422,6 @@ async function _exportOneWithSaveImpl(options){
       }
     }catch(_){ }
 
-    // BWF-J: Linear PCM only
     try{
       const pcm = detectPcmFromFmtPayload(state.srcFmtPayload);
       if(!pcm.ok){
@@ -9453,7 +9431,6 @@ async function _exportOneWithSaveImpl(options){
       }
     }catch(_){ }
 
-    // Label encoding strict check（Shift-JIS/CP932）
     try{
       const bad = [];
       for(const c of __cues){
@@ -9492,10 +9469,9 @@ async function _exportOneWithSaveImpl(options){
       autoBackupEnabled = settings?.autoBackupEnabled ?? true;
       autoCleanupEnabled = settings?.autoCleanup ?? true;
       autoCleanupOnExport = settings?.autoCleanup ?? true;
-    }catch(_){}
+    }catch(_){ }
     try{ scheduleDiffUpdate(true); }catch(_){ }
 
-    // 既定のファイル名は「元ファイル名」を提示（現場の命名ルールを尊重）
     const fallbackName = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
     const suggested = (options?.suggestedName && String(options.suggestedName).trim())
       ? String(options.suggestedName).trim()
@@ -9511,7 +9487,6 @@ async function _exportOneWithSaveImpl(options){
       try{
         if(!progressEnabled) return;
         if(phase==="picker_open"){
-          // 保存先選択中はバーを出さない（要望）
           if(__exportBarShown){ getProg().hide(); __exportBarShown = false; }
         }else if(phase==="picked"){
           __ensureExportBar("書き込み準備…");
@@ -9527,14 +9502,13 @@ async function _exportOneWithSaveImpl(options){
         }else if(phase==="cancel"){
           if(__exportBarShown){ getProg().hide(); __exportBarShown = false; }
         }
-      }catch(_){}
+      }catch(_){ }
     });
     if(_saveRes && _saveRes.mode === "cancel"){
       log("INFO: 書き出しをキャンセルしました。");
       return { ok:false, canceled:true };
     }
 
-    // Self-verify: 透過チャンク（未知/編集対象外）とiXMLの保持を簡易検証
     let verifyOk = true;
     const verifyNotes = [];
     const verifyDiffLines = [];
@@ -9557,7 +9531,6 @@ async function _exportOneWithSaveImpl(options){
       if(want.join("|") !== got.join("|")){
         verifyOk = false;
         verifyNotes.push("未知/透過チャンクの保持が一致しません（件数/サイズ差分）。");
-        // Differences (multiset compare of "4CC:size")
         try{
           const toCounts = (arr)=>{
             const m = new Map();
@@ -9586,7 +9559,7 @@ async function _exportOneWithSaveImpl(options){
             extra.slice(0,LIM).forEach(([k,n])=> verifyDiffLines.push(`- Extra: ${fmt(k,n)}`));
             if(extra.length > LIM) verifyDiffLines.push(`- Extra: ... (${extra.length - LIM} more)`);
           }
-        }catch(_e){}
+        }catch(_e){ }
       }
       const hadIXml = !!state.srcIXmlPayload;
       const hasIXmlOut = !!_riffExtractChunkPayload(outAb, "iXML");
@@ -9599,7 +9572,6 @@ async function _exportOneWithSaveImpl(options){
       verifyNotes.push("自己検証で例外が発生しました。");
     }
 
-    // Auto backup + report (app-managed folders)
     if(autoBackupEnabled){
       try{
         const report = buildExportReportJson({
@@ -9651,7 +9623,7 @@ async function _exportOneWithSaveImpl(options){
           settingsLogAdd(`書き出し後のクリーンアップがエラーで終了しました（エラー ${cleanupResult.summary?.errorCount ?? "不明"}件）。`);
           window.safeToast && window.safeToast("自動クリーンアップがエラーで終了しました", "warn", 3600);
         }
-      }catch(_){}
+      }catch(_){ }
     }
 
     __exportOK = true;
@@ -9671,8 +9643,8 @@ async function _exportOneWithSaveImpl(options){
         getProg().set(1, "書き出し中…", "完了");
         await getProg().yield();
       }
-    }catch(_){}
-    try{ if(progressEnabled) getProg().hide(); }catch(_){}
+    }catch(_){ }
+    try{ if(progressEnabled) getProg().hide(); }catch(_){ }
   }
 }
 
@@ -9699,7 +9671,85 @@ async function exportWav(){
   });
 }
 
+function normalizeExportFileName(name){
+  const raw = String(name || "").trim();
+  const baseName = (raw ? raw.split(/[\\/]/).pop() : "") || "output.wav";
+  const extMatch = baseName.match(/\.[^.]+$/);
+  const ext = (extMatch && extMatch[0]) ? extMatch[0] : ".wav";
+  const base = extMatch ? baseName.slice(0, -ext.length) : baseName;
+  const safeBase = _sanitizeFileSegment(base || "output");
+  const safeExt = ext || ".wav";
+  return { base: safeBase, ext: safeExt };
+}
+async function writeBlobToIpcFolder(folderPath, name, blob){
+  if(!window.wavcue?.writeFileBase64){
+    throw new Error("writeFileBase64 is unavailable.");
+  }
+  const { base, ext } = normalizeExportFileName(name);
+  const dataBase64 = _base64FromArrayBuffer(await blob.arrayBuffer());
+  const MAX_TRIES = 1000;
+  for(let i=0; i<MAX_TRIES; i++){
+    const suffix = i === 0 ? "" : `_${i}`;
+    const fileName = `${base}${suffix}${ext}`;
+    const res = await window.wavcue.writeFileBase64({
+      folderPath,
+      fileName,
+      dataBase64,
+    });
+    if(res?.ok){
+      return { mode:"ipc", filePath: res.filePath || fileName, suggested: fileName };
+    }
+    if(res?.error && /EEXIST/i.test(res.error)){
+      continue;
+    }
+    throw new Error(res?.error || "write failed");
+  }
+  throw new Error("同名ファイルが多すぎます");
+}
+async function exportOneToTarget(targetOrOpts, suggestedName){
+  if(typeof targetOrOpts === "string"){
+    return exportOneToTarget({ target: { kind:"ipc", folderPath: targetOrOpts }, suggestedName });
+  }
+  const opts = (targetOrOpts && targetOrOpts.target) ? targetOrOpts : null;
+  let target = opts ? opts.target : targetOrOpts;
+  const name = opts ? opts.suggestedName : suggestedName;
+  const fileId = opts?.fileId;
+  if(!target && opts?.folderPath){
+    target = { kind:"ipc", folderPath: opts.folderPath };
+  }
+  const saveHandler = async (blob, nameArg, onPhase)=>{
+    if(target?.kind === "ipc"){
+      if(onPhase) onPhase("writing");
+      return await writeBlobToIpcFolder(target.folderPath, nameArg, blob);
+    }
+    throw new Error("export target is unavailable");
+  };
+  const res = await _exportOneWithSaveImpl({
+    saveHandler,
+    suggestedName: name,
+    progressEnabled: false,
+    notifyOnError: false,
+    fileId,
+  });
+  const savedName = res?.save?.suggested || res?.save?.filePath || name;
+  return { ok: !!res?.ok, error: res?.error, save: res?.save, savedName };
+}
 
+const WavCueExportCore = {
+  getProg,
+  buildExportWavBytes,
+  exportOneWithSave,
+  exportOneToTarget: async (optsOrFolder, nameArg)=>{
+    if(typeof optsOrFolder === "string"){
+      return exportOneToTarget(optsOrFolder, nameArg);
+    }
+    return exportOneToTarget(optsOrFolder);
+  },
+};
+window.WavCueExportCore = WavCueExportCore;
+window.getProg = WavCueExportCore.getProg;
+window.buildExportWavBytes = WavCueExportCore.buildExportWavBytes;
+window.exportOneWithSave = WavCueExportCore.exportOneWithSave;
 /* Buttons */
 function updateButtons(){
 if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
@@ -14699,12 +14749,10 @@ try{
     filter:{status:'all'},
     lastClickIndex:null,
     popover:{openType:null, openFileId:null, anchorEl:null},
-    historyTriggerLogged:false,
-    bulkExportTarget:null
+    historyTriggerLogged:false
   };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
   const history = { entries:[], active:null, selectedId:null };
-  let __bulkExportRunning = false;
 
   (function ensureGlobalLog(){
     if(typeof window.log === "function") return;
@@ -15983,36 +16031,12 @@ try{
     renderHistoryList();
     renderHistoryDetail();
   }
-  function normalizeExportFileName(name){
-    const raw = String(name || "").trim();
-    const baseName = (raw ? raw.split(/[\\/]/).pop() : "") || "output.wav";
-    const extMatch = baseName.match(/\.[^.]+$/);
-    const ext = (extMatch && extMatch[0]) ? extMatch[0] : ".wav";
-    const base = extMatch ? baseName.slice(0, -ext.length) : baseName;
-    const safeBase = _sanitizeFileSegment(base || "output");
-    const safeExt = ext || ".wav";
-    return { base: safeBase, ext: safeExt };
-  }
   async function resolveBulkExportTarget(){
-    if(project.bulkExportTarget) return project.bulkExportTarget;
     if(window.wavcue?.pickExportFolder && window.wavcue?.writeFileBase64){
       const res = await window.wavcue.pickExportFolder();
       if(res?.canceled) return null;
       if(res?.folderPath){
-        project.bulkExportTarget = { kind:"ipc", folderPath: res.folderPath };
-        return project.bulkExportTarget;
-      }
-    }
-    if(typeof window.showDirectoryPicker === "function"){
-      try{
-        const handle = await window.showDirectoryPicker();
-        if(handle){
-          project.bulkExportTarget = { kind:"fs", dirHandle: handle };
-          return project.bulkExportTarget;
-        }
-      }catch(err){
-        if(err && err.name === "AbortError") return null;
-        throw err;
+        return { kind:"ipc", folderPath: res.folderPath };
       }
     }
     logJob("書き出し先フォルダの選択に失敗しました。");
@@ -16021,119 +16045,10 @@ try{
     }catch(_){}
     return null;
   }
-  async function writeBlobToDirectoryHandle(dirHandle, name, blob){
-    const { base, ext } = normalizeExportFileName(name);
-    const MAX_TRIES = 1000;
-    for(let i=0; i<MAX_TRIES; i++){
-      const suffix = i === 0 ? "" : `_${i}`;
-      const fileName = `${base}${suffix}${ext}`;
-      let exists = false;
-      try{
-        await dirHandle.getFileHandle(fileName);
-        exists = true;
-      }catch(err){
-        if(err && err.name === "NotFoundError"){
-          exists = false;
-        }else{
-          throw err;
-        }
-      }
-      if(exists) continue;
-      const fileHandle = await dirHandle.getFileHandle(fileName, { create: true });
-      const writable = await fileHandle.createWritable();
-      await writable.write(blob);
-      await writable.close();
-      return { mode:"fs", filePath: fileName, suggested: fileName };
-    }
-    throw new Error("同名ファイルが多すぎます");
-  }
-  async function writeBlobToIpcFolder(folderPath, name, blob){
-    if(!window.wavcue?.writeFileBase64){
-      throw new Error("writeFileBase64 is unavailable.");
-    }
-    const { base, ext } = normalizeExportFileName(name);
-    const dataBase64 = _base64FromArrayBuffer(await blob.arrayBuffer());
-    const MAX_TRIES = 1000;
-    for(let i=0; i<MAX_TRIES; i++){
-      const suffix = i === 0 ? "" : `_${i}`;
-      const fileName = `${base}${suffix}${ext}`;
-      const res = await window.wavcue.writeFileBase64({
-        folderPath,
-        fileName,
-        dataBase64,
-      });
-      if(res?.ok){
-        return { mode:"ipc", filePath: res.filePath || fileName, suggested: fileName };
-      }
-      if(res?.error && /EEXIST/i.test(res.error)){
-        continue;
-      }
-      throw new Error(res?.error || "write failed");
-    }
-    throw new Error("同名ファイルが多すぎます");
-  }
-  async function exportOneToTarget(targetOrOpts, suggestedName){
-    if(typeof targetOrOpts === "string"){
-      return exportOneToTarget({ target: { kind:"ipc", folderPath: targetOrOpts }, suggestedName });
-    }
-    const opts = (targetOrOpts && targetOrOpts.target) ? targetOrOpts : null;
-    let target = opts ? opts.target : targetOrOpts;
-    const name = opts ? opts.suggestedName : suggestedName;
-    const fileId = opts?.fileId;
-    if(!target && opts?.folderPath){
-      target = { kind:"ipc", folderPath: opts.folderPath };
-    }
-    const saveHandler = async (blob, nameArg, onPhase)=>{
-      if(target?.kind === "ipc"){
-        if(onPhase) onPhase("writing");
-        return await writeBlobToIpcFolder(target.folderPath, nameArg, blob);
-      }
-      if(target?.kind === "fs"){
-        if(onPhase) onPhase("writing");
-        return await writeBlobToDirectoryHandle(target.dirHandle, nameArg, blob);
-      }
-      throw new Error("export target is unavailable");
-    };
-    const res = await _exportOneWithSaveImpl({
-      saveHandler,
-      suggestedName: name,
-      progressEnabled: false,
-      notifyOnError: false,
-      fileId,
-    });
-    const savedName = res?.save?.suggested || res?.save?.filePath || name;
-    return { ok: !!res?.ok, error: res?.error, save: res?.save, savedName };
-  }
-  const WavCueExportCore = {
-    getProg,
-    buildExportWavBytes,
-    exportOneWithSave,
-    exportOneToTarget: async (optsOrFolder, nameArg)=>{
-      if(typeof optsOrFolder === "string"){
-        return exportOneToTarget(optsOrFolder, nameArg);
-      }
-      return exportOneToTarget(optsOrFolder);
-    },
-  };
-  window.WavCueExportCore = WavCueExportCore;
-  window.getProg = WavCueExportCore.getProg;
-  window.buildExportWavBytes = WavCueExportCore.buildExportWavBytes;
-  window.exportOneWithSave = WavCueExportCore.exportOneWithSave;
   async function runJob(type, idsOverride){
     const usingOverride = Array.isArray(idsOverride);
     const targets = usingOverride ? idsOverride : getVisibleFileIds();
-    const filterStatus = project?.filter?.status;
-    const filterOn = !!filterStatus && filterStatus !== "all";
-    const progFallback = {
-      show(){}, hide(){}, set(){}, yield: async()=>{},
-      setText(){}, setLabel(){}, setSub(){}, setDetail(){}
-    };
-    const exportCore = window?.WavCueExportCore || null;
-    const progRef = exportCore?.getProg ? exportCore.getProg() : ((typeof getProg === "function") ? getProg() : (window?._prog || null));
-    const prog = (progRef && typeof progRef.show==="function" && typeof progRef.hide==="function" && typeof progRef.set==="function")
-      ? progRef
-      : progFallback;
-    const overlay = (typeof bulkOverlay !== "undefined") ? bulkOverlay : null;
+    const filterOn = project.filter.status && project.filter.status !== "all";
     console.log(`[Bulk] target=${usingOverride ? "override" : "visible"} count=${targets.length} filter=${filterOn ? "on" : "off"} action=${type==="qc" ? "QC" : "EXPORT"}`);
     if(!targets.length){
       logJob("対象件数: 0");
@@ -16143,31 +16058,22 @@ try{
       }catch(_){}
       return;
     }
-    console.log("[BULK] start total=" + targets.length);
-    let bulkStartedAt = 0;
+    const prog = getProg();
     let exportTarget = null;
-    let exportFolderLabel = "";
+    let bulkStartedAt = 0;
     if(type === "export"){
       bulkStartedAt = Date.now();
+      console.log(`[BULK] start total=${targets.length}`);
       prog.show("一括書き出し中…", `0/${targets.length}`);
       exportTarget = await resolveBulkExportTarget();
       if(!exportTarget){
         logJob("一括書き出しをキャンセルしました。");
-        try{
-          if(typeof toast === "function") toast("一括書き出しをキャンセルしました", "warn");
-        }catch(_){}
         prog.hide();
         return;
       }
-      if(exportTarget.kind === "ipc"){
-        exportFolderLabel = exportTarget.folderPath || "";
-      }else if(exportTarget.kind === "fs"){
-        exportFolderLabel = exportTarget.dirHandle?.name || "";
-      }
+      const exportFolderLabel = exportTarget.folderPath || "";
       console.log(`[BULK] pickFolder ok path=${exportFolderLabel}`);
-      logJob(`[BulkExport] start total=${targets.length} folder=${exportFolderLabel} filter=${filterOn ? filterStatus : "all"}`);
     }
-    __bulkExportRunning = true;
     job.running = true;
     job.cancel=false;
     job.failed=[];
@@ -16199,7 +16105,7 @@ try{
     logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
     updateJobUI();
     if(type !== "export"){
-      overlay?.start?.(type, targets.length);
+      bulkOverlay.start(type, targets.length);
     }
 
     let qcUpdatedRows = 0;
@@ -16218,7 +16124,7 @@ try{
             const pct = job.total ? (job.done / job.total) : 0;
             prog.set(pct, "一括書き出し中…", `${index}/${job.total} ${f.name || ""}`);
           }else{
-            overlay?.update?.(job.done, job.total, f.name);
+            bulkOverlay.update(job.done, job.total, f.name);
           }
           if(type==='qc'){
             const st = window.WavCue?.state;
@@ -16266,17 +16172,17 @@ try{
             const fileLabel = f.name || state.fileName || "export.wav";
             const fileStartedAt = Date.now();
             console.log(`[BULK] file ${index}/${targets.length} begin id=${id} name=${fileLabel}`);
-            const res = exportCore?.exportOneToTarget
-              ? await exportCore.exportOneToTarget({ target: exportTarget, suggestedName: fileLabel, fileId: id })
-              : await exportOneToTarget(exportTarget, fileLabel);
+            const res = await window.WavCueExportCore.exportOneToTarget({
+              target: exportTarget,
+              suggestedName: fileLabel,
+              fileId: id,
+            });
             if(!res?.ok){
               const msg = res?.error?.message || res?.error || "export failed";
               throw new Error(msg);
             }
             f.status.exported = true;
-            const savedName = res?.savedName || fileLabel || "exported";
-            historyEntry.exportedNames.push(savedName);
-            const savedPath = res?.save?.filePath || savedName;
+            historyEntry.exportedNames.push(res?.savedName || fileLabel || "exported");
             console.log(`[BULK] file ${index}/${targets.length} ok ms=${Date.now() - fileStartedAt}`);
           }
           job.ok++;
@@ -16288,12 +16194,10 @@ try{
         }catch(e){
           job.failed.push(id);
           historyEntry.failCount += 1;
-          const failMsg = e?.message || e;
-          logJob(`失敗: ${f.name} / ${failMsg}`);
-          console.error("[BulkExport] failed", { fileId: f?.id, name: f?.name, err: String(e), stack: e?.stack });
+          logJob(`失敗: ${f.name} / ${e?.message || e}`);
           if(type === "export"){
             const stack = e?.stack ? String(e.stack) : "";
-            console.log(`[BULK] file ${index}/${targets.length} ng reason=${failMsg} stack=${stack}`);
+            console.log(`[BULK] file ${index}/${targets.length} ng reason=${e?.message || e} stack=${stack}`);
           }
         }finally{
           job.done++;
@@ -16302,14 +16206,13 @@ try{
             const pct = job.total ? (job.done / job.total) : 0;
             prog.set(pct, "一括書き出し中…", `${Math.min(index, job.total)}/${job.total} ${f.name || ""}`);
           }else{
-            overlay?.update?.(job.done, job.total, f.name);
+            bulkOverlay.update(job.done, job.total, f.name);
           }
           render();
         }
       }
     }finally{
       logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
-      __bulkExportRunning = false;
       if(type==='qc'){
         console.log(`[QC][bulk] done updatedRows=${qcUpdatedRows}`);
         render();
@@ -16324,7 +16227,7 @@ try{
         prog.hide();
         console.log(`[BULK] end ok=${job.ok} ng=${job.failed.length} ms=${Date.now() - bulkStartedAt}`);
       }
-      overlay?.end?.(type, status);
+      bulkOverlay.end(type, status);
       historyEntry.running = false;
       historyEntry.endedAt = Date.now();
       if(type === "export"){
@@ -16341,8 +16244,6 @@ try{
       console.log(`[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.okCount} ng=${historyEntry.ngCount} fail=${historyEntry.failCount}`);
       renderHistoryList();
       renderHistoryDetail();
-      prog.hide();
-      overlay?.end?.(type, status);
     }
   }
   function idsSelectedOrActive(){

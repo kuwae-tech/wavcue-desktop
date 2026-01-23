@@ -627,6 +627,38 @@ ipcMain.handle('settings:get-backup-status', async () => {
   };
 });
 
+ipcMain.handle('export:pickFolder', async () => {
+  try {
+    const { canceled, filePaths } = await dialog.showOpenDialog({
+      title: '書き出し先フォルダを選択',
+      properties: ['openDirectory', 'createDirectory'],
+    });
+    if (canceled || !filePaths || !filePaths[0]) {
+      return { ok: false, canceled: true };
+    }
+    return { ok: true, folderPath: filePaths[0] };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle('export:writeFileBase64', async (_event, { folderPath, fileName, dataBase64 }) => {
+  try {
+    if (!folderPath || !fileName || !dataBase64) {
+      return { ok: false, error: 'Missing export parameters.' };
+    }
+    const resolvedPath = ensureWavExtension(path.join(folderPath, fileName));
+    const buf = Buffer.from(dataBase64, 'base64');
+    fsSync.writeFileSync(resolvedPath, buf, { flag: 'wx' });
+    return { ok: true, filePath: resolvedPath };
+  } catch (error) {
+    if (error && error.code === 'EEXIST') {
+      return { ok: false, error: 'EEXIST' };
+    }
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
 ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) => {
   try {
     const { canceled, filePath } = await dialog.showSaveDialog({
