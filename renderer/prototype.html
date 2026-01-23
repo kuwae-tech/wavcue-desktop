@@ -9436,7 +9436,7 @@ async function _exportOneWithSaveImpl(options){
       for(const c of __cues){
         const s = (c && c.label != null) ? String(c.label) : "";
         if(!s) continue;
-        const enc = cp932EncodeEx(s + "\0");
+        const enc = cp932EncodeEx(s + "\\0");
         if(enc && enc.hadReplace){
           bad.push(s);
           if(bad.length >= 3) break;
