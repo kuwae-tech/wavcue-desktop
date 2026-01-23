@@ -1841,6 +1841,48 @@
   backdrop-filter: blur(2px);
 }
 
+/* ===== Bulk Export NG preflight dialog ===== */
+dialog.bulkNgDialog{
+  width: min(560px, 92vw);
+  max-width: 560px;
+}
+.bulkNgDialog .bulkNgDesc{
+  font-size: 13px;
+  opacity: .9;
+  line-height: 1.5;
+}
+.bulkNgDialog .bulkNgList{
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: min(46vh, 360px);
+  overflow: auto;
+  padding-right: 4px;
+}
+.bulkNgDialog .bulkNgItem{
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.03);
+}
+.bulkNgDialog .bulkNgName{
+  font-weight: 700;
+  font-size: 14px;
+}
+.bulkNgDialog .bulkNgReasons{
+  margin: 6px 0 0 0;
+  padding-left: 1.1em;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.bulkNgDialog .bulkNgActions{
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 12px;
+}
+/* ===== /Bulk Export NG preflight dialog ===== */
+
 /* ===== StdCheck dialog stability tweaks (tabbed preset) ===== */
 .stdCheckDialog{
   width: min(900px, 92vw);
@@ -3829,6 +3871,18 @@ body, #appRoot, .appRoot, .mainLayout{
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:14px">
       <button type="button" class="btn" id="exportQcNgCancelBtn">キャンセル</button>
       <button type="button" class="btn primary" id="exportQcNgProceedBtn">このまま書き出す</button>
+    </div>
+  </div>
+</dialog>
+<dialog id="bulkExportNgDialog" class="modal bulkNgDialog">
+  <div class="modalHead">
+    <div class="title"><b>一括書き出しできないファイルがあります</b></div>
+  </div>
+  <div class="modalBody">
+    <div class="bulkNgDesc">以下のファイルを修正してから再度お試しください</div>
+    <div id="bulkExportNgList" class="bulkNgList"></div>
+    <div class="bulkNgActions">
+      <button type="button" class="btn" id="bulkExportNgClose">閉じる</button>
     </div>
   </div>
 </dialog>
@@ -16045,6 +16099,46 @@ try{
     }catch(_){}
     return null;
   }
+  function formatBulkNgReasons(qcResult, limit){
+    const { ng } = safeExtract(qcResult || null);
+    if(!ng.length) return [];
+    const out = [];
+    for(const raw of ng){
+      const detail = formatNgDetailItem(raw);
+      const label = detail.label || "NG";
+      const reason = (detail.reason && detail.reason !== "詳細不明") ? `：${detail.reason}` : "";
+      out.push(`${label}${reason}`);
+      if(limit && out.length >= limit) break;
+    }
+    return out;
+  }
+  function openBulkExportNgDialog(items){
+    const dlg = $("bulkExportNgDialog");
+    const list = $("bulkExportNgList");
+    if(!dlg || !list) return false;
+    list.innerHTML = "";
+    if(!items.length){
+      list.innerHTML = `<div class="muted">NG項目はありません。</div>`;
+    }else{
+      list.innerHTML = items.map(entry=>{
+        const reasons = entry.reasons?.length ? entry.reasons : ["規格NG"];
+        const reasonHtml = reasons.map(r=>`<li>${esc(r)}</li>`).join("");
+        return `<div class="bulkNgItem">
+          <div class="bulkNgName">${esc(entry.name)}</div>
+          <ul class="bulkNgReasons">${reasonHtml}</ul>
+        </div>`;
+      }).join("");
+    }
+    try{
+      if(dlg.open) dlg.close();
+    }catch(_){}
+    try{
+      dlg.showModal();
+    }catch(_){
+      try{ dlg.show(); }catch(__){}
+    }
+    return true;
+  }
   async function runJob(type, idsOverride){
     const usingOverride = Array.isArray(idsOverride);
     const targets = usingOverride ? idsOverride : getVisibleFileIds();
@@ -16062,6 +16156,24 @@ try{
     let exportTarget = null;
     let bulkStartedAt = 0;
     if(type === "export"){
+      console.log(`[BULK][PREFLIGHT] start total=${targets.length}`);
+      const ngItems = [];
+      targets.forEach(id=>{
+        const f = project.files.find(x=>x.id===id);
+        if(!f) return;
+        const { ng } = safeExtract(f.qcResult || null);
+        if(!ng.length) return;
+        const reasons = formatBulkNgReasons(f.qcResult || null, 3);
+        const name = f.name || `file:${id}`;
+        console.log(`[BULK][PREFLIGHT] ng file=${name} reasons=${reasons.join(" / ") || "規格NG"}`);
+        ngItems.push({ id, name, reasons });
+      });
+      console.log(`[BULK][PREFLIGHT] ngCount=${ngItems.length}`);
+      if(ngItems.length){
+        openBulkExportNgDialog(ngItems);
+        return;
+      }
+      console.log("[BULK][PREFLIGHT] pass -> continue");
       bulkStartedAt = Date.now();
       console.log(`[BULK] start total=${targets.length}`);
       prog.show("一括書き出し中…", `0/${targets.length}`);
@@ -16470,6 +16582,24 @@ try{
     });
     $('proBtnBatchExport')?.addEventListener('click', ()=> {
       runJob('export').catch((e)=> console.error("[BulkExport] runJob error", e));
+    });
+    const bulkNgDlg = $("bulkExportNgDialog");
+    if(bulkNgDlg && !bulkNgDlg.dataset.bound){
+      bulkNgDlg.dataset.bound = "1";
+      bulkNgDlg.addEventListener("click", (e)=>{
+        if(e.target === bulkNgDlg){
+          try{ bulkNgDlg.close(); }catch(_){ bulkNgDlg.removeAttribute("open"); }
+        }
+      });
+      bulkNgDlg.addEventListener("cancel", (e)=>{
+        e.preventDefault();
+        try{ bulkNgDlg.close(); }catch(_){ bulkNgDlg.removeAttribute("open"); }
+      });
+    }
+    $("bulkExportNgClose")?.addEventListener("click", ()=>{
+      if(bulkNgDlg){
+        try{ bulkNgDlg.close(); }catch(_){ bulkNgDlg.removeAttribute("open"); }
+      }
     });
 
     $('proJobMini')?.addEventListener('click', ()=> showJob(true));
