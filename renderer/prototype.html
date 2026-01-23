@@ -4475,6 +4475,7 @@ const _prog = (()=> {
 
   return { show, hide, set, step, run, yield:_yieldUI };
 })();
+window._prog = _prog;
 
 function _readFileArrayBufferWithProgress(file, onProg){
   return new Promise((resolve, reject)=>{
@@ -9124,22 +9125,289 @@ function logExportPreflight(){
     log("WARN: チャンク解析が不完全 → 未知チャンク保持が保証できません（フォールバック再構築の可能性）");
   }
 }
+function getProg(){
+  const p = (typeof window !== "undefined") ? window._prog : null;
+  if(p && typeof p.show==="function" && typeof p.hide==="function" && typeof p.set==="function") return p;
+  return {
+    show(){}, hide(){}, set(){}, yield: async()=>{},
+    setText(){}, setLabel(){}, setSub(){}, setDetail(){}
+  };
+}
+async function buildExportWavBytes(opts){
+  const targetFileId = opts?.fileId;
+  if(targetFileId && typeof setActiveFile === "function" && state.activeFileId !== targetFileId){
+    await setActiveFile(targetFileId, { force:true });
+  }
+  if(!state.buffer || !state.srcFmtPayload || !state.srcDataPayload){
+    throw _exportMakeError("書き出し前提データがありません", true);
+  }
+// --- build replacements (editable chunks only) ---
+  const bextBuf = buildBextChunk();                        // bext (version preserved)
+  const cmcdBuf = buildCmcdChunkFixed2048();               // cmcd (fixed 2048)
 
-async function exportWav(){
+  // cue / plst / LIST(adtl) (ファイル添付は LIST/adtl/file)
+  // Hybrid: when ONLY moving existing cues (no add/remove/label change, no attachment),
+  // patch the source 'cue ' chunk values in-place. Otherwise rebuild cue/LIST as before.
+  let srcAbForBuild = state.srcAb;
+  let cueChunk = null, listChunk = null, plstChunk = null;
+
+  const hasAttach = Array.isArray(state.attachments) && state.attachments.some(a=>a && a.bytes && a.bytes.length);
+  const sigNow = cueSig(state.cues);
+  const canInPlaceMove =
+    !hasAttach &&
+    !!state.srcAb &&
+    !!state.cuePatchMeta &&
+    !!state.loadedCueSig &&
+    (sigNow === state.loadedCueSig);
+
+  if(canInPlaceMove){
+    // Patch the existing 'cue ' chunk(s) sample offsets (no size/order changes)
+    srcAbForBuild = applyCueInPlacePatch(state.srcAb, state.cuePatchMeta, state.cues, ((state.fileSr && isFinite(state.fileSr)) ? state.fileSr : state.buffer.sampleRate));
+    cueChunk = null;
+    listChunk = null;
+    // plst は規格互換のため再生成（BC$NOTE除外 / 全BC$）
+    try{ plstChunk = buildCueChunks(state.buffer, state.cues).plstChunk; }catch(_){ plstChunk = null; }
+    log("INFO: CUEは元チャンクを更新（移動のみ / ハイブリッド）");
+    if(plstChunk) log("INFO: plstを再生成（BC$NOTE除外 / 全BC$）");
+  }else{
+    const built = buildCueChunks(state.buffer, state.cues);
+    cueChunk = built.cueChunk;
+    listChunk = built.listChunk;
+    plstChunk = built.plstChunk;
+  }
+
+  // data: only replace when auto-level fix was applied (PCM bytes are still PCM16)
+  const dataBuf = (state.procApplied && state.procDataPayload)
+    ? _makeChunk("data", state.procDataPayload)
+    : null;
+
+  const replacements = {
+    bextBuf: (bextBuf instanceof Uint8Array) ? bextBuf : new Uint8Array(bextBuf),
+    cmcdBuf: (cmcdBuf instanceof Uint8Array) ? cmcdBuf : new Uint8Array(cmcdBuf),
+    cueBuf:  cueChunk ? ((cueChunk instanceof Uint8Array) ? cueChunk : new Uint8Array(cueChunk)) : null,
+    plstBuf: plstChunk ? ((plstChunk instanceof Uint8Array) ? plstChunk : new Uint8Array(plstChunk)) : null,
+    listBuf: listChunk ? ((listChunk instanceof Uint8Array) ? listChunk : new Uint8Array(listChunk)) : null,
+    dataBuf: dataBuf, // Uint8Array from _makeChunk, or null
+    fmtBuf:  null,    // keep original 'fmt ' as-is
+  };;
+
+  // --- chunk-level rebuild (pass-through iXML + unknown chunks) ---
+  let blob = null;
+  const chunks = state.srcChunks || parseRiffChunks(state.srcAb);
+  if(state.srcAb && chunks && Array.isArray(chunks) && chunks.length){
+    blob = rebuildWaveFromOriginal(srcAbForBuild || state.srcAb, chunks, replacements);
+  }else{
+    // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
+    log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
+    const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
+    const pcmPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
+    const dataBuf2 = _makeChunk("data", pcmPayload);
+    const parts = [
+      new Uint8Array(bextBuf),
+      fmtBuf,
+      dataBuf2,
+      new Uint8Array(cmcdBuf),
+      new Uint8Array(cueChunk),
+      ...(plstChunk ? [new Uint8Array(plstChunk)] : []),
+      new Uint8Array(listChunk),
+    ];
+    const outAb = _buildCanonicalWavFromParts(parts);
+    blob = new Blob([outAb], {type:"audio/wav"});
+  }
+  const outAb = await blob.arrayBuffer();
+  return new Uint8Array(outAb);
+}
+function buildExportReportJson(params){
+  const saveRes = params?.saveRes || null;
+  const suggested = params?.suggestedName || "output.wav";
+  const verifyOk = params?.verifyOk ?? true;
+  const verifyNotes = params?.verifyNotes || [];
+  const verifyDiffLines = params?.verifyDiffLines || [];
+  const exportBytes = params?.exportBytes || new Uint8Array();
+
+  const lines = [];
+  lines.push("WavCue Export Report");
+  lines.push(`Date: ${new Date().toString()}`);
+  lines.push(`Source: ${String(state.fileName||"")}`);
+  const _outMode = String(saveRes?.mode||"");
+  let _outName = "";
+  if(_outMode === "ipc"){
+    _outName = String(_baseNameFromPath(saveRes?.filePath) || saveRes?.suggested || suggested || "");
+  }else{
+    _outName = String(saveRes?.suggested || suggested || "");
+  }
+  if(_outName){
+    lines.push(`Output: ${_outName} (${_outMode})`);
+  }else{
+    lines.push(`Output: — (${_outMode})`);
+  }
+  lines.push("Backup: export.wav (auto)");
+  try{
+    const norm=(s)=> String(s||"").trim().replace(/\s+/g,"").toUpperCase();
+    const bcCount = (Array.isArray(state.cues)?state.cues:[]).filter(c=>{
+      const t = norm(c && c.label);
+      return t.startsWith("BC$") && !t.startsWith("BC$NOTE");
+    }).length;
+    lines.push(`plst: ${bcCount} segments (BC$NOTE excluded)`);
+  }catch(_){ }
+
+  lines.push("");
+  lines.push("Change Summary (Original -> Current)");
+  const diffs = (state._diff && state._diff.diffs) ? state._diff.diffs : diffSnapshots(state.originalSnapshot, takeSnapshot());
+  diffs.forEach(d=> lines.push(`- [${d.sec}] ${d.item}: ${d.from} -> ${d.to}`));
+  lines.push("");
+  lines.push(`Self-Verify: ${verifyOk ? "PASS" : "FAIL"}`);
+  verifyNotes.forEach(n=> lines.push(`- ${n}`));
+  if(verifyDiffLines.length){
+    lines.push("");
+    verifyDiffLines.forEach(l=> lines.push(l));
+  }
+  try{
+    const qc = (typeof getLastQcForCurrentFile === "function") ? getLastQcForCurrentFile() : (window.__wavcueLastQc?.result || null);
+    const qcHas = !!qc;
+    const ex = (typeof extractQcNgItems === "function") ? extractQcNgItems(qc) : { items: (qc?.items||[]), ng: (qc?.items||[]).filter(x=>x && x.ok===false) };
+    const qcItems = Array.isArray(ex.items) ? ex.items : [];
+    const qcNg = Array.isArray(ex.ng) ? ex.ng : [];
+    const qcStatus = !qcHas ? "UNKNOWN" : (qcNg.length>0 ? "NG" : "OK");
+
+    const qcPresetId = (qc && qc.presetId) ? String(qc.presetId) : String(state.qcPresetId || "");
+    const qcPreset = (typeof _scGetPresetById === "function") ? _scGetPresetById(qcPresetId) : null;
+    const qcPresetName = qcPreset ? String(qcPreset.name || "（無名）") : "（不明）";
+
+    lines.push("");
+    lines.push("QC (規格チェック)");
+    lines.push(`- Result: ${qcStatus}`);
+    lines.push(`- Preset: ${qcPresetName}${qcPresetId ? ` (id: ${qcPresetId})` : ""}`);
+
+    if(qcPreset){
+      const sr = Array.isArray(qcPreset.allowedSampleRates) && qcPreset.allowedSampleRates.length ? qcPreset.allowedSampleRates.join(",") : "制限なし";
+      const bd = Array.isArray(qcPreset.allowedBits) && qcPreset.allowedBits.length ? qcPreset.allowedBits.join(",") : "制限なし";
+      const ch = Array.isArray(qcPreset.allowedChannels) && qcPreset.allowedChannels.length ? qcPreset.allowedChannels.join(",") : "制限なし";
+      lines.push(`- Target LUFS: ${qcPreset.targetLufs} ±${qcPreset.tolLufs} LU`);
+      lines.push(`- TruePeak Max: ${qcPreset.maxTruePeakDb} dBTP`);
+      lines.push(`- SampleRate: ${sr}`);
+      lines.push(`- BitDepth: ${bd}`);
+      lines.push(`- Channels: ${ch}`);
+      if(Number.isFinite(qcPreset.silenceMinSec) || Number.isFinite(qcPreset.silenceMaxSec)){
+        const a = Number.isFinite(qcPreset.silenceMinSec) ? qcPreset.silenceMinSec : 0;
+        const b = Number.isFinite(qcPreset.silenceMaxSec) ? qcPreset.silenceMaxSec : 0;
+        lines.push(`- Silence Allowance: ${a}〜${b} sec (前/後それぞれ)`);
+      }
+    }
+
+    if(qcItems.length){
+      lines.push("- Items:");
+      qcItems.forEach(it=>{
+        const label = String(it?.label || it?.name || it?.key || "項目");
+        const ok = !(it && (it.ok===false || it.status==="ng" || it.pass===false));
+        const reason = (it && (it.reason || it.message || it.detail)) ? String(it.reason || it.message || it.detail) : "";
+        lines.push(`  - ${label}: ${ok ? "OK" : "NG"}${reason ? ` / ${reason}` : ""}`);
+      });
+    }else{
+      lines.push("- Items: （詳細なし）");
+    }
+  }catch(e){
+    try{ lines.push(""); lines.push("QC (規格チェック)"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){ }
+  }
+
+  try{
+    lines.push("");
+    lines.push("CMCD");
+    const cmcdApplied = !!state.cmcdBytes;
+    const cmcdPresetId = String(state.cmcdPresetId || "");
+    const cmcdPreset = (cmcdPresetId && typeof _cmcdGetPresetById === "function") ? _cmcdGetPresetById(cmcdPresetId) : null;
+    const cmcdPresetName = cmcdPreset ? String(cmcdPreset.name || "（無名）") : (cmcdApplied ? "（手入力/未指定）" : "未適用");
+
+    lines.push(`- Applied: ${cmcdApplied ? "YES" : "NO"}`);
+    lines.push(`- Preset: ${cmcdPresetName}${cmcdPresetId ? ` (id: ${cmcdPresetId})` : ""}`);
+  }catch(e){
+    try{ lines.push(""); lines.push("CMCD"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){ }
+  }
+  lines.push("");
+  lines.push("Log (tail)");
+  const logTxt = getLogText();
+  const logLines = String(logTxt||"").split("\n");
+  lines.push(logLines.slice(Math.max(0, logLines.length-200)).join("\n"));
+
+  const reportText = lines.join("\n");
+  const exportBase64 = _base64FromUint8(exportBytes instanceof Uint8Array ? exportBytes : new Uint8Array(exportBytes));
+  const sourceFile = state.file;
+  const sourceSizeBytes = Number.isFinite(sourceFile?.size) ? sourceFile.size : null;
+  const sourceMtime = (typeof sourceFile?.lastModified === "number")
+    ? new Date(sourceFile.lastModified).toISOString()
+    : null;
+  const overallEl = $("sc_overall");
+  const overallText = String(overallEl?.textContent || "");
+  const qcResult = !state.qcHasRun
+    ? "UNKNOWN"
+    : (overallText.includes("NG") ? "NG" : (overallText.includes("OK") ? "OK" : "UNKNOWN"));
+  const exportBaseName = (() => {
+    try{
+      const p = String(saveRes?.filePath || "");
+      if(!p) return "";
+      const name = p.split(/[\\/]/).pop() || "";
+      return name.replace(/\.[^.]+$/, "");
+    }catch(_){ return ""; }
+  })();
+
+  return {
+    reportText,
+    exportBase64,
+    exportBaseName,
+    exportFileName: _outName,
+    sourceFileName: String(state.fileName || ""),
+    sourceSizeBytes,
+    sourceMtime,
+    exportSampleRate: Number.isFinite(state.buffer?.sampleRate) ? state.buffer.sampleRate : null,
+    exportChannels: Number.isFinite(state.buffer?.numberOfChannels) ? state.buffer.numberOfChannels : null,
+    qcResult,
+    qcNotes: overallEl?.title ? String(overallEl.title) : null,
+    qcPresetId: (typeof getLastQcForCurrentFile==="function" && getLastQcForCurrentFile()?.presetId)
+      ? String(getLastQcForCurrentFile().presetId)
+      : String(state.qcPresetId || ""),
+    qcPresetName: (()=>{ try{
+      const id = (typeof getLastQcForCurrentFile==="function" && getLastQcForCurrentFile()?.presetId) ? String(getLastQcForCurrentFile().presetId) : String(state.qcPresetId || "");
+      const p = (typeof _scGetPresetById==="function") ? _scGetPresetById(id) : null;
+      return p ? String(p.name || "（無名）") : null;
+    }catch(_){ return null; } })(),
+    qcDetail: (typeof getLastQcForCurrentFile==="function") ? (getLastQcForCurrentFile() || null) : (window.__wavcueLastQc?.result || null),
+
+    cmcdApplied: !!state.cmcdBytes,
+    cmcdPresetId: String(state.cmcdPresetId || ""),
+    cmcdPresetName: (()=>{ try{
+      const id = String(state.cmcdPresetId || "");
+      const p = (id && typeof _cmcdGetPresetById==="function") ? _cmcdGetPresetById(id) : null;
+      return p ? String(p.name || "（無名）") : null;
+    }catch(_){ return null; } })(),
+    appVersion: (typeof APP_VERSION === "string") ? APP_VERSION : null,
+  };
+}
+function _exportMakeError(message, silent){
+  const err = new Error(message);
+  if(silent) err.silent = true;
+  return err;
+}
+async function _exportOneWithSaveImpl(options){
+  const saveHandler = options?.saveHandler;
+  const progressEnabled = options?.progressEnabled !== false;
+  const notifyOnError = options?.notifyOnError !== false;
+  if(typeof saveHandler !== "function"){
+    return { ok:false, error: _exportMakeError("saveHandler is unavailable.", false) };
+  }
   if(!state.buffer || !state.srcFmtPayload || !state.srcDataPayload){
     log("WARN: 先にWAVを読み込んでください。（読み込み直後に書き出し可能です）");
-    return;
+    return { ok:false, error: _exportMakeError("書き出し前提データがありません", true) };
   }
+  let __exportOK = false;
   try{
     log("INFO: 書き出し開始");
     try{ logExportPreflight(); }catch(_){ }
 
-    // JPPA-1-2018: cue-point max 99 / NOTE label uniqueness
     const __cues = Array.isArray(state.cues) ? state.cues : [];
     if(__cues.length > 99){
       window.safeToast && window.safeToast("CUEは最大99件です（規格）","ng");
       log(`WARN: CUE数が上限（99）を超えています: ${__cues.length}件`);
-      return;
+      return { ok:false, error: _exportMakeError("CUE数が規格上限を超えています", true) };
     }
     try{
       const norm = (s)=> String(s||"").trim().replace(/\s+/g, "").toUpperCase();
@@ -9150,27 +9418,25 @@ async function exportWav(){
       if(dups.length){
         window.safeToast && window.safeToast("NOTEラベルが重複しています（規格）","ng");
         log(`WARN: NOTEラベル重複: ${Array.from(new Set(dups)).join(", ")}`);
-        return;
+        return { ok:false, error: _exportMakeError("NOTEラベルが重複しています", true) };
       }
     }catch(_){ }
 
-    // BWF-J: Linear PCM only
     try{
       const pcm = detectPcmFromFmtPayload(state.srcFmtPayload);
       if(!pcm.ok){
         window.safeToast && window.safeToast("非PCM形式は現在未対応です","ng");
         log(`WARN: 非PCM/未対応: ${pcm.reason}`);
-        return;
+        return { ok:false, error: _exportMakeError("非PCM形式は未対応です", true) };
       }
     }catch(_){ }
 
-    // Label encoding strict check（Shift-JIS/CP932）
     try{
       const bad = [];
       for(const c of __cues){
         const s = (c && c.label != null) ? String(c.label) : "";
         if(!s) continue;
-        const enc = cp932EncodeEx(s + "\0");
+        const enc = cp932EncodeEx(s + "\\0");
         if(enc && enc.hadReplace){
           bad.push(s);
           if(bad.length >= 3) break;
@@ -9179,21 +9445,19 @@ async function exportWav(){
       if(bad.length){
         window.safeToast && window.safeToast("ラベルにShift-JIS非対応文字が含まれます（書き出し不可）","ng");
         log(`WARN: ラベルShift-JIS非対応: ${bad.slice(0,2).join(" / ")}${bad.length>2?" ...":""}`);
-        return;
+        return { ok:false, error: _exportMakeError("ラベルにShift-JIS非対応文字が含まれます", true) };
       }
     }catch(err){
       window.safeToast && window.safeToast("ラベル文字の検査に失敗しました（書き出し不可）","ng");
       log(`WARN: ラベル検査失敗: ${String(err&&err.message||err)}`);
-      return;
+      return { ok:false, error: _exportMakeError("ラベル検査に失敗しました", true) };
     }
 
-
-
-    let __exportOK = false;
     let __exportBarShown = false;
     const __ensureExportBar = (sub)=>{
+      if(!progressEnabled) return;
       if(__exportBarShown) return;
-      _prog.show("書き出し中…", sub || "書き込み中…");
+      getProg().show("書き出し中…", sub || "書き込み中…");
       __exportBarShown = true;
     };
 
@@ -9205,115 +9469,46 @@ async function exportWav(){
       autoBackupEnabled = settings?.autoBackupEnabled ?? true;
       autoCleanupEnabled = settings?.autoCleanup ?? true;
       autoCleanupOnExport = settings?.autoCleanup ?? true;
-    }catch(_){}
+    }catch(_){ }
     try{ scheduleDiffUpdate(true); }catch(_){ }
 
-    // 既定のファイル名は「元ファイル名」を提示（現場の命名ルールを尊重）
-    const base = _baseNameNoExt((state.fileName && String(state.fileName).trim()) ? state.fileName : "output.wav");
-    const suggested = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
+    const fallbackName = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
+    const suggested = (options?.suggestedName && String(options.suggestedName).trim())
+      ? String(options.suggestedName).trim()
+      : fallbackName;
+    const base = _baseNameNoExt(fallbackName || suggested || "output.wav");
     const backupBase = _sanitizeFileSegment(base);
 // --- build replacements (editable chunks only) ---
-    _prog.set(0.18, "書き出し中…", "チャンク生成中");
-    const bextBuf = buildBextChunk();                        // bext (version preserved)
-    const cmcdBuf = buildCmcdChunkFixed2048();               // cmcd (fixed 2048)
+    if(progressEnabled) getProg().set(0.18, "書き出し中…", "チャンク生成中");
+    const exportBytes = await buildExportWavBytes({ fileId: options?.fileId });
+    const blob = new Blob([exportBytes], {type:"audio/wav"});
 
-    // cue / plst / LIST(adtl) (ファイル添付は LIST/adtl/file)
-    // Hybrid: when ONLY moving existing cues (no add/remove/label change, no attachment),
-    // patch the source 'cue ' chunk values in-place. Otherwise rebuild cue/LIST as before.
-    let srcAbForBuild = state.srcAb;
-    let cueChunk = null, listChunk = null, plstChunk = null;
-
-    const hasAttach = Array.isArray(state.attachments) && state.attachments.some(a=>a && a.bytes && a.bytes.length);
-    const sigNow = cueSig(state.cues);
-    const canInPlaceMove =
-      !hasAttach &&
-      !!state.srcAb &&
-      !!state.cuePatchMeta &&
-      !!state.loadedCueSig &&
-      (sigNow === state.loadedCueSig);
-
-    if(canInPlaceMove){
-      // Patch the existing 'cue ' chunk(s) sample offsets (no size/order changes)
-      srcAbForBuild = applyCueInPlacePatch(state.srcAb, state.cuePatchMeta, state.cues, ((state.fileSr && isFinite(state.fileSr)) ? state.fileSr : state.buffer.sampleRate));
-      cueChunk = null;
-      listChunk = null;
-      // plst は規格互換のため再生成（BC$NOTE除外 / 全BC$）
-      try{ plstChunk = buildCueChunks(state.buffer, state.cues).plstChunk; }catch(_){ plstChunk = null; }
-      log("INFO: CUEは元チャンクを更新（移動のみ / ハイブリッド）");
-      if(plstChunk) log("INFO: plstを再生成（BC$NOTE除外 / 全BC$）");
-    }else{
-      const built = buildCueChunks(state.buffer, state.cues);
-      cueChunk = built.cueChunk;
-      listChunk = built.listChunk;
-      plstChunk = built.plstChunk;
-    }
-
-    // data: only replace when auto-level fix was applied (PCM bytes are still PCM16)
-    const dataBuf = (state.procApplied && state.procDataPayload)
-      ? _makeChunk("data", state.procDataPayload)
-      : null;
-
-    const replacements = {
-      bextBuf: (bextBuf instanceof Uint8Array) ? bextBuf : new Uint8Array(bextBuf),
-      cmcdBuf: (cmcdBuf instanceof Uint8Array) ? cmcdBuf : new Uint8Array(cmcdBuf),
-      cueBuf:  cueChunk ? ((cueChunk instanceof Uint8Array) ? cueChunk : new Uint8Array(cueChunk)) : null,
-      plstBuf: plstChunk ? ((plstChunk instanceof Uint8Array) ? plstChunk : new Uint8Array(plstChunk)) : null,
-      listBuf: listChunk ? ((listChunk instanceof Uint8Array) ? listChunk : new Uint8Array(listChunk)) : null,
-      dataBuf: dataBuf, // Uint8Array from _makeChunk, or null
-      fmtBuf:  null,    // keep original 'fmt ' as-is
-    };;
-
-    // --- chunk-level rebuild (pass-through iXML + unknown chunks) ---
-    let blob = null;
-    const chunks = state.srcChunks || parseRiffChunks(state.srcAb);
-    if(state.srcAb && chunks && Array.isArray(chunks) && chunks.length){
-      blob = rebuildWaveFromOriginal(srcAbForBuild || state.srcAb, chunks, replacements);
-    }else{
-      // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
-      log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
-      const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
-      const pcmPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
-      const dataBuf2 = _makeChunk("data", pcmPayload);
-      const parts = [
-        new Uint8Array(bextBuf),
-        fmtBuf,
-        dataBuf2,
-        new Uint8Array(cmcdBuf),
-        new Uint8Array(cueChunk),
-        ...(plstChunk ? [new Uint8Array(plstChunk)] : []),
-        new Uint8Array(listChunk),
-      ];
-      const outAb = _buildCanonicalWavFromParts(parts);
-      blob = new Blob([outAb], {type:"audio/wav"});
-    }
-
-    const _saveRes = await _saveBlobWithFallback(blob, suggested, (phase)=>{
+    const _saveRes = await saveHandler(blob, suggested, (phase)=>{
       try{
+        if(!progressEnabled) return;
         if(phase==="picker_open"){
-          // 保存先選択中はバーを出さない（要望）
-          if(__exportBarShown){ _prog.hide(); __exportBarShown = false; }
+          if(__exportBarShown){ getProg().hide(); __exportBarShown = false; }
         }else if(phase==="picked"){
           __ensureExportBar("書き込み準備…");
-          _prog.set(0.86, "書き出し中…", "保存先確定…");
+          getProg().set(0.86, "書き出し中…", "保存先確定…");
         }else if(phase==="writing"){
           __ensureExportBar("書き込み中…");
-          _prog.set(0.92, "書き出し中…", "書き込み中…");
+          getProg().set(0.92, "書き出し中…", "書き込み中…");
         }else if(phase==="download_start"){
           __ensureExportBar("ダウンロード開始…");
-          _prog.set(0.90, "書き出し中…", "ダウンロード開始…");
+          getProg().set(0.90, "書き出し中…", "ダウンロード開始…");
         }else if(phase==="done"){
-          if(__exportBarShown) _prog.set(0.96, "書き出し中…", "保存後処理…");
+          if(__exportBarShown) getProg().set(0.96, "書き出し中…", "保存後処理…");
         }else if(phase==="cancel"){
-          if(__exportBarShown){ _prog.hide(); __exportBarShown = false; }
+          if(__exportBarShown){ getProg().hide(); __exportBarShown = false; }
         }
-      }catch(_){}
+      }catch(_){ }
     });
     if(_saveRes && _saveRes.mode === "cancel"){
       log("INFO: 書き出しをキャンセルしました。");
-      return;
+      return { ok:false, canceled:true };
     }
 
-    // Self-verify: 透過チャンク（未知/編集対象外）とiXMLの保持を簡易検証
     let verifyOk = true;
     const verifyNotes = [];
     const verifyDiffLines = [];
@@ -9336,7 +9531,6 @@ async function exportWav(){
       if(want.join("|") !== got.join("|")){
         verifyOk = false;
         verifyNotes.push("未知/透過チャンクの保持が一致しません（件数/サイズ差分）。");
-        // Differences (multiset compare of "4CC:size")
         try{
           const toCounts = (arr)=>{
             const m = new Map();
@@ -9365,7 +9559,7 @@ async function exportWav(){
             extra.slice(0,LIM).forEach(([k,n])=> verifyDiffLines.push(`- Extra: ${fmt(k,n)}`));
             if(extra.length > LIM) verifyDiffLines.push(`- Extra: ... (${extra.length - LIM} more)`);
           }
-        }catch(_e){}
+        }catch(_e){ }
       }
       const hadIXml = !!state.srcIXmlPayload;
       const hasIXmlOut = !!_riffExtractChunkPayload(outAb, "iXML");
@@ -9378,169 +9572,36 @@ async function exportWav(){
       verifyNotes.push("自己検証で例外が発生しました。");
     }
 
-    // Auto backup + report (app-managed folders)
     if(autoBackupEnabled){
       try{
-        const diffs = (state._diff && state._diff.diffs) ? state._diff.diffs : diffSnapshots(state.originalSnapshot, takeSnapshot());
-        const lines = [];
-        lines.push("WavCue Export Report");
-        lines.push(`Date: ${new Date().toString()}`);
-        lines.push(`Source: ${String(state.fileName||"")}`);
-        // Output filename: pickerなら実際に確定した名前（handle.name）を優先。downloadはユーザーが保存ダイアログで変更し得るため、名称は省略する。
-        const _outMode = String(_saveRes?.mode||"");
-        let _outName = "";
-        if(_outMode === "ipc"){
-          _outName = String(_baseNameFromPath(_saveRes?.filePath) || _saveRes?.suggested || suggested || "");
-        }else{
-          _outName = String(_saveRes?.suggested || suggested || "");
-        }
-        if(_outName){
-          lines.push(`Output: ${_outName} (${_outMode})`);
-        }else{
-          lines.push(`Output: — (${_outMode})`);
-        }
-        lines.push("Backup: export.wav (auto)");
-        try{
-          const norm=(s)=> String(s||"").trim().replace(/\s+/g,"").toUpperCase();
-          const bcCount = (Array.isArray(state.cues)?state.cues:[]).filter(c=>{
-            const t = norm(c && c.label);
-            return t.startsWith("BC$") && !t.startsWith("BC$NOTE");
-          }).length;
-          lines.push(`plst: ${bcCount} segments (BC$NOTE excluded)`);
-        }catch(_){ }
-
-        lines.push("");
-        lines.push("Change Summary (Original -> Current)");
-        diffs.forEach(d=> lines.push(`- [${d.sec}] ${d.item}: ${d.from} -> ${d.to}`));
-        lines.push("");
-        lines.push(`Self-Verify: ${verifyOk ? "PASS" : "FAIL"}`);
-        verifyNotes.forEach(n=> lines.push(`- ${n}`));
-        if(verifyDiffLines.length){
-          lines.push("");
-          verifyDiffLines.forEach(l=> lines.push(l));
-        }
-        // =========================
-        // QC / CMCD snapshot for team sharing
-        // =========================
-        try{
-          const qc = (typeof getLastQcForCurrentFile === "function") ? getLastQcForCurrentFile() : (window.__wavcueLastQc?.result || null);
-          const qcHas = !!qc;
-          const ex = (typeof extractQcNgItems === "function") ? extractQcNgItems(qc) : { items: (qc?.items||[]), ng: (qc?.items||[]).filter(x=>x && x.ok===false) };
-          const qcItems = Array.isArray(ex.items) ? ex.items : [];
-          const qcNg = Array.isArray(ex.ng) ? ex.ng : [];
-          const qcStatus = !qcHas ? "UNKNOWN" : (qcNg.length>0 ? "NG" : "OK");
-
-          const qcPresetId = (qc && qc.presetId) ? String(qc.presetId) : String(state.qcPresetId || "");
-          const qcPreset = (typeof _scGetPresetById === "function") ? _scGetPresetById(qcPresetId) : null;
-          const qcPresetName = qcPreset ? String(qcPreset.name || "（無名）") : "（不明）";
-
-          lines.push("");
-          lines.push("QC (規格チェック)");
-          lines.push(`- Result: ${qcStatus}`);
-          lines.push(`- Preset: ${qcPresetName}${qcPresetId ? ` (id: ${qcPresetId})` : ""}`);
-
-          if(qcPreset){
-            const sr = Array.isArray(qcPreset.allowedSampleRates) && qcPreset.allowedSampleRates.length ? qcPreset.allowedSampleRates.join(",") : "制限なし";
-            const bd = Array.isArray(qcPreset.allowedBits) && qcPreset.allowedBits.length ? qcPreset.allowedBits.join(",") : "制限なし";
-            const ch = Array.isArray(qcPreset.allowedChannels) && qcPreset.allowedChannels.length ? qcPreset.allowedChannels.join(",") : "制限なし";
-            lines.push(`- Target LUFS: ${qcPreset.targetLufs} ±${qcPreset.tolLufs} LU`);
-            lines.push(`- TruePeak Max: ${qcPreset.maxTruePeakDb} dBTP`);
-            lines.push(`- SampleRate: ${sr}`);
-            lines.push(`- BitDepth: ${bd}`);
-            lines.push(`- Channels: ${ch}`);
-            if(Number.isFinite(qcPreset.silenceMinSec) || Number.isFinite(qcPreset.silenceMaxSec)){
-              const a = Number.isFinite(qcPreset.silenceMinSec) ? qcPreset.silenceMinSec : 0;
-              const b = Number.isFinite(qcPreset.silenceMaxSec) ? qcPreset.silenceMaxSec : 0;
-              lines.push(`- Silence Allowance: ${a}〜${b} sec (前/後それぞれ)`);
-            }
-          }
-
-          if(qcItems.length){
-            lines.push("- Items:");
-            qcItems.forEach(it=>{
-              const label = String(it?.label || it?.name || it?.key || "項目");
-              const ok = !(it && (it.ok===false || it.status==="ng" || it.pass===false));
-              const reason = (it && (it.reason || it.message || it.detail)) ? String(it.reason || it.message || it.detail) : "";
-              lines.push(`  - ${label}: ${ok ? "OK" : "NG"}${reason ? ` / ${reason}` : ""}`);
-            });
-          }else{
-            lines.push("- Items: （詳細なし）");
-          }
-        }catch(e){
-          try{ lines.push(""); lines.push("QC (規格チェック)"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){}
-        }
-
-        try{
-          lines.push("");
-          lines.push("CMCD");
-          const cmcdApplied = !!state.cmcdBytes;
-          const cmcdPresetId = String(state.cmcdPresetId || "");
-          const cmcdPreset = (cmcdPresetId && typeof _cmcdGetPresetById === "function") ? _cmcdGetPresetById(cmcdPresetId) : null;
-          const cmcdPresetName = cmcdPreset ? String(cmcdPreset.name || "（無名）") : (cmcdApplied ? "（手入力/未指定）" : "未適用");
-
-          lines.push(`- Applied: ${cmcdApplied ? "YES" : "NO"}`);
-          lines.push(`- Preset: ${cmcdPresetName}${cmcdPresetId ? ` (id: ${cmcdPresetId})` : ""}`);
-        }catch(e){
-          try{ lines.push(""); lines.push("CMCD"); lines.push(`- WARN: report追記に失敗: ${e?.name||"Error"} ${e?.message||""}`); }catch(_){}
-        }
-        lines.push("");
-        lines.push("Log (tail)");
-        const logTxt = getLogText();
-        const logLines = String(logTxt||"").split("\n");
-        lines.push(logLines.slice(Math.max(0, logLines.length-200)).join("\n"));
-
-        const reportText = lines.join("\n");
-        const exportArrayBuffer = await blob.arrayBuffer();
-        const exportBase64 = _base64FromArrayBuffer(exportArrayBuffer);
-        const sourceFile = state.file;
-        const sourceSizeBytes = Number.isFinite(sourceFile?.size) ? sourceFile.size : null;
-        const sourceMtime = (typeof sourceFile?.lastModified === "number")
-          ? new Date(sourceFile.lastModified).toISOString()
-          : null;
-        const overallEl = $("sc_overall");
-        const overallText = String(overallEl?.textContent || "");
-        const qcResult = !state.qcHasRun
-          ? "UNKNOWN"
-          : (overallText.includes("NG") ? "NG" : (overallText.includes("OK") ? "OK" : "UNKNOWN"));
-        const exportBaseName = (() => {
-          try{
-            const p = String(_saveRes?.filePath || "");
-            if(!p) return "";
-            const name = p.split(/[\\/]/).pop() || "";
-            return name.replace(/\.[^.]+$/, "");
-          }catch(_){ return ""; }
-        })();
+        const report = buildExportReportJson({
+          saveRes: _saveRes,
+          suggestedName: suggested,
+          verifyOk,
+          verifyNotes,
+          verifyDiffLines,
+          exportBytes,
+        });
         const backupRes = await window.wavcue?.saveBackupReport?.({
           sourceBaseName: backupBase,
-          backupNameHint: exportBaseName,
-          exportDataBase64: exportBase64,
-          reportText,
-          sourceFileName: String(state.fileName || ""),
-          sourceSizeBytes,
-          sourceMtime,
-          exportFileName: _outName,
-          exportSampleRate: Number.isFinite(state.buffer?.sampleRate) ? state.buffer.sampleRate : null,
-          exportChannels: Number.isFinite(state.buffer?.numberOfChannels) ? state.buffer.numberOfChannels : null,
-          qcResult,
-          qcNotes: overallEl?.title ? String(overallEl.title) : null,
-          qcPresetId: (typeof getLastQcForCurrentFile==="function" && getLastQcForCurrentFile()?.presetId)
-            ? String(getLastQcForCurrentFile().presetId)
-            : String(state.qcPresetId || ""),
-          qcPresetName: (()=>{ try{
-            const id = (typeof getLastQcForCurrentFile==="function" && getLastQcForCurrentFile()?.presetId) ? String(getLastQcForCurrentFile().presetId) : String(state.qcPresetId || "");
-            const p = (typeof _scGetPresetById==="function") ? _scGetPresetById(id) : null;
-            return p ? String(p.name || "（無名）") : null;
-          }catch(_){ return null; } })(),
-          qcDetail: (typeof getLastQcForCurrentFile==="function") ? (getLastQcForCurrentFile() || null) : (window.__wavcueLastQc?.result || null),
-
-          cmcdApplied: !!state.cmcdBytes,
-          cmcdPresetId: String(state.cmcdPresetId || ""),
-          cmcdPresetName: (()=>{ try{
-            const id = String(state.cmcdPresetId || "");
-            const p = (id && typeof _cmcdGetPresetById==="function") ? _cmcdGetPresetById(id) : null;
-            return p ? String(p.name || "（無名）") : null;
-          }catch(_){ return null; } })(),
-          appVersion: (typeof APP_VERSION === "string") ? APP_VERSION : null,
+          backupNameHint: report.exportBaseName,
+          exportDataBase64: report.exportBase64,
+          reportText: report.reportText,
+          sourceFileName: report.sourceFileName,
+          sourceSizeBytes: report.sourceSizeBytes,
+          sourceMtime: report.sourceMtime,
+          exportFileName: report.exportFileName,
+          exportSampleRate: report.exportSampleRate,
+          exportChannels: report.exportChannels,
+          qcResult: report.qcResult,
+          qcNotes: report.qcNotes,
+          qcPresetId: report.qcPresetId,
+          qcPresetName: report.qcPresetName,
+          qcDetail: report.qcDetail,
+          cmcdApplied: report.cmcdApplied,
+          cmcdPresetId: report.cmcdPresetId,
+          cmcdPresetName: report.cmcdPresetName,
+          appVersion: report.appVersion,
         });
         if(backupRes?.ok){
           log(`OK: バックアップを保存しました: ${backupRes?.jobFolderName || "job folder"}`);
@@ -9562,31 +9623,133 @@ async function exportWav(){
           settingsLogAdd(`書き出し後のクリーンアップがエラーで終了しました（エラー ${cleanupResult.summary?.errorCount ?? "不明"}件）。`);
           window.safeToast && window.safeToast("自動クリーンアップがエラーで終了しました", "warn", 3600);
         }
-      }catch(_){}
+      }catch(_){ }
     }
 
     __exportOK = true;
 
     log("OK: 書き出し完了");
+    return { ok:true, save:_saveRes };
   }catch(e){
     log(`ERROR: Export failed: ${e?.name||"Error"} ${e?.message||""}`);
     if(e?.stack) log(String(e.stack).slice(0, 4000));
-    if(!(e && e.name==="AbortError")){
+    if(notifyOnError && !(e && e.name==="AbortError") && !e?.silent){
       alert("書き出しに失敗しました。ログをご確認ください。");
     }
+    return { ok:false, error:e };
   }finally{
     try{
-      if(__exportOK){
-        _prog.set(1, "書き出し中…", "完了");
-        await _prog.yield();
+      if(progressEnabled && __exportOK){
+        getProg().set(1, "書き出し中…", "完了");
+        await getProg().yield();
       }
-    }catch(_){}
-    try{ _prog.hide(); }catch(_){}
+    }catch(_){ }
+    try{ if(progressEnabled) getProg().hide(); }catch(_){ }
   }
 }
 
+async function exportOneWithSave(options){
+  const opts = options || {};
+  if(!opts.saveHandler){
+    return _exportOneWithSaveImpl({
+      ...opts,
+      saveHandler: _saveBlobWithFallback,
+      progressEnabled: opts.progressEnabled !== false,
+      notifyOnError: opts.notifyOnError !== false,
+    });
+  }
+  return _exportOneWithSaveImpl(opts);
+}
 
+async function exportWav(){
+  const suggested = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
+  await exportOneWithSave({
+    saveHandler: _saveBlobWithFallback,
+    suggestedName: suggested,
+    progressEnabled: true,
+    notifyOnError: true,
+  });
+}
 
+function normalizeExportFileName(name){
+  const raw = String(name || "").trim();
+  const baseName = (raw ? raw.split(/[\\/]/).pop() : "") || "output.wav";
+  const extMatch = baseName.match(/\.[^.]+$/);
+  const ext = (extMatch && extMatch[0]) ? extMatch[0] : ".wav";
+  const base = extMatch ? baseName.slice(0, -ext.length) : baseName;
+  const safeBase = _sanitizeFileSegment(base || "output");
+  const safeExt = ext || ".wav";
+  return { base: safeBase, ext: safeExt };
+}
+async function writeBlobToIpcFolder(folderPath, name, blob){
+  if(!window.wavcue?.writeFileBase64){
+    throw new Error("writeFileBase64 is unavailable.");
+  }
+  const { base, ext } = normalizeExportFileName(name);
+  const dataBase64 = _base64FromArrayBuffer(await blob.arrayBuffer());
+  const MAX_TRIES = 1000;
+  for(let i=0; i<MAX_TRIES; i++){
+    const suffix = i === 0 ? "" : `_${i}`;
+    const fileName = `${base}${suffix}${ext}`;
+    const res = await window.wavcue.writeFileBase64({
+      folderPath,
+      fileName,
+      dataBase64,
+    });
+    if(res?.ok){
+      return { mode:"ipc", filePath: res.filePath || fileName, suggested: fileName };
+    }
+    if(res?.error && /EEXIST/i.test(res.error)){
+      continue;
+    }
+    throw new Error(res?.error || "write failed");
+  }
+  throw new Error("同名ファイルが多すぎます");
+}
+async function exportOneToTarget(targetOrOpts, suggestedName){
+  if(typeof targetOrOpts === "string"){
+    return exportOneToTarget({ target: { kind:"ipc", folderPath: targetOrOpts }, suggestedName });
+  }
+  const opts = (targetOrOpts && targetOrOpts.target) ? targetOrOpts : null;
+  let target = opts ? opts.target : targetOrOpts;
+  const name = opts ? opts.suggestedName : suggestedName;
+  const fileId = opts?.fileId;
+  if(!target && opts?.folderPath){
+    target = { kind:"ipc", folderPath: opts.folderPath };
+  }
+  const saveHandler = async (blob, nameArg, onPhase)=>{
+    if(target?.kind === "ipc"){
+      if(onPhase) onPhase("writing");
+      return await writeBlobToIpcFolder(target.folderPath, nameArg, blob);
+    }
+    throw new Error("export target is unavailable");
+  };
+  const res = await _exportOneWithSaveImpl({
+    saveHandler,
+    suggestedName: name,
+    progressEnabled: false,
+    notifyOnError: false,
+    fileId,
+  });
+  const savedName = res?.save?.suggested || res?.save?.filePath || name;
+  return { ok: !!res?.ok, error: res?.error, save: res?.save, savedName };
+}
+
+const WavCueExportCore = {
+  getProg,
+  buildExportWavBytes,
+  exportOneWithSave,
+  exportOneToTarget: async (optsOrFolder, nameArg)=>{
+    if(typeof optsOrFolder === "string"){
+      return exportOneToTarget(optsOrFolder, nameArg);
+    }
+    return exportOneToTarget(optsOrFolder);
+  },
+};
+window.WavCueExportCore = WavCueExportCore;
+window.getProg = WavCueExportCore.getProg;
+window.buildExportWavBytes = WavCueExportCore.buildExportWavBytes;
+window.exportOneWithSave = WavCueExportCore.exportOneWithSave;
 /* Buttons */
 function updateButtons(){
 if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
@@ -15859,6 +16022,7 @@ try{
       history.active.done = job.done;
       if(history.active.type === "export"){
         history.active.okCount = job.ok;
+        history.active.ngCount = job.failed.length;
       }
       history.active.failCount = job.failed.length;
       history.active.failedIds = job.failed.slice();
@@ -15866,6 +16030,20 @@ try{
     }
     renderHistoryList();
     renderHistoryDetail();
+  }
+  async function resolveBulkExportTarget(){
+    if(window.wavcue?.pickExportFolder && window.wavcue?.writeFileBase64){
+      const res = await window.wavcue.pickExportFolder();
+      if(res?.canceled) return null;
+      if(res?.folderPath){
+        return { kind:"ipc", folderPath: res.folderPath };
+      }
+    }
+    logJob("書き出し先フォルダの選択に失敗しました。");
+    try{
+      if(typeof toast === "function") toast("書き出し先フォルダが選択できませんでした", "warn");
+    }catch(_){}
+    return null;
   }
   async function runJob(type, idsOverride){
     const usingOverride = Array.isArray(idsOverride);
@@ -15879,6 +16057,22 @@ try{
         else alert("対象ファイルがありません");
       }catch(_){}
       return;
+    }
+    const prog = getProg();
+    let exportTarget = null;
+    let bulkStartedAt = 0;
+    if(type === "export"){
+      bulkStartedAt = Date.now();
+      console.log(`[BULK] start total=${targets.length}`);
+      prog.show("一括書き出し中…", `0/${targets.length}`);
+      exportTarget = await resolveBulkExportTarget();
+      if(!exportTarget){
+        logJob("一括書き出しをキャンセルしました。");
+        prog.hide();
+        return;
+      }
+      const exportFolderLabel = exportTarget.folderPath || "";
+      console.log(`[BULK] pickFolder ok path=${exportFolderLabel}`);
     }
     job.running = true;
     job.cancel=false;
@@ -15910,19 +16104,28 @@ try{
     logJob(`対象件数: ${targets.length}`);
     logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
     updateJobUI();
-    bulkOverlay.start(type, targets.length);
+    if(type !== "export"){
+      bulkOverlay.start(type, targets.length);
+    }
 
     let qcUpdatedRows = 0;
     try{
+      let index = 0;
       for(const id of targets){
         if(job.cancel) break;
         const f = project.files.find(x=>x.id===id);
         if(!f) continue;
         try{
+          index += 1;
           logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
           await setActiveFile(id, {force:true});
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
-          bulkOverlay.update(job.done, job.total, f.name);
+          if(type === "export"){
+            const pct = job.total ? (job.done / job.total) : 0;
+            prog.set(pct, "一括書き出し中…", `${index}/${job.total} ${f.name || ""}`);
+          }else{
+            bulkOverlay.update(job.done, job.total, f.name);
+          }
           if(type==='qc'){
             const st = window.WavCue?.state;
             if(!st || !st.buffer){
@@ -15966,9 +16169,21 @@ try{
             }
           }
           if(type==='export'){
-            await doFinalExport();
+            const fileLabel = f.name || state.fileName || "export.wav";
+            const fileStartedAt = Date.now();
+            console.log(`[BULK] file ${index}/${targets.length} begin id=${id} name=${fileLabel}`);
+            const res = await window.WavCueExportCore.exportOneToTarget({
+              target: exportTarget,
+              suggestedName: fileLabel,
+              fileId: id,
+            });
+            if(!res?.ok){
+              const msg = res?.error?.message || res?.error || "export failed";
+              throw new Error(msg);
+            }
             f.status.exported = true;
-            historyEntry.exportedNames.push(f.name || "exported");
+            historyEntry.exportedNames.push(res?.savedName || fileLabel || "exported");
+            console.log(`[BULK] file ${index}/${targets.length} ok ms=${Date.now() - fileStartedAt}`);
           }
           job.ok++;
           if(type === "qc"){
@@ -15980,10 +16195,19 @@ try{
           job.failed.push(id);
           historyEntry.failCount += 1;
           logJob(`失敗: ${f.name} / ${e?.message || e}`);
+          if(type === "export"){
+            const stack = e?.stack ? String(e.stack) : "";
+            console.log(`[BULK] file ${index}/${targets.length} ng reason=${e?.message || e} stack=${stack}`);
+          }
         }finally{
           job.done++;
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
-          bulkOverlay.update(job.done, job.total, f.name);
+          if(type === "export"){
+            const pct = job.total ? (job.done / job.total) : 0;
+            prog.set(pct, "一括書き出し中…", `${Math.min(index, job.total)}/${job.total} ${f.name || ""}`);
+          }else{
+            bulkOverlay.update(job.done, job.total, f.name);
+          }
           render();
         }
       }
@@ -15999,12 +16223,16 @@ try{
       render();
 
       const status = job.cancel ? "cancel" : (job.failed.length ? "fail" : "success");
+      if(type === "export"){
+        prog.hide();
+        console.log(`[BULK] end ok=${job.ok} ng=${job.failed.length} ms=${Date.now() - bulkStartedAt}`);
+      }
       bulkOverlay.end(type, status);
       historyEntry.running = false;
       historyEntry.endedAt = Date.now();
       if(type === "export"){
         historyEntry.okCount = job.ok;
-        historyEntry.ngCount = 0;
+        historyEntry.ngCount = job.failed.length;
       }
       historyEntry.failCount = job.failed.length;
       historyEntry.done = job.done;
@@ -16237,8 +16465,12 @@ try{
       console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
     });
 
-    $('proBtnBatchCheck')?.addEventListener('click', ()=> runJob('qc'));
-    $('proBtnBatchExport')?.addEventListener('click', ()=> runJob('export'));
+    $('proBtnBatchCheck')?.addEventListener('click', ()=> {
+      runJob('qc').catch((e)=> console.error("[BulkExport] runJob error", e));
+    });
+    $('proBtnBatchExport')?.addEventListener('click', ()=> {
+      runJob('export').catch((e)=> console.error("[BulkExport] runJob error", e));
+    });
 
     $('proJobMini')?.addEventListener('click', ()=> showJob(true));
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
@@ -16268,7 +16500,7 @@ try{
       const entries = historyEntries();
       const entry = entries.find(e=>e.id===history.selectedId) || entries[0] || null;
       if(entry && entry.type === "qc" && Array.isArray(entry.failedIds) && entry.failedIds.length){
-        runJob('qc', entry.failedIds.slice());
+        runJob('qc', entry.failedIds.slice()).catch((e)=> console.error("[BulkExport] runJob error", e));
       }
     });
 
