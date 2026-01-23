@@ -1879,6 +1879,7 @@ dialog.bulkNgDialog{
 .bulkNgDialog .bulkNgActions{
   display: flex;
   justify-content: flex-end;
+  gap: 10px;
   margin-top: 12px;
 }
 /* ===== /Bulk Export NG preflight dialog ===== */
@@ -3876,13 +3877,14 @@ body, #appRoot, .appRoot, .mainLayout{
 </dialog>
 <dialog id="bulkExportNgDialog" class="modal bulkNgDialog">
   <div class="modalHead">
-    <div class="title"><b>一括書き出しできないファイルがあります</b></div>
+    <div class="title"><b>一括書き出しの警告</b></div>
   </div>
   <div class="modalBody">
-    <div class="bulkNgDesc">以下のファイルを修正してから再度お試しください</div>
+    <div class="bulkNgDesc">規格NGが含まれます。修正を推奨しますが、このまま続行できます。</div>
     <div id="bulkExportNgList" class="bulkNgList"></div>
     <div class="bulkNgActions">
-      <button type="button" class="btn" id="bulkExportNgClose">閉じる</button>
+      <button type="button" class="btn" id="bulkExportNgCancel">キャンセル</button>
+      <button type="button" class="btn primary" id="bulkExportNgProceed">このまま続行</button>
     </div>
   </div>
 </dialog>
@@ -16099,45 +16101,84 @@ try{
     }catch(_){}
     return null;
   }
+  function trimBulkReasonText(text){
+    const s = String(text || "");
+    const parenIndex = s.indexOf("（");
+    const parenAsciiIndex = s.indexOf("(");
+    const firstParen = (parenIndex === -1) ? parenAsciiIndex : (parenAsciiIndex === -1 ? parenIndex : Math.min(parenIndex, parenAsciiIndex));
+    if(firstParen >= 0){
+      return s.slice(0, firstParen).trim();
+    }
+    const slashIndex = s.indexOf(" / ");
+    if(slashIndex >= 0){
+      return s.slice(0, slashIndex).trim();
+    }
+    return s.trim();
+  }
   function formatBulkNgReasons(qcResult, limit){
     const { ng } = safeExtract(qcResult || null);
     if(!ng.length) return [];
     const out = [];
     for(const raw of ng){
       const detail = formatNgDetailItem(raw);
-      const label = detail.label || "NG";
-      const reason = (detail.reason && detail.reason !== "詳細不明") ? `：${detail.reason}` : "";
-      out.push(`${label}${reason}`);
+      const label = trimBulkReasonText(detail.label || "NG");
+      const reasonRaw = (detail.reason && detail.reason !== "詳細不明") ? detail.reason : "";
+      const reasonText = trimBulkReasonText(reasonRaw);
+      const reason = reasonText ? `：${reasonText}` : "";
+      out.push(`${label}${reason}`.trim());
       if(limit && out.length >= limit) break;
     }
     return out;
   }
-  function openBulkExportNgDialog(items){
+  function showBulkExportNgDialog(items){
     const dlg = $("bulkExportNgDialog");
     const list = $("bulkExportNgList");
-    if(!dlg || !list) return false;
+    if(!dlg || !list) return Promise.resolve(false);
     list.innerHTML = "";
     if(!items.length){
       list.innerHTML = `<div class="muted">NG項目はありません。</div>`;
     }else{
       list.innerHTML = items.map(entry=>{
         const reasons = entry.reasons?.length ? entry.reasons : ["規格NG"];
-        const reasonHtml = reasons.map(r=>`<li>${esc(r)}</li>`).join("");
+        const reasonHtml = reasons.map(r=>`<li>${esc(trimBulkReasonText(r))}</li>`).join("");
         return `<div class="bulkNgItem">
           <div class="bulkNgName">${esc(entry.name)}</div>
           <ul class="bulkNgReasons">${reasonHtml}</ul>
         </div>`;
       }).join("");
     }
-    try{
-      if(dlg.open) dlg.close();
-    }catch(_){}
-    try{
-      dlg.showModal();
-    }catch(_){
-      try{ dlg.show(); }catch(__){}
-    }
-    return true;
+    return new Promise(resolve=>{
+      const cleanup = (result)=>{
+        try{
+          dlg.close();
+        }catch(_){
+          dlg.removeAttribute("open");
+        }
+        dlg.removeEventListener("click", onBackdrop);
+        dlg.removeEventListener("cancel", onCancel);
+        cancelBtn?.removeEventListener("click", onCancelBtn);
+        proceedBtn?.removeEventListener("click", onProceedBtn);
+        resolve(result);
+      };
+      const onBackdrop = (e)=>{ if(e.target === dlg) cleanup(false); };
+      const onCancel = (e)=>{ e.preventDefault(); cleanup(false); };
+      const onCancelBtn = ()=> cleanup(false);
+      const onProceedBtn = ()=> cleanup(true);
+      const cancelBtn = $("bulkExportNgCancel");
+      const proceedBtn = $("bulkExportNgProceed");
+      dlg.addEventListener("click", onBackdrop);
+      dlg.addEventListener("cancel", onCancel);
+      cancelBtn?.addEventListener("click", onCancelBtn);
+      proceedBtn?.addEventListener("click", onProceedBtn);
+      try{
+        if(dlg.open) dlg.close();
+      }catch(_){}
+      try{
+        dlg.showModal();
+      }catch(_){
+        try{ dlg.show(); }catch(__){}
+      }
+    });
   }
   async function runJob(type, idsOverride){
     const usingOverride = Array.isArray(idsOverride);
@@ -16170,8 +16211,10 @@ try{
       });
       console.log(`[BULK][PREFLIGHT] ngCount=${ngItems.length}`);
       if(ngItems.length){
-        openBulkExportNgDialog(ngItems);
-        return;
+        console.log("[BULK][PREFLIGHT] showWarningDialog");
+        const proceed = await showBulkExportNgDialog(ngItems);
+        console.log(`[BULK][PREFLIGHT] continueByUser=${proceed}`);
+        if(!proceed) return;
       }
       console.log("[BULK][PREFLIGHT] pass -> continue");
       bulkStartedAt = Date.now();
@@ -16582,24 +16625,6 @@ try{
     });
     $('proBtnBatchExport')?.addEventListener('click', ()=> {
       runJob('export').catch((e)=> console.error("[BulkExport] runJob error", e));
-    });
-    const bulkNgDlg = $("bulkExportNgDialog");
-    if(bulkNgDlg && !bulkNgDlg.dataset.bound){
-      bulkNgDlg.dataset.bound = "1";
-      bulkNgDlg.addEventListener("click", (e)=>{
-        if(e.target === bulkNgDlg){
-          try{ bulkNgDlg.close(); }catch(_){ bulkNgDlg.removeAttribute("open"); }
-        }
-      });
-      bulkNgDlg.addEventListener("cancel", (e)=>{
-        e.preventDefault();
-        try{ bulkNgDlg.close(); }catch(_){ bulkNgDlg.removeAttribute("open"); }
-      });
-    }
-    $("bulkExportNgClose")?.addEventListener("click", ()=>{
-      if(bulkNgDlg){
-        try{ bulkNgDlg.close(); }catch(_){ bulkNgDlg.removeAttribute("open"); }
-      }
     });
 
     $('proJobMini')?.addEventListener('click', ()=> showJob(true));
