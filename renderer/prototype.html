@@ -4329,7 +4329,7 @@ if(document.readyState === "loading"){
 /* ===============================
    PROGRESS (Load / Export)
 ================================ */
-window._prog = window._prog || (()=> {
+const _prog = window._prog || (()=> {
   let ov=null, msg=null, sub=null, pctEl=null, bar=null, hint=null, cancelBtn=null;
   let token = 0;
   let visible = false;
@@ -4475,9 +4475,10 @@ window._prog = window._prog || (()=> {
 
   return { show, hide, set, step, run, yield:_yieldUI };
 })();
+window._prog = _prog;
 try {
-  if (typeof globalThis !== 'undefined') globalThis._prog = window._prog;
-  if (typeof window !== 'undefined') window._prog = window._prog;
+  if (typeof globalThis !== 'undefined') globalThis._prog = _prog;
+  if (typeof window !== 'undefined') window._prog = _prog;
 
   // backward-compat: 一括側が getProg() / _getProg() を呼ぶビルドがある
   if (typeof globalThis.getProg !== 'function') {
@@ -6383,25 +6384,25 @@ async function loadFile(file){
     const ctx = await ensureAudioCtx();
     let __loadOK = false;
     const __loadCtrl = new AbortController();
-    getProg().show("読み込み中…","ファイルを読み取り中", __loadCtrl);
+    _prog.show("読み込み中…","ファイルを読み取り中", __loadCtrl);
     const __sig = __loadCtrl.signal;
     let ab;
     try{
       ab = await _readFileArrayBufferWithProgress(file, (r)=>{
-        if(r==null) getProg().set(null, "読み込み中…", "ファイルを読み取り中");
-        else getProg().set(0.05 + r*0.55, "読み込み中…", `ファイルを読み取り中（${Math.round(r*100)}%）`);
+        if(r==null) _prog.set(null, "読み込み中…", "ファイルを読み取り中");
+        else _prog.set(0.05 + r*0.55, "読み込み中…", `ファイルを読み取り中（${Math.round(r*100)}%）`);
       });
     }catch(err){
-      getProg().hide();
+      _prog.hide();
       throw err;
     }
-    getProg().set(0.60, "読み込み中…", "解析");
+    _prog.set(0.60, "読み込み中…", "解析");
     // early container validation
     const cinfo = detectWavContainer(ab);
     if(!cinfo.ok){
       throw new Error(`非対応/破損の可能性: ${cinfo.reason}`);
     }
-    getProg().set(0.64, "読み込み中…", "解析→CUE");
+    _prog.set(0.64, "読み込み中…", "解析→CUE");
   /* PDF_ATTACH_LOAD_HOOK */
   try{
     const list = pdfFindAllInWav(ab);
@@ -6510,7 +6511,7 @@ state.srcChunks = parseRiffChunks(ab);
 
     
     // --- Read existing CUEs BEFORE decodeAudioData (avoid detached ArrayBuffer) ---
-    try{ getProg().set(0.72, "読み込み中…", "CUE解析"); }catch(_){}
+    try{ _prog.set(0.72, "読み込み中…", "CUE解析"); }catch(_){}
     const cueSr = (state.fileSr && isFinite(state.fileSr)) ? state.fileSr : 48000;
     let existing = [];
     try{
@@ -6532,7 +6533,7 @@ state.srcChunks = parseRiffChunks(ab);
     }
 
     // --- decode for waveform/analyzer (use copy to keep srcAb intact) ---
-    try{ getProg().set(null, "読み込み中…", "波形準備（デコード）"); }catch(_){}
+    try{ _prog.set(null, "読み込み中…", "波形準備（デコード）"); }catch(_){}
     const buf = await new Promise((resolve,reject)=> ctx.decodeAudioData(ab.slice(0), resolve, reject));
     state.buffer = buf;
     state.sr = buf.sampleRate;
@@ -6544,12 +6545,12 @@ state.srcChunks = parseRiffChunks(ab);
     state.scrollPx = 0;
     state.playheadSec = 0;
 
-    try{ getProg().set(0.86, "読み込み中…", "波形生成"); }catch(_){}
+    try{ _prog.set(0.86, "読み込み中…", "波形生成"); }catch(_){}
     state.peaks = await buildPeaksAsync(buf, 6000, __sig, (r)=>{
-      try{ getProg().set(0.86 + r*0.10, "読み込み中…", "波形生成"); }catch(_){ }
+      try{ _prog.set(0.86 + r*0.10, "読み込み中…", "波形生成"); }catch(_){ }
     });
     _ensureNotCancelled(__sig);
-    try{ getProg().set(0.97, "読み込み中…", "UI反映"); }catch(_){ }
+    try{ _prog.set(0.97, "読み込み中…", "UI反映"); }catch(_){ }
 
     // Clamp cue positions with the true decoded duration
     try{
@@ -6595,11 +6596,11 @@ state.srcChunks = parseRiffChunks(ab);
     // Always close the overlay (and show 100% only when success)
     try{
       if(__loadOK){
-        getProg().set(1, "読み込み中…", "完了");
-        await getProg().yield();
+        _prog.set(1, "読み込み中…", "完了");
+        await _prog.yield();
       }
     }catch(_){}
-    try{ getProg().hide(); }catch(_){}
+    try{ _prog.hide(); }catch(_){}
     if(state.ui) state.ui.isLoadingWav = false;
   }
 }
@@ -9676,14 +9677,16 @@ async function _exportOneWithSaveImpl(options){
 }
 
 async function exportOneWithSave(options){
-  if(options?.saveHandler){
-    return _exportOneWithSaveImpl(options);
+  const opts = options || {};
+  if(!opts.saveHandler){
+    return _exportOneWithSaveImpl({
+      ...opts,
+      saveHandler: _saveBlobWithFallback,
+      progressEnabled: opts.progressEnabled !== false,
+      notifyOnError: opts.notifyOnError !== false,
+    });
   }
-  const core = window?.WavCueExportCore;
-  if(core?.exportOneToTarget){
-    return core.exportOneToTarget(options);
-  }
-  return _exportOneWithSaveImpl(options || {});
+  return _exportOneWithSaveImpl(opts);
 }
 
 async function exportWav(){
@@ -12703,7 +12706,7 @@ async function _scApplyAutoFix(){
 
   const fixCtrl = new AbortController();
   let fixProgShown = false;
-  try{ getProg().show("補正中…", "補正を実行中", fixCtrl); fixProgShown = true; }catch(_){ }
+  try{ _prog.show("補正中…", "補正を実行中", fixCtrl); fixProgShown = true; }catch(_){ }
 
   try{
     const recId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -12863,7 +12866,7 @@ async function _scApplyAutoFix(){
   }
 
     // re-measure
-    try{ getProg().set(null, "補正中…", "解析中…"); }catch(_){ }
+    try{ _prog.set(null, "補正中…", "解析中…"); }catch(_){ }
     _scRunMeasureAndRender();
 
     try{
@@ -12877,7 +12880,7 @@ async function _scApplyAutoFix(){
     }catch(_){ }
   }finally{
     if(fixProgShown){
-      try{ getProg().hide(); }catch(_){ }
+      try{ _prog.hide(); }catch(_){ }
     }
   }
 }
@@ -14639,9 +14642,9 @@ try{
     // already-declared functions/objects in a grouped way for easier discovery.
     modules: Object.freeze({
       progress: Object.freeze({
-        show: getProg().show,
-        set: getProg().set,
-        hide: getProg().hide,
+        show: _prog.show,
+        set: _prog.set,
+        hide: _prog.hide,
       }),
 
       riff: Object.freeze({
@@ -16070,10 +16073,16 @@ try{
     throw new Error("同名ファイルが多すぎます");
   }
   async function exportOneToTarget(targetOrOpts, suggestedName){
+    if(typeof targetOrOpts === "string"){
+      return exportOneToTarget({ target: { kind:"ipc", folderPath: targetOrOpts }, suggestedName });
+    }
     const opts = (targetOrOpts && targetOrOpts.target) ? targetOrOpts : null;
-    const target = opts ? opts.target : targetOrOpts;
+    let target = opts ? opts.target : targetOrOpts;
     const name = opts ? opts.suggestedName : suggestedName;
     const fileId = opts?.fileId;
+    if(!target && opts?.folderPath){
+      target = { kind:"ipc", folderPath: opts.folderPath };
+    }
     const saveHandler = async (blob, nameArg, onPhase)=>{
       if(target?.kind === "ipc"){
         if(onPhase) onPhase("writing");
@@ -16095,21 +16104,21 @@ try{
     const savedName = res?.save?.suggested || res?.save?.filePath || name;
     return { ok: !!res?.ok, error: res?.error, save: res?.save, savedName };
   }
-  const WavCueExportCore = window.WavCueExportCore || {};
-  WavCueExportCore.getProg = () => getProg();
-  WavCueExportCore.buildExportWavBytes = (opts)=> buildExportWavBytes(opts);
-  WavCueExportCore.exportOneToTarget = async (opts)=>{
-    const target = opts?.target || opts?.exportTarget || null;
-    if(!target){
-      return { ok:false, error: new Error("export target is unavailable") };
-    }
-    const suggestedName = opts?.suggestedName || opts?.name || "";
-    return exportOneToTarget({ target, suggestedName, fileId: opts?.fileId });
+  const WavCueExportCore = {
+    getProg,
+    buildExportWavBytes,
+    exportOneWithSave,
+    exportOneToTarget: async (optsOrFolder, nameArg)=>{
+      if(typeof optsOrFolder === "string"){
+        return exportOneToTarget(optsOrFolder, nameArg);
+      }
+      return exportOneToTarget(optsOrFolder);
+    },
   };
   window.WavCueExportCore = WavCueExportCore;
   window.getProg = WavCueExportCore.getProg;
   window.buildExportWavBytes = WavCueExportCore.buildExportWavBytes;
-  window.exportOneWithSave = exportOneWithSave;
+  window.exportOneWithSave = WavCueExportCore.exportOneWithSave;
   async function runJob(type, idsOverride){
     const usingOverride = Array.isArray(idsOverride);
     const targets = usingOverride ? idsOverride : getVisibleFileIds();
@@ -16134,16 +16143,20 @@ try{
       }catch(_){}
       return;
     }
-    console.log("[BulkExport] start", { total: targets.length, target: "visible-filtered", filter: filterOn ? filterStatus : "all" });
+    console.log("[BULK] start total=" + targets.length);
+    let bulkStartedAt = 0;
     let exportTarget = null;
     let exportFolderLabel = "";
     if(type === "export"){
+      bulkStartedAt = Date.now();
+      prog.show("一括書き出し中…", `0/${targets.length}`);
       exportTarget = await resolveBulkExportTarget();
       if(!exportTarget){
         logJob("一括書き出しをキャンセルしました。");
         try{
           if(typeof toast === "function") toast("一括書き出しをキャンセルしました", "warn");
         }catch(_){}
+        prog.hide();
         return;
       }
       if(exportTarget.kind === "ipc"){
@@ -16151,7 +16164,7 @@ try{
       }else if(exportTarget.kind === "fs"){
         exportFolderLabel = exportTarget.dirHandle?.name || "";
       }
-      console.log(`[BulkExport] start total=${targets.length} folder=${exportFolderLabel} filter=${filterOn ? filterStatus : "all"}`);
+      console.log(`[BULK] pickFolder ok path=${exportFolderLabel}`);
       logJob(`[BulkExport] start total=${targets.length} folder=${exportFolderLabel} filter=${filterOn ? filterStatus : "all"}`);
     }
     __bulkExportRunning = true;
@@ -16185,9 +16198,7 @@ try{
     logJob(`対象件数: ${targets.length}`);
     logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
     updateJobUI();
-    if(type === "export"){
-      prog.show("一括書き出し中…", `0/${targets.length}`);
-    }else{
+    if(type !== "export"){
       overlay?.start?.(type, targets.length);
     }
 
@@ -16253,7 +16264,8 @@ try{
           }
           if(type==='export'){
             const fileLabel = f.name || state.fileName || "export.wav";
-            console.log(`[BulkExport] file begin id=${id} name=${fileLabel}`);
+            const fileStartedAt = Date.now();
+            console.log(`[BULK] file ${index}/${targets.length} begin id=${id} name=${fileLabel}`);
             const res = exportCore?.exportOneToTarget
               ? await exportCore.exportOneToTarget({ target: exportTarget, suggestedName: fileLabel, fileId: id })
               : await exportOneToTarget(exportTarget, fileLabel);
@@ -16265,7 +16277,7 @@ try{
             const savedName = res?.savedName || fileLabel || "exported";
             historyEntry.exportedNames.push(savedName);
             const savedPath = res?.save?.filePath || savedName;
-            console.log(`[BulkExport] file ok id=${id} path=${savedPath}`);
+            console.log(`[BULK] file ${index}/${targets.length} ok ms=${Date.now() - fileStartedAt}`);
           }
           job.ok++;
           if(type === "qc"){
@@ -16280,7 +16292,8 @@ try{
           logJob(`失敗: ${f.name} / ${failMsg}`);
           console.error("[BulkExport] failed", { fileId: f?.id, name: f?.name, err: String(e), stack: e?.stack });
           if(type === "export"){
-            console.log(`[BulkExport] file fail id=${id} reason=${failMsg}`);
+            const stack = e?.stack ? String(e.stack) : "";
+            console.log(`[BULK] file ${index}/${targets.length} ng reason=${failMsg} stack=${stack}`);
           }
         }finally{
           job.done++;
@@ -16309,8 +16322,7 @@ try{
       const status = job.cancel ? "cancel" : (job.failed.length ? "fail" : "success");
       if(type === "export"){
         prog.hide();
-        console.log(`[BulkExport] done ok=${job.ok} fail=${job.failed.length}`);
-        console.log("[BulkExport] done", { total: job.total, ok: job.ok, ng: job.failed.length, fail: job.failed.length });
+        console.log(`[BULK] end ok=${job.ok} ng=${job.failed.length} ms=${Date.now() - bulkStartedAt}`);
       }
       overlay?.end?.(type, status);
       historyEntry.running = false;
