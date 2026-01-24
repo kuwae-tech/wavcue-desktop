@@ -4313,6 +4313,56 @@ const CMCD_FIXED_SLOTS = [[0, 2], [2, 16], [18, 16], [34, 24], [58, 16], [74, 16
 const $ = (id)=> document.getElementById(id);
 
 /* ===============================
+   LOG helpers
+================================ */
+// 通常はOFF。必要時のみ localStorage で有効化:
+// localStorage.setItem("wavcue_log","*")
+// localStorage.setItem("wavcue_log","CUE,IMPORT")
+// localStorage.removeItem("wavcue_log")
+const LOG_STORAGE_KEY = "wavcue_log";
+const LOG_THROTTLE_STATE = new Map();
+
+function getLogSet(){
+  let raw = "";
+  try{
+    raw = localStorage.getItem(LOG_STORAGE_KEY) || "";
+  }catch(_){
+    return new Set();
+  }
+  const trimmed = String(raw).trim();
+  if(!trimmed || trimmed === "0") return new Set();
+  if(trimmed === "*") return new Set(["*"]);
+  return new Set(trimmed.split(",").map((v)=> v.trim().toUpperCase()).filter(Boolean));
+}
+
+function isLogOn(tag){
+  const set = getLogSet();
+  if(set.has("*")) return true;
+  if(!tag) return false;
+  return set.has(String(tag).toUpperCase());
+}
+
+function infoLog(tag, ...args){
+  if(!isLogOn(tag)) return;
+  try{ console.log(...args); }catch(_){}
+}
+function warnLog(tag, ...args){
+  try{ console.warn(...args); }catch(_){}
+}
+function errorLog(tag, ...args){
+  try{ console.error(...args); }catch(_){}
+}
+
+function infoLogThrottled(tag, key, ms, ...args){
+  if(!isLogOn(tag)) return;
+  const now = Date.now();
+  const last = LOG_THROTTLE_STATE.get(key) || 0;
+  if(now - last < ms) return;
+  LOG_THROTTLE_STATE.set(key, now);
+  try{ console.log(...args); }catch(_){}
+}
+
+/* ===============================
    MODAL SHELL (outside click + x + dirty confirm)
 ================================ */
 const _dialogDirtyText = "変更内容が保存されていません。閉じますか？";
@@ -4358,7 +4408,7 @@ function _wireDialogShell(dlg){
   if(dlg.dataset.closeLogged !== "1"){
     dlg.dataset.closeLogged = "1";
     const name = dlg.id || dlg.getAttribute("aria-label") || (dlg.className || "dialog");
-    console.log(`[UI] closeBtn layout modal=${name}`);
+    infoLog("UI", `[UI] closeBtn layout modal=${name}`);
   }
   dlg.addEventListener("click", (e)=>{ if(e.target === dlg) _dialogCloseWithGuard(dlg); });
   dlg.addEventListener("cancel", (e)=>{ e.preventDefault(); _dialogCloseWithGuard(dlg); });
@@ -4813,7 +4863,7 @@ function toast(msg, type="ok", timeout=2600){
   const targetContainer = getToastHostTarget();
   if(!targetContainer) return;
 
-  console.log("[Toast] show:", msg, "target:", targetContainer);
+  infoLog("UI", "[Toast] show:", msg, "target:", targetContainer);
 
   const t = document.createElement("div");
   t.className = `toast ${type}`;
@@ -4884,8 +4934,8 @@ function maybeToastFromLog(msg){
     window.diagLog = function(tag, msg, obj){
       try{
         if (!window.WAVCUE_DIAG) return;
-        if (obj !== undefined) console.log(tag, msg, obj);
-        else console.log(tag, msg);
+        if (obj !== undefined) infoLog("DIAG", tag, msg, obj);
+        else infoLog("DIAG", tag, msg);
       }catch(_){}
     };
   }
@@ -5001,8 +5051,8 @@ if (typeof window.diagState !== "function") {
             const obj = tryParseJSON(cand);
             if(obj){
               const keysPreview = Object.keys(obj).slice(0, 12);
-              console.log("[ARTIFACT][CMCD] found by marker", { fileId, src: `chunk:${id}`, len: cand.length });
-              console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+              infoLog("IMPORT", "[ARTIFACT][CMCD] found by marker", { fileId, src: `chunk:${id}`, len: cand.length });
+              infoLog("IMPORT", "[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
               return obj;
             }
           }
@@ -5019,8 +5069,8 @@ if (typeof window.diagState !== "function") {
           const obj = tryParseJSON(cand);
           if(obj){
             const keysPreview = Object.keys(obj).slice(0, 12);
-            console.log("[ARTIFACT][CMCD] found by key-hints", { fileId, src: `chunk:${id}`, len: cand.length });
-            console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+            infoLog("IMPORT", "[ARTIFACT][CMCD] found by key-hints", { fileId, src: `chunk:${id}`, len: cand.length });
+            infoLog("IMPORT", "[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
             return obj;
           }
         }
@@ -5035,7 +5085,7 @@ if (typeof window.diagState !== "function") {
         });
         if(Object.keys(kvObj).length){
           const keysPreview = Object.keys(kvObj).slice(0, 12);
-          console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+          infoLog("IMPORT", "[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
           return kvObj;
         }
       }
@@ -5054,8 +5104,8 @@ if (typeof window.diagState !== "function") {
           const obj = tryParseJSON(cand);
           if(obj){
             const keysPreview = Object.keys(obj).slice(0, 12);
-            console.log("[ARTIFACT][CMCD] found in XML tag", { fileId, src: `chunk:${id}`, len: cand.length });
-            console.log("[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
+            infoLog("IMPORT", "[ARTIFACT][CMCD] found in XML tag", { fileId, src: `chunk:${id}`, len: cand.length });
+            infoLog("IMPORT", "[CMCD]", "found", { fileId, source: `chunk:${id}`, nonEmptyCount: keysPreview.length, keysPreview });
             return obj;
           }
         }
@@ -5100,7 +5150,7 @@ if (typeof window.diagState !== "function") {
       try{
         if (!obj || typeof obj !== "object") return;
         const keys = Object.keys(obj);
-        console.log("[MIGRATE][KEYS]", label || "", {keyCount: keys.length, keys: keys.slice(0, 60)});
+        infoLog("IMPORT", "[MIGRATE][KEYS]", label || "", {keyCount: keys.length, keys: keys.slice(0, 60)});
       }catch(e){}
     };
   }
@@ -5241,7 +5291,7 @@ if (typeof window.diagState !== "function") {
           if(m){
             const obj = JSON.parse(m[0]);
             if(obj && typeof obj === "object"){
-              console.log("[ARTIFACT][CMCD]", "found", { fileId, chunkId, mode, keys: Object.keys(obj).slice(0, 12) });
+              infoLog("IMPORT", "[ARTIFACT][CMCD]", "found", { fileId, chunkId, mode, keys: Object.keys(obj).slice(0, 12) });
               return obj;
             }
           }
@@ -5256,7 +5306,7 @@ if (typeof window.diagState !== "function") {
           }
         });
         if(Object.keys(obj).length){
-          console.log("[ARTIFACT][CMCD]", "found", { fileId, chunkId, mode, keys: Object.keys(obj).slice(0, 12) });
+          infoLog("IMPORT", "[ARTIFACT][CMCD]", "found", { fileId, chunkId, mode, keys: Object.keys(obj).slice(0, 12) });
           return obj;
         }
         return null;
@@ -5389,7 +5439,7 @@ if (typeof window.diagState !== "function") {
             }catch(_){ }
             return { id, size, headAscii };
           });
-          console.log("[ARTIFACT][CHUNKS]", { fileId, count: chunks.length, sample });
+          infoLog("IMPORT", "[ARTIFACT][CHUNKS]", { fileId, count: chunks.length, sample });
           let previewed = 0;
           for(const c of chunks){
             if(previewed >= 10) break;
@@ -5405,7 +5455,7 @@ if (typeof window.diagState !== "function") {
               || headAscii.includes("{") || headAscii.includes("Ver") || headAscii.includes("cmcd") || headAscii.includes("素材");
             if(candidate){
               const headText = tryDecodeUtf8(u8, 300).slice(0, 300);
-              console.log("[ARTIFACT][PREVIEW]", { fileId, id, headText });
+              infoLog("IMPORT", "[ARTIFACT][PREVIEW]", { fileId, id, headText });
               previewed += 1;
             }
           }
@@ -5458,7 +5508,7 @@ if (typeof window.diagState !== "function") {
       }
       const attachments = findPdfChunks(chunks, fileBuf);
       const cmcdLen = (()=>{ try{ return cmcdInputs ? JSON.stringify(cmcdInputs).length : 0; }catch(_){ return 0; } })();
-      console.log("[ARTIFACT]", "scan", { fileId, pdfFound: attachments.length, cmcdFound: !!cmcdInputs, cmcdLen, chunkIdsSample });
+      infoLog("IMPORT", "[ARTIFACT]", "scan", { fileId, pdfFound: attachments.length, cmcdFound: !!cmcdInputs, cmcdLen, chunkIdsSample });
       return { cmcdInputs, cmcdText, attachments };
     }catch(_){
       return { cmcdInputs: null, cmcdText: "", attachments: [] };
@@ -5495,7 +5545,7 @@ if (typeof window.diagState !== "function") {
         rec.attachments = Array.isArray(ac) ? ac : (ac ? [ac] : []);
       }
 
-      console.log("[MIGRATE]", "normalizeRecArtifacts", {
+      infoLog("IMPORT", "[MIGRATE]", "normalizeRecArtifacts", {
         fileId: rec.fileId || rec.id || null,
         cmcdLen: rec.cmcd ? rec.cmcd.length : 0,
         pdfCount: rec.attachments ? rec.attachments.length : 0
@@ -5562,7 +5612,7 @@ if (typeof window.diagState !== "function") {
           window.safeCall(window.updateBadges);
         };
         if (typeof window.diagLog === "function") window.diagLog("[UI]", "requestFullRefresh", window.diagState({ reason }));
-        console.log("[UI] requestFullRefresh", reason);
+        infoLog("UI", "[UI] requestFullRefresh", reason);
         requestAnimationFrame(()=>{ r1(); requestAnimationFrame(r2); });
       }catch(e){
         console.error("[UI] requestFullRefresh failed", e);
@@ -5589,7 +5639,7 @@ if (typeof window.diagState !== "function") {
       // badges + repaint
       window.safeCall(window.updateBadges);
       if (typeof window.requestFullRefresh === "function") window.requestFullRefresh("commitAll:" + (reason||""));
-      console.log("[commitAll]", reason, opts || {});
+      infoLog("UI", "[commitAll]", reason, opts || {});
       if (typeof window.diagLog === "function") window.diagLog("[commitAll]", reason || "", window.diagState(opts || {}));
     }catch(e){
       console.error("[commitAll] failed", e);
@@ -6014,7 +6064,7 @@ function moveCueToTime(cueId, targetSec, jumpAfter, commitReason="cue:move"){
   log(`CUE: ${cue.label} を ${fmtTime(cue.sec)} に移動${(state.linkPair && isPair) ? "（連動）" : ""}`);
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-    console.log("[CUE] move", { id: cue.id, label: cue.label, sec: cue.sec, fileId: activeId });
+    infoLog("CUE", "[CUE] move", { id: cue.id, label: cue.label, sec: cue.sec, fileId: activeId });
     if (typeof window.diagLog === "function") window.diagLog("[CUE]", "move", window.diagState({ id: cue.id, label: cue.label, sec: cue.sec, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
@@ -6091,11 +6141,11 @@ function setupDragAndDrop(){
         }
       }
       if(!files.length){ return; }
-      console.log(`[Pro] drop wavs=${files.length}`);
+      infoLog("IMPORT", `[Pro] drop wavs=${files.length}`);
       const add = window.__wavcueProAddFiles;
       if(typeof add === "function"){
         await add(files);
-        console.log(`[Pro] drop add completed count=${files.length}`);
+        infoLog("IMPORT", `[Pro] drop add completed count=${files.length}`);
       }else{
         await loadFile(files[0]);
       }
@@ -6710,7 +6760,7 @@ function addCue(label){
   drawAll();
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-    console.log("[CUE] add", { id, label, sec, beforeCount, afterCount: state.cues.length, fileId: activeId });
+    infoLog("CUE", "[CUE] add", { id, label, sec, beforeCount, afterCount: state.cues.length, fileId: activeId });
     if (typeof window.diagLog === "function") window.diagLog("[CUE]", "add", window.diagState({ id, label, sec, beforeCount, afterCount: state.cues.length, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
@@ -6749,7 +6799,7 @@ function addStartStopCues(){
   drawAll();
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-    console.log("[CUE] addStartStop", { beforeCount, afterCount: state.cues.length, fileId: activeId });
+    infoLog("CUE", "[CUE] addStartStop", { beforeCount, afterCount: state.cues.length, fileId: activeId });
     if (typeof window.diagLog === "function") window.diagLog("[CUE]", "add", window.diagState({ type: "startStop", beforeCount, afterCount: state.cues.length, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
@@ -6790,7 +6840,7 @@ function addCuePair(){
   drawAll();
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-    console.log("[CUE] addPair", { beforeCount, afterCount: state.cues.length, fileId: activeId });
+    infoLog("CUE", "[CUE] addPair", { beforeCount, afterCount: state.cues.length, fileId: activeId });
     if (typeof window.diagLog === "function") window.diagLog("[CUE]", "add", window.diagState({ type: "pair", beforeCount, afterCount: state.cues.length, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
@@ -6808,7 +6858,7 @@ function deleteCue(id){
   drawAll();
   try{
     const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-    console.log("[CUE] delete", { id, label: target?.label, beforeCount, afterCount: state.cues.length, fileId: activeId });
+    infoLog("CUE", "[CUE] delete", { id, label: target?.label, beforeCount, afterCount: state.cues.length, fileId: activeId });
     if (typeof window.diagLog === "function") window.diagLog("[CUE]", "delete", window.diagState({ id, label: target?.label, beforeCount, afterCount: state.cues.length, fileId: activeId }));
   }catch(_){}
   if(typeof window.commitAll === "function"){
@@ -6892,7 +6942,7 @@ function renderCues(){
       inp.value = fmtTime(cc ? cc.sec : c.sec);
       try{
         const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-        console.log("[CUE] list edit", { id: c.id, from: oldSec, to: cc ? cc.sec : c.sec, fileId: activeId });
+        infoLog("CUE", "[CUE] list edit", { id: c.id, from: oldSec, to: cc ? cc.sec : c.sec, fileId: activeId });
         if (typeof window.diagLog === "function") window.diagLog("[CUE]", "edit", window.diagState({ id: c.id, from: oldSec, to: cc ? cc.sec : c.sec, fileId: activeId }));
       }catch(_){}
     });
@@ -6956,7 +7006,7 @@ function resizeCanvas(elOrId){
   if(changed){
     try{
       const id = el.id || "(no-id)";
-      console.log("[UI][resizeCanvas]", { id, rectW: r.width, rectH: r.height, w, h, dpr });
+      infoLog("UI", "[UI][resizeCanvas]", { id, rectW: r.width, rectH: r.height, w, h, dpr });
     }catch(_){}
   }
 }
@@ -6979,7 +7029,7 @@ function _uiLogWaveLayout(tag){
     const cs = (el)=> el ? window.getComputedStyle(el) : null;
     const pick = (s)=> s ? ({ h:s.height, minH:s.minHeight, maxH:s.maxHeight, flex:s.flex, flexGrow:s.flexGrow, flexBasis:s.flexBasis, overflow:s.overflow }) : null;
 
-    console.log("[UI][layout]", tag, {
+    infoLog("UI", "[UI][layout]", tag, {
       vw: window.innerWidth, vh: window.innerHeight,
       wave: { rect: rect(wave), attr: { w: wave?.width, h: wave?.height }, style: pick(cs(wave)) },
       waveBox: { rect: rect(waveBox), style: pick(cs(waveBox)) },
@@ -7036,8 +7086,8 @@ function clearCueLayerOnSwitch(fileId, cueCount, reason){
     try{ console.warn("[CUE] clearCueLayerOnSwitch failed (ignored)", e); }catch(_){}
   }
   try{
-    console.log("[CUE] clearLayer onSwitch", { fileId, cueCount, reason });
-    console.log("[CUE][clear]", "fileId=", fileId, "done");
+    infoLog("CUE", "[CUE] clearLayer onSwitch", { fileId, cueCount, reason });
+    infoLog("CUE", "[CUE][clear]", "fileId=", fileId, "done");
   }catch(_){}
 }
 
@@ -7045,7 +7095,7 @@ function logCueRenderMarkers(fileId, cueCount){
   if(state.cueRenderLog?.fileId === fileId && state.cueRenderLog?.cueCount === cueCount) return;
   state.cueRenderLog = { fileId, cueCount };
   try{
-    console.log("[CUE] renderMarkers", { fileId, cueCount });
+    infoLogThrottled("CUE", "cue-render-markers", 1000, "[CUE] renderMarkers", { fileId, cueCount });
   }catch(_){}
 }
 
@@ -7057,7 +7107,7 @@ function renderMarkers(fileId, cues){
     return;
   }
   try{
-    console.log("[CUE][render]", "fileId=", fileId, "activeFileId=", activeFileId, "cueCount=", cueCount);
+    infoLogThrottled("CUE", "cue-render", 1000, "[CUE][render]", "fileId=", fileId, "activeFileId=", activeFileId, "cueCount=", cueCount);
   }catch(_){}
   logCueRenderMarkers(fileId, cueCount);
   if(!state.buffer || !cueCtx) return;
@@ -7068,7 +7118,7 @@ function renderMarkers(fileId, cues){
   const cueNames = (Array.isArray(cues) ? cues : []).map(c=> (c?.name || c?.dwName || c?.label || ""));
 
   try{
-    console.log("[CUE][render]", "cueNames=", cueNames);
+    infoLogThrottled("CUE", "cue-render-names", 1000, "[CUE][render]", "cueNames=", cueNames);
   }catch(_){}
   clearCanvasFull(cueCanvas);
   for(const c of cues){
@@ -7079,7 +7129,7 @@ function renderMarkers(fileId, cues){
     const cueColor = isST ? "rgba(126,231,162,.95)" : isEN ? "rgba(251,191,36,.95)" : "rgba(229,231,235,.70)";
     cueCtx.strokeStyle = cueColor;
     cueCtx.lineWidth = 2;
-    console.log("[CUE][line]", "name=", String(c.label ?? ""), "x=", x, "color=", cueColor);
+    infoLogThrottled("CUE", "cue-line", 1000, "[CUE][line]", "name=", String(c.label ?? ""), "x=", x, "color=", cueColor);
     cueCtx.beginPath(); cueCtx.moveTo(x, 0); cueCtx.lineTo(x, H); cueCtx.stroke();
 
     cueCtx.fillStyle = "rgba(0,0,0,.45)";
@@ -7315,7 +7365,7 @@ window.addEventListener("mouseup",()=>{
       }
       try{
         const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
-        console.log("[CUE] drag end", { id: c.id, label: c.label, sec: c.sec, fileId: activeId });
+        infoLog("CUE", "[CUE] drag end", { id: c.id, label: c.label, sec: c.sec, fileId: activeId });
       }catch(_){}
       if(typeof window.commitAll === "function"){
         const activeId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId() : null;
@@ -8083,7 +8133,7 @@ function normalizeRecArtifacts(rec, stateLike){
     if(hasInputs && (!hasStr || emptyTemplate)){
       try{ rec.cmcd = JSON.stringify(rec.cmcdInputs); }catch(_){ rec.cmcd = ""; }
       if(emptyTemplate){
-        console.log("[CMCD] prefer inputs over empty template", {
+        infoLog("IMPORT", "[CMCD] prefer inputs over empty template", {
           fileId: rec.fileId || rec.id,
           cmcdLen: rec.cmcd.length,
         });
@@ -8125,13 +8175,13 @@ function normalizeRecArtifacts(rec, stateLike){
     rec.attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
   }
   try{
-    console.log("[MIGRATE]", "normalizeRecArtifacts", {
+    infoLog("IMPORT", "[MIGRATE]", "normalizeRecArtifacts", {
       fileId: rec.fileId || rec.id,
       cmcdLen: rec.cmcd.length,
       pdfCount: rec.attachments.length,
     });
     if(imported){
-      console.log("[MIGRATE]", "imported", {
+      infoLog("IMPORT", "[MIGRATE]", "imported", {
         fileId: rec.fileId || rec.id,
         cmcdLen: rec.cmcd.length,
         pdfCount: rec.attachments.length,
@@ -8139,12 +8189,12 @@ function normalizeRecArtifacts(rec, stateLike){
     }else if(src){
       console.warn("[MIGRATE]", "no artifacts found", { fileId: rec.fileId || rec.id });
       if(typeof window.deepFindByKey === "function"){
-        console.log("[MIGRATE][FIND]", "cmcd", window.deepFindByKey(src, (k)=> String(k).toLowerCase().includes("cmcd"), 20));
-        console.log("[MIGRATE][FIND]", "pdf/attach", window.deepFindByKey(src, (k)=> {
+        infoLog("IMPORT", "[MIGRATE][FIND]", "cmcd", window.deepFindByKey(src, (k)=> String(k).toLowerCase().includes("cmcd"), 20));
+        infoLog("IMPORT", "[MIGRATE][FIND]", "pdf/attach", window.deepFindByKey(src, (k)=> {
           const key = String(k).toLowerCase();
           return key.includes("pdf") || key.includes("attach");
         }, 20));
-        console.log("[MIGRATE][FIND]", "pdf arrays", window.deepFindByKey(src, (_k,v)=> {
+        infoLog("IMPORT", "[MIGRATE][FIND]", "pdf arrays", window.deepFindByKey(src, (_k,v)=> {
           return Array.isArray(v) && v.length && (v[0]?.name || v[0]?.fileName || v[0]?.mime);
         }, 20));
       }
@@ -8323,7 +8373,7 @@ function setupCmcdDialog(){
     if(rec){
       rec.cmcd = "";
       rec.cmcdInputs = null;
-      console.log("[CMCD]", "clear", { fileId: rec.id, value: rec.cmcd });
+      infoLog("IMPORT", "[CMCD]", "clear", { fileId: rec.id, value: rec.cmcd });
       if(typeof window.commitAll === "function"){
         window.commitAll("cmcd:clear", { fileId: rec.id });
       }
@@ -8343,7 +8393,7 @@ function setupCmcdDialog(){
         rec.cmcdInputs = null;
         rec.cmcd = "";
       }
-      console.log("[CMCD]", "apply", { fileId: rec.id, value: rec.cmcd });
+      infoLog("IMPORT", "[CMCD]", "apply", { fileId: rec.id, value: rec.cmcd });
       if(typeof window.commitAll === "function"){
         window.commitAll("cmcd:apply", { fileId: rec.id });
       }
@@ -9944,7 +9994,7 @@ const refreshSettingsData = async ()=>{
   if(!window.wavcue?.getSettings) return;
   try{ await window.wavcue.ensureDefaultFolders?.(); }catch(_){}
   const settings = await window.wavcue.getSettings();
-  console.log("[Settings] loaded settings:", settings);
+  infoLog("SETTINGS", "[Settings] loaded settings:", settings);
   if(settingsLog && settingsLog.textContent.trim() === "準備完了"){
     settingsLog.textContent = "クリーンアップログはバックアップ内のreport.txtに保存されます。";
   }
@@ -10080,12 +10130,12 @@ async function onSaveSettingsClicked(){
       autoCleanupOnQuit: false,
       autoCleanupOnStartup: false,
     };
-    console.log("[Settings] save clicked, patch:", patch);
+    infoLog("SETTINGS", "[Settings] save clicked, patch:", patch);
     if(typeof window.wavcue?.setSettings !== "function"){
       throw new Error("settings:set unavailable");
     }
     const result = await window.wavcue.setSettings(patch);
-    console.log("[Settings] setSettings resolved:", result);
+    infoLog("SETTINGS", "[Settings] setSettings resolved:", result);
     updateRulesBadge();
     settingsLogAdd("設定を保存しました。");
     if(typeof toast === "function"){
@@ -12954,7 +13004,7 @@ async function _scApplyAutoFix(){
   _scSet("sc_fixState", "適用中");
   _scSet("sc_fixInfo", `ゲイン ${gainDb.toFixed(2)} dB / TP安全 ${tpSafetyDb.toFixed(2)} dB（合計 ${totalDb.toFixed(2)} dB）`);
 
-  console.log("[FixCommitB]", {
+  infoLog("IMPORT", "[FixCommitB]", {
     fileId: rec?.id || null,
     name: rec?.name || state.fileName || null,
     gainDb,
@@ -12962,7 +13012,7 @@ async function _scApplyAutoFix(){
     replacedFile,
   });
   if(dataReplaceOk){
-    console.log("[FixCommitB] data-replace ok", { fileId: rec?.id || null, bytes: rebuiltBytesLen });
+    infoLog("IMPORT", "[FixCommitB] data-replace ok", { fileId: rec?.id || null, bytes: rebuiltBytesLen });
   }else{
     console.warn("[FixCommitB] data-replace ng", { fileId: rec?.id || null, bytes: rebuiltBytesLen });
   }
@@ -13367,7 +13417,7 @@ function updateViewportVars(){
   const vw = window.innerWidth * 0.01;
   document.documentElement.style.setProperty('--vh', `${vh}px`);
   document.documentElement.style.setProperty('--vw', `${vw}px`);
-  console.log(`[UI][viewport] w=${window.innerWidth}, h=${window.innerHeight}, vh=${vh.toFixed(2)}, vw=${vw.toFixed(2)}`);
+  infoLog("UI", `[UI][viewport] w=${window.innerWidth}, h=${window.innerHeight}, vh=${vh.toFixed(2)}, vw=${vw.toFixed(2)}`);
 }
 function installViewportWatch(){
   if(window.__viewportWatchInstalled) return;
@@ -13382,13 +13432,13 @@ function installViewportWatch(){
     if(w === lastW && h === lastH) return;
     lastW = w;
     lastH = h;
-    console.log(`[UI][watchResize] detected w/h change ${w}x${h}`);
+    infoLog("UI", `[UI][watchResize] detected w/h change ${w}x${h}`);
     updateViewportVars();
     if (_resizeRaf) cancelAnimationFrame(_resizeRaf);
     if (_resizeTimer) clearTimeout(_resizeTimer);
     const kick = (phase)=>{
       try{
-        console.log(`[UI][resizeKick] ${phase} w=${w} h=${h}`);
+        infoLog("UI", `[UI][resizeKick] ${phase} w=${w} h=${h}`);
         resizeAll();
         drawAll();
         _uiLogWaveLayout(`resizeKick:${phase}`);
@@ -13453,7 +13503,7 @@ window.addEventListener("resize", ()=>{
     const waveRect = waveEl?.getBoundingClientRect?.() || {width:0,height:0};
     const meterRect = meterEl?.getBoundingClientRect?.() || {width:0,height:0};
     const imagerRect = imagerEl?.getBoundingClientRect?.() || {width:0,height:0};
-    console.log("[UI][canvas]", {
+    infoLog("UI", "[UI][canvas]", {
       wave: { rectW: waveRect.width, rectH: waveRect.height, w: waveEl?.width, h: waveEl?.height },
       meter: { rectW: meterRect.width, rectH: meterRect.height, w: meterEl?.width, h: meterEl?.height },
       imager: { rectW: imagerRect.width, rectH: imagerRect.height, w: imagerEl?.width, h: imagerEl?.height },
@@ -13749,7 +13799,7 @@ function attachAdd(att){
   _pdfUI_set(state.pdfAttach);
   const rec = _syncActiveRecAttachments();
   if(rec){
-    console.log("[PDF]", "add", { fileId: rec.id, count: rec.attachments.length });
+    infoLog("EXPORT", "[PDF]", "add", { fileId: rec.id, count: rec.attachments.length });
     if(typeof window.commitAll === "function"){
       window.commitAll("pdf:add", { fileId: rec.id });
     }
@@ -13772,7 +13822,7 @@ function attachRemoveSelected(confirmMsg){
   log(`OK: 添付を解除しました: ${name}`);
   const rec = _syncActiveRecAttachments();
   if(rec){
-    console.log("[PDF]", "remove", { fileId: rec.id, count: rec.attachments.length });
+    infoLog("EXPORT", "[PDF]", "remove", { fileId: rec.id, count: rec.attachments.length });
     if(typeof window.commitAll === "function"){
       window.commitAll("pdf:remove", { fileId: rec.id });
     }
@@ -14033,7 +14083,7 @@ function pdfOpenViewerForObject(obj, meta){
 
     if(meta && meta.source === "popover"){
       try{
-        console.log("[PDF]", "openFromPopover", {
+        infoLog("EXPORT", "[PDF]", "openFromPopover", {
           fileId: meta.fileId,
           index: meta.index,
           name: obj.name || "",
@@ -14249,7 +14299,7 @@ function setupPdfDialog(){
       _pdfUI_set(state.pdfAttach);
       const rec = _syncActiveRecAttachments();
       if(rec){
-        console.log("[PDF]", "reorder", { fileId: rec.id, count: rec.attachments.length });
+        infoLog("EXPORT", "[PDF]", "reorder", { fileId: rec.id, count: rec.attachments.length });
         if(typeof window.commitAll === "function"){
           window.commitAll("pdf:reorder", { fileId: rec.id });
         }
@@ -14831,10 +14881,10 @@ try{
         }
 
         if(!box && !box2){
-          console.log("[LOG]", msg);
+          infoLog("UI", "[LOG]", msg);
         }
       }catch(err){
-        console.log("[LOG][fallback]", msg, err);
+        infoLog("UI", "[LOG][fallback]", msg, err);
       }
     };
   })();
@@ -14863,7 +14913,7 @@ try{
       if(sub) sub.textContent = `0/${total} (0%)`;
       if(now) now.textContent = "";
       ov.classList.add("show");
-      console.log(`[Overlay] bulk:start type=${String(type||"")} total=${total}`);
+      infoLog("UI", `[Overlay] bulk:start type=${String(type||"")} total=${total}`);
     };
     const update = (done, total, filename)=>{
       ensure();
@@ -14878,7 +14928,7 @@ try{
       ensure();
       if(!ov) return;
       ov.classList.remove("show");
-      console.log(`[Overlay] bulk:end type=${String(type||"")} status=${status}`);
+      infoLog("UI", `[Overlay] bulk:end type=${String(type||"")} status=${status}`);
     };
     return { start, update, end };
   })();
@@ -14893,7 +14943,7 @@ try{
       if(typeof window?.log === "function"){ window.log(msg); return; }
       if(typeof log === "function"){ log(msg); return; }
     }catch(_){}
-    try{ console.log(msg); }catch(_){}
+    try{ infoLog("UI", msg); }catch(_){}
   }
   const audioCache = { map: new Map(), totalBytes: 0 };
   const _getCFG = ()=>{
@@ -14922,9 +14972,9 @@ try{
   function audioCacheLog(action, detail){
     try{
       const extra = detail ? ` ${JSON.stringify(detail)}` : "";
-      console.log(`[Pro][AudioCache] ${action}${extra}`);
+      infoLog("IMPORT", `[Pro][AudioCache] ${action}${extra}`);
     }catch(_){
-      console.log(`[Pro][AudioCache] ${action}`);
+      infoLog("IMPORT", `[Pro][AudioCache] ${action}`);
     }
   }
   function audioCacheEvictToFit(bytesNeeded){
@@ -15283,7 +15333,7 @@ try{
     rec.cuesSig = sig;
     rec.dirty = true;
 
-    console.log(`[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.cuesSnapshot.length}`);
+    infoLog("IMPORT", `[Pro] saveEdits(${reason||""}${force?",force":""}) -> ${rec.name} cues=${rec.cuesSnapshot.length}`);
   }
   function proApplyEditsToApp(rec, reason){
     const st = window.WavCue?.state;
@@ -15305,7 +15355,7 @@ try{
     try{ if(typeof renderCues === "function") renderCues(); }catch(_){}
     try{ if(typeof drawAll === "function") drawAll(); }catch(_){}
     try{ if(typeof updateButtons === "function") updateButtons(); }catch(_){}
-    if(reason){ console.log(`[Pro] applyEdits(${reason}) -> ${rec.name} cues=${st.cues.length}`); }
+    if(reason){ infoLog("IMPORT", `[Pro] applyEdits(${reason}) -> ${rec.name} cues=${st.cues.length}`); }
   }
   function proSyncRecFromState(rec, reason, opts={}){
     const st = window.WavCue?.state;
@@ -15321,7 +15371,7 @@ try{
     if(opts.markEdited){
       rec.status.edited = true;
     }
-    if(reason){ console.log(`[Pro] syncRec(${reason}) -> ${rec.name} cues=${rec.cues.length}`); }
+    if(reason){ infoLog("IMPORT", `[Pro] syncRec(${reason}) -> ${rec.name} cues=${rec.cues.length}`); }
   }
   function proUpdateBadges(reason){
     project.files.forEach(f=>{
@@ -15329,7 +15379,7 @@ try{
         f.cues = f.cuesSnapshot.map(c=>({ ...c }));
       }
     });
-    if(reason){ console.log(`[Pro] updateBadges(${reason})`); }
+    if(reason){ infoLog("IMPORT", `[Pro] updateBadges(${reason})`); }
     render();
   }
   function proCommitEdits(reason, opts){
@@ -15337,7 +15387,7 @@ try{
     const rec = project.files.find(f=>f.id===id);
     if(!rec) return;
     proSyncRecFromState(rec, reason || "commit", {markEdited:true});
-    if(reason){ console.log(`[Pro] commitEdits(${reason}) -> ${rec.name}`); }
+    if(reason){ infoLog("IMPORT", `[Pro] commitEdits(${reason}) -> ${rec.name}`); }
   }
   window.commitEdits = window.commitEdits || proCommitEdits;
   window.updateBadges = window.updateBadges || proUpdateBadges;
@@ -15348,7 +15398,7 @@ try{
     proUpdateAfterFix(rec);
   });
   function proForceRedraw(reason){
-    if(reason) console.log(`[Pro] forceRedraw(${reason})`);
+    if(reason) infoLog("IMPORT", `[Pro] forceRedraw(${reason})`);
     try{ if(typeof window.resizeAll === "function") window.resizeAll(); }catch(_){}
     try{ if(typeof window.drawAll === "function") window.drawAll(); }catch(_){}
     setTimeout(()=>{
@@ -15500,7 +15550,7 @@ try{
     if(!file) return;
     const qcResult = file.qcResult || null;
     const { ng } = safeExtract(qcResult || null);
-    console.log(`[NGDetail] open fileId=${file.id} ngCount=${ng.length}`);
+    infoLog("UI", `[NGDetail] open fileId=${file.id} ngCount=${ng.length}`);
     renderNgDetail(qcResult, file.name || "");
     const dlg = $("ngDetailDialog");
     if(dlg){
@@ -15531,7 +15581,7 @@ try{
       rec.status.qcReason = reason;
       rec.qcResult = qcResult;
       if(opts?.source === "bulk"){
-        console.log(`[QC][apply] fileId=${rec.id} ok=${ng.length === 0} field=qcResult`);
+        infoLog("QC", `[QC][apply] fileId=${rec.id} ok=${ng.length === 0} field=qcResult`);
       }
     }
   }
@@ -15559,7 +15609,7 @@ try{
       if(!files.length) return;
       const dndGuard = (files.length > 1) ? { expected: files.length, seen: 0, startedAt: Date.now() } : null;
       if (typeof window.diagLog === "function") window.diagLog("[DND]", "start", window.diagState({ count: files.length, startedAt: dndGuard?.startedAt || null }));
-      console.log(`[DND] start ${files.length}`);
+      infoLog("DND", `[DND] start ${files.length}`);
       const addedIds = [];
       const addedRecs = [];
       for(const file of files){
@@ -15584,7 +15634,7 @@ try{
       if(typeof loadSingleWav === "function"){
         for(const rec of addedRecs){
           try{
-            console.log("[DND] fullLoad start", rec.name);
+            infoLog("DND", "[DND] fullLoad start", rec.name);
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad start", window.diagState({ name: rec.name, fileId: rec.id }));
             await loadSingleWav(rec.file);
             project.lastLoadedId = rec.id;
@@ -15624,7 +15674,7 @@ try{
                 if(typeof window.normalizeRecArtifacts === "function"){
                   window.normalizeRecArtifacts(rec, null);
                 }
-                console.log("[ARTIFACT]", "import", {
+                infoLog("IMPORT", "[ARTIFACT]", "import", {
                   fileId: rec.id,
                   cmcdFilled: !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)),
                   pdfCount: rec.attachments?.length || 0,
@@ -15645,7 +15695,7 @@ try{
                 if((!rec.attachments || !rec.attachments.length) && Array.isArray(artifacts.attachments)){
                   rec.attachments = artifacts.attachments;
                 }
-                console.log("[ARTIFACT]", "import fallback", {
+                infoLog("IMPORT", "[ARTIFACT]", "import fallback", {
                   fileId: rec.id,
                   cmcdFilled: !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)),
                   pdfCount: rec.attachments?.length || 0,
@@ -15671,7 +15721,7 @@ try{
             }catch(err){
               console.warn("[Pro] audio cache remember failed", rec.name, err);
             }
-            console.log("[DND] fullLoad done", rec.name);
+            infoLog("DND", "[DND] fullLoad done", rec.name);
             if (typeof window.diagLog === "function") window.diagLog("[DND]", "fullLoad done", window.diagState({ name: rec.name, fileId: rec.id }));
           }catch(err){
             console.error("[DND] fullLoad error", rec.name, err);
@@ -15690,14 +15740,14 @@ try{
         if (typeof window.diagLog === "function") window.diagLog("[GUARD]", "dnd:seen-mismatch", warnPayload);
       }
       if (typeof window.diagLog === "function") window.diagLog("[DND]", "all done", window.diagState({ expected: dndGuard?.expected || files.length, seen: dndGuard?.seen || files.length }));
-      console.log(`[DND] all done ${addedRecs.length}`);
+      infoLog("DND", `[DND] all done ${addedRecs.length}`);
       if(targetActiveId){
         await setActiveFile(targetActiveId, {force:true, skipSave:true});
       }else{
         render();
       }
       if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("dnd:done");
-      console.log(`[Pro] addFiles done total=${project.files.length}`);
+      infoLog("IMPORT", `[Pro] addFiles done total=${project.files.length}`);
       if (typeof window.diagLog === "function") window.diagLog("[DND]", "addFiles done", window.diagState({ total: project.files.length }));
       return addedIds;
     }catch(err){
@@ -15711,8 +15761,8 @@ try{
       const rec = project.files.find(f=>f.id===id);
       if(!rec) return;
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "start", window.diagState({ fileId: id, hasGetState: (typeof window.getState === "function") }));
-      console.log("[Pro] setActiveFile start", { id, name: rec.name, force: !!opts?.force });
-      console.log("[FixCommitB] restore-check", {
+      infoLog("IMPORT", "[Pro] setActiveFile start", { id, name: rec.name, force: !!opts?.force });
+      infoLog("IMPORT", "[FixCommitB] restore-check", {
         fileId: rec.id,
         isReplacedFile: !!rec._fixReplacedFile,
         srcAbLen: rec?.srcAb?.byteLength || rec?._stateSnap?.srcAb?.byteLength || null,
@@ -15721,7 +15771,7 @@ try{
       if(!opts?.skipSave){
         proSaveActiveEdits("before-switch", true);
       }else{
-        console.log("[ACTIVE]", "skipSave", { fileId: id });
+        infoLog("IMPORT", "[ACTIVE]", "skipSave", { fileId: id });
       }
 
       project.activeId = id;
@@ -15769,10 +15819,10 @@ try{
         proForceRedraw("cache-hit");
         proApplyEditsToApp(rec, "cache-hit");
       }else if(!allowDecode){
-        console.log("[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
+        infoLog("IMPORT", "[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
         return;
       }else{
-        console.log(`[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
+        infoLog("IMPORT", `[Pro] setActiveFile(force=${!!opts?.force}) -> ${rec.name}`);
         await loadSingleWav(rec.file);  // ★ここが本体のloadFileに確実に到達する
         project.lastLoadedId = id;
         proForceRedraw("after-load");
@@ -15810,15 +15860,15 @@ try{
         }catch(err){ console.error("[MIGRATE] active normalize error", err); }
         const cmcdInput = window._cmcdInput;
         if(cmcdInput){
-        if(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)){
-          cmcdInput.value = rec.cmcdInputs;
-        }else{
-          cmcdInput.value = rec.cmcd || "";
-        }
-          console.log("[CMCD]", "restore", { fileId: rec.id, value: cmcdInput.value });
+          if(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)){
+            cmcdInput.value = rec.cmcdInputs;
+          }else{
+            cmcdInput.value = rec.cmcd || "";
+          }
+          infoLog("IMPORT", "[CMCD]", "restore", { fileId: rec.id, value: cmcdInput.value });
         }else if(typeof window._cmcdApplyValuesToInputs === "function"){
           window._cmcdApplyValuesToInputs(rec.cmcd || null);
-          console.log("[CMCD]", "restore", { fileId: rec.id, value: rec.cmcd || "" });
+          infoLog("IMPORT", "[CMCD]", "restore", { fileId: rec.id, value: rec.cmcd || "" });
         }else if(typeof window._cmcdCaptureInputs === "function"){
           rec.cmcd = window._cmcdCaptureInputs();
         }
@@ -15841,12 +15891,12 @@ try{
         console.error("[ACTIVE] pdf restore error", err);
       }
       try{
-        console.log("[PDF]", "restore", {
+        infoLog("EXPORT", "[PDF]", "restore", {
           fileId: rec.id,
           count: rec.attachments?.length || 0,
           names: (rec.attachments || []).map(a=>a?.name || a?.fileName || a?.filename || "").filter(Boolean).slice(0,3),
         });
-        console.log("[ACTIVE]", "restore", {
+        infoLog("IMPORT", "[ACTIVE]", "restore", {
           fileId: rec.id,
           hasCmcd: _cmcdHasValues(rec.cmcd),
           pdfCount: rec.attachments?.length || 0,
@@ -15882,7 +15932,7 @@ try{
     }finally{
       render();
       if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch");
-      console.log("[Pro] setActiveFile done", id);
+      infoLog("IMPORT", "[Pro] setActiveFile done", id);
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id }));
     }
   }
@@ -16033,7 +16083,7 @@ try{
         exportList.innerHTML = "";
       }
     }
-    console.log(`[History] render entry id=${entry.id} ok=${okCount} ng=${ngCount} fail=${failCount}`);
+    infoLog("UI", `[History] render entry id=${entry.id} ok=${okCount} ng=${ngCount} fail=${failCount}`);
     const retryBtn = $("proJobRetryFailed");
     const cancelBtn = $("proJobCancel");
     if(retryBtn) retryBtn.disabled = !entry.failedIds?.length || entry.running;
@@ -16051,7 +16101,7 @@ try{
       requestAnimationFrame(()=>{
         const r = dlg.getBoundingClientRect();
         const entriesCount = historyEntries().length;
-        console.log(`[History] open size=${Math.round(r.width)},${Math.round(r.height)} entries=${entriesCount}`);
+        infoLog("UI", `[History] open size=${Math.round(r.width)},${Math.round(r.height)} entries=${entriesCount}`);
       });
     }else{
       try{ dlg.close(); }catch(_){ dlg.removeAttribute("open"); }
@@ -16180,7 +16230,7 @@ try{
     const usingOverride = Array.isArray(idsOverride);
     const targets = usingOverride ? idsOverride : getVisibleFileIds();
     const filterOn = project.filter.status && project.filter.status !== "all";
-    console.log(`[Bulk] target=${usingOverride ? "override" : "visible"} count=${targets.length} filter=${filterOn ? "on" : "off"} action=${type==="qc" ? "QC" : "EXPORT"}`);
+    infoLog("EXPORT", `[Bulk] target=${usingOverride ? "override" : "visible"} count=${targets.length} filter=${filterOn ? "on" : "off"} action=${type==="qc" ? "QC" : "EXPORT"}`);
     if(!targets.length){
       logJob("対象件数: 0");
       try{
@@ -16193,7 +16243,7 @@ try{
     let exportTarget = null;
     let bulkStartedAt = 0;
     if(type === "export"){
-      console.log(`[BULK][PREFLIGHT] start total=${targets.length}`);
+      infoLog("EXPORT", `[BULK][PREFLIGHT] start total=${targets.length}`);
       const ngItems = [];
       targets.forEach(id=>{
         const f = project.files.find(x=>x.id===id);
@@ -16202,19 +16252,19 @@ try{
         if(!ng.length) return;
         const reasons = formatBulkNgReasons(f.qcResult || null, 3);
         const name = f.name || `file:${id}`;
-        console.log(`[BULK][PREFLIGHT] ng file=${name} reasons=${reasons.join(" / ") || "規格NG"}`);
+        infoLog("EXPORT", `[BULK][PREFLIGHT] ng file=${name} reasons=${reasons.join(" / ") || "規格NG"}`);
         ngItems.push({ id, name, reasons });
       });
-      console.log(`[BULK][PREFLIGHT] ngCount=${ngItems.length}`);
+      infoLog("EXPORT", `[BULK][PREFLIGHT] ngCount=${ngItems.length}`);
       if(ngItems.length){
-        console.log("[BULK][PREFLIGHT] showWarningDialog");
+        infoLog("EXPORT", "[BULK][PREFLIGHT] showWarningDialog");
         const proceed = await showBulkExportNgDialog(ngItems);
-        console.log(`[BULK][PREFLIGHT] continueByUser=${proceed}`);
+        infoLog("EXPORT", `[BULK][PREFLIGHT] continueByUser=${proceed}`);
         if(!proceed) return;
       }
-      console.log("[BULK][PREFLIGHT] pass -> continue");
+      infoLog("EXPORT", "[BULK][PREFLIGHT] pass -> continue");
       bulkStartedAt = Date.now();
-      console.log(`[BULK] start total=${targets.length}`);
+      infoLog("EXPORT", `[BULK] start total=${targets.length}`);
       prog.show("一括書き出し中…", `0/${targets.length}`);
       exportTarget = await resolveBulkExportTarget();
       if(!exportTarget){
@@ -16223,7 +16273,7 @@ try{
         return;
       }
       const exportFolderLabel = exportTarget.folderPath || "";
-      console.log(`[BULK] pickFolder ok path=${exportFolderLabel}`);
+      infoLog("EXPORT", `[BULK] pickFolder ok path=${exportFolderLabel}`);
     }
     job.running = true;
     job.cancel=false;
@@ -16322,7 +16372,7 @@ try{
           if(type==='export'){
             const fileLabel = f.name || state.fileName || "export.wav";
             const fileStartedAt = Date.now();
-            console.log(`[BULK] file ${index}/${targets.length} begin id=${id} name=${fileLabel}`);
+            infoLog("EXPORT", `[BULK] file ${index}/${targets.length} begin id=${id} name=${fileLabel}`);
             const res = await window.WavCueExportCore.exportOneToTarget({
               target: exportTarget,
               suggestedName: fileLabel,
@@ -16334,7 +16384,7 @@ try{
             }
             f.status.exported = true;
             historyEntry.exportedNames.push(res?.savedName || fileLabel || "exported");
-            console.log(`[BULK] file ${index}/${targets.length} ok ms=${Date.now() - fileStartedAt}`);
+            infoLog("EXPORT", `[BULK] file ${index}/${targets.length} ok ms=${Date.now() - fileStartedAt}`);
           }
           job.ok++;
           if(type === "qc"){
@@ -16348,7 +16398,7 @@ try{
           logJob(`失敗: ${f.name} / ${e?.message || e}`);
           if(type === "export"){
             const stack = e?.stack ? String(e.stack) : "";
-            console.log(`[BULK] file ${index}/${targets.length} ng reason=${e?.message || e} stack=${stack}`);
+            infoLog("EXPORT", `[BULK] file ${index}/${targets.length} ng reason=${e?.message || e} stack=${stack}`);
           }
         }finally{
           job.done++;
@@ -16365,7 +16415,7 @@ try{
     }finally{
       logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
       if(type==='qc'){
-        console.log(`[QC][bulk] done updatedRows=${qcUpdatedRows}`);
+        infoLog("QC", `[QC][bulk] done updatedRows=${qcUpdatedRows}`);
         render();
         if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("qc:bulk");
       }
@@ -16376,7 +16426,7 @@ try{
       const status = job.cancel ? "cancel" : (job.failed.length ? "fail" : "success");
       if(type === "export"){
         prog.hide();
-        console.log(`[BULK] end ok=${job.ok} ng=${job.failed.length} ms=${Date.now() - bulkStartedAt}`);
+        infoLog("EXPORT", `[BULK] end ok=${job.ok} ng=${job.failed.length} ms=${Date.now() - bulkStartedAt}`);
       }
       bulkOverlay.end(type, status);
       historyEntry.running = false;
@@ -16392,7 +16442,7 @@ try{
       history.entries.unshift(historyEntry);
       history.active = null;
       history.selectedId = historyEntry.id;
-      console.log(`[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.okCount} ng=${historyEntry.ngCount} fail=${historyEntry.failCount}`);
+      infoLog("UI", `[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.okCount} ng=${historyEntry.ngCount} fail=${historyEntry.failCount}`);
       renderHistoryList();
       renderHistoryDetail();
     }
@@ -16553,7 +16603,7 @@ try{
         if(e.detail >= 2) return;
         if(e.target.closest('.proFileActionBtn')) return;
         const id = row.getAttribute('data-id');
-        console.log('[Pro] row click', id);
+        infoLog("UI", '[Pro] row click', id);
         const idx = Number(row.getAttribute('data-idx'));
         const isCtrl = e.ctrlKey || e.metaKey;
         const isShift = e.shiftKey;
@@ -16579,7 +16629,7 @@ try{
       });
       row.addEventListener('dblclick', ()=>{
         const id = row.getAttribute('data-id');
-        console.log('[Pro] row dblclick', id);
+        infoLog("UI", '[Pro] row dblclick', id);
         void setActiveFile(id, {force:true});
       });
     });
@@ -16613,7 +16663,7 @@ try{
     $('proFilterStatus')?.addEventListener('change', (e)=>{
       project.filter.status = e.target.value||'all';
       render();
-      console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
+      infoLog("UI", `[Filter] set key=${project.filter.status} visible=${filtered().length}`);
     });
 
     $('proBtnBatchCheck')?.addEventListener('click', ()=> {
@@ -16627,7 +16677,7 @@ try{
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
     if(!project.historyTriggerLogged){
       project.historyTriggerLogged = true;
-      console.log("[UI] historyTrigger=rightOnly");
+      infoLog("UI", "[UI] historyTrigger=rightOnly");
     }
     $('proJobCopy')?.addEventListener('click', async ()=>{
       try{
