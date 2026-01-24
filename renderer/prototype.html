@@ -4148,6 +4148,78 @@ body, #appRoot, .appRoot, .mainLayout{
 </dialog>
 <!-- ===== /Export Check ===== -->
 <script>
+(function(){
+  "use strict";
+
+  if (typeof window.infoLog !== "function") window.infoLog = function(){};
+  if (typeof window.infoLogThrottled !== "function") window.infoLogThrottled = function(){};
+
+  const __origLog = console.log.bind(console);
+  const __origInfo = (console.info ? console.info.bind(console) : __origLog);
+  const SUPPRESSED_TAGS = new Set(["UI", "DND", "PRO", "SETTINGS", "CUE", "IMPORT", "EXPORT"]);
+
+  const readEnabledSet = () => {
+    try {
+      const raw = window.localStorage ? window.localStorage.getItem("wavcue_log") : "";
+      const value = (raw || "").trim();
+      if (!value || value === "0") return new Set();
+      if (value === "*") return new Set(["*"]);
+      return new Set(
+        value
+          .split(",")
+          .map((entry) => entry.trim())
+          .filter(Boolean)
+          .map((entry) => entry.toUpperCase())
+      );
+    } catch (err) {
+      __origLog("Log gate localStorage error:", err);
+      return new Set();
+    }
+  };
+
+  const extractTag = (args) => {
+    if (!args || args.length === 0) return null;
+    const text = String(args[0]);
+    if (!text.startsWith("[")) return null;
+    const match = text.match(/^\[([A-Za-z0-9_-]+)\]/);
+    if (!match) return null;
+    return match[1].toUpperCase();
+  };
+
+  const shouldLog = (tag, enabledSet) => {
+    if (enabledSet.has("*")) return true;
+    if (tag && enabledSet.has(tag)) return true;
+    if (!tag) return true;
+    return !SUPPRESSED_TAGS.has(tag);
+  };
+
+  console.log = (...args) => {
+    try {
+      const enabledSet = readEnabledSet();
+      const tag = extractTag(args);
+      if (shouldLog(tag, enabledSet)) {
+        return __origLog(...args);
+      }
+    } catch (err) {
+      __origLog("Log gate error:", err);
+      return __origLog(...args);
+    }
+  };
+
+  console.info = (...args) => {
+    try {
+      const enabledSet = readEnabledSet();
+      const tag = extractTag(args);
+      if (shouldLog(tag, enabledSet)) {
+        return __origInfo(...args);
+      }
+    } catch (err) {
+      __origLog("Log gate error:", err);
+      return __origInfo(...args);
+    }
+  };
+})();
+
 (() => {
 "use strict";
 
