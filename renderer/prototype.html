@@ -4167,6 +4167,26 @@ body, #appRoot, .appRoot, .mainLayout{
 (function(){
   "use strict";
 
+  function _applyLicenseUiState(){
+    try{
+      if(typeof _applyLicenseUiStateImpl === "function"){
+        return _applyLicenseUiStateImpl.apply(this, arguments);
+      }
+    }catch(e){
+      try{ console.error("[License] _applyLicenseUiState failed (non-fatal)", e); }catch(_){ }
+    }
+  }
+
+  function _refreshLicenseState(){
+    try{
+      if(typeof _refreshLicenseStateImpl === "function"){
+        return _refreshLicenseStateImpl.apply(this, arguments);
+      }
+    }catch(e){
+      try{ console.error("[License] _refreshLicenseState failed (non-fatal)", e); }catch(_){ }
+    }
+  }
+
   if (typeof window.infoLog !== "function") window.infoLog = function(){};
   if (typeof window.infoLogThrottled !== "function") window.infoLogThrottled = function(){};
 
@@ -4996,7 +5016,7 @@ function _applyLicenseUiStateImpl(status){
   });
 }
 
-async function _refreshLicenseState(source){
+async function _refreshLicenseStateImpl(source){
   const gate = getLicenseGate();
   if(!gate) return __licenseState;
   const tier = gate.getTier ? gate.getTier() : "pro";
@@ -5105,16 +5125,6 @@ function maybeToastFromLog(msg){
 
 /* ===== /ProTools+ v2 UX helpers ===== */
   try{ maybeToastFromLog(msg); }catch(_){ }
-}
-
-function _applyLicenseUiState(){
-  try{
-    if(typeof _applyLicenseUiStateImpl === "function"){
-      return _applyLicenseUiStateImpl.apply(this, arguments);
-    }
-  }catch(e){
-    try{ console.error("[License] _applyLicenseUiState failed (non-fatal)", e); }catch(_){ }
-  }
 }
 
 /* --- WavCue diagnostics (no behavior change) --- */
@@ -13800,15 +13810,21 @@ function init(){
   drawAll();
   log("Ready.");
 
-  _refreshLicenseState("startup").then((status)=>{
-    if(status?.tier === "demo"){
-      if(status.isDemoLocked){
-        alert("体験版の期限切れ、またはオンライン認証が必要です。");
-      }else{
-        _demoNotice();
-      }
+  try{
+    if(typeof _refreshLicenseState === "function"){
+      _refreshLicenseState("startup").then((status)=>{
+        if(status?.tier === "demo"){
+          if(status.isDemoLocked){
+            alert("体験版の期限切れ、またはオンライン認証が必要です。");
+          }else{
+            _demoNotice();
+          }
+        }
+      }).catch(()=>{});
     }
-  }).catch(()=>{});
+  }catch(e){
+    try{ console.error("[License] startup refresh failed (non-fatal)", e); }catch(_){ }
+  }
 
   // 2回目：レイアウト確定後に再描画（起動直後にメーター目盛り/LRが消える対策）
   requestAnimationFrame(()=>{
