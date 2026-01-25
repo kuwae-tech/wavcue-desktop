@@ -47,6 +47,18 @@
   html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none}
   body{padding-top: var(--titlebar-drag-h)}
   .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
+  .licenseBanner{
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid rgba(255,91,110,.45);
+    background:rgba(255,91,110,.14);
+    color:var(--text);
+    font-size:12px;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .licenseBanner.hidden{display:none}
   .appHeader{
     display:flex;
     align-items:center;
@@ -3626,6 +3638,9 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
+<div class="licenseBanner hidden" id="licenseLockBanner" role="status" aria-live="polite">
+  体験版の期限切れ、またはオンライン認証が必要です。ライセンス認証後にご利用ください。
+</div>
 <div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
@@ -4147,6 +4162,7 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
 </dialog>
 <!-- ===== /Export Check ===== -->
+<script src="./licenseGate.js"></script>
 <script>
 (function(){
   "use strict";
@@ -4917,6 +4933,149 @@ function toast(msg, type="ok", timeout=2600){
 window.safeToast = function(message, type="ok", timeout=2600){
   toast(message, type, timeout);
 };
+
+const getLicenseGate = ()=> (typeof window !== "undefined" ? window.WavCueLicenseGate : null);
+let __licenseState = { tier: "pro", isDemoLocked: false };
+
+function _licenseToast(message){
+  if(!message) return;
+  if(typeof window.safeToast === "function") window.safeToast(message, "warn", 2600);
+  else alert(message);
+}
+function _demoNotice(){
+  if(typeof window.safeToast === "function") window.safeToast("本ソフトは体験版です。", "warn", 2000);
+  else alert("本ソフトは体験版です。");
+}
+function _setDisabledWithReason(el, disabled, reason){
+  if(!el) return;
+  el.disabled = !!disabled;
+  el.title = disabled && reason ? reason : "";
+  if(disabled && reason) el.dataset.licenseReason = reason;
+  else delete el.dataset.licenseReason;
+}
+function _applyLicenseUiState(status){
+  const tier = status?.tier || "pro";
+  const locked = tier === "demo" && !!status?.isDemoLocked;
+  const banner = $("licenseLockBanner");
+  if(banner){
+    banner.classList.toggle("hidden", !locked);
+  }
+
+  const lockReason = "体験版の期限切れ、またはオンライン認証が必要です。";
+  const bulkReason = "一括機能はPro専用です。";
+  const presetReason = "体験版ではプリセットを利用できません。";
+  const backupReason = "体験版ではバックアップが利用できません。";
+
+  const lockIds = [
+    "btnBrowse","fileInput","btnPlay","btnPause","btnZoomIn","btnZoomOut","btnVZoomIn","btnVZoomOut",
+    "btnExport","btnStdCheck","btnChunk","btnCmcd","btnPdfAttach","btnAddCustom","btnAddPair",
+    "btnAddBcLabel","btnSettings","proJobMini","proJobCopy","proJobClear","proJobRetryFailed","proJobCancel",
+  ];
+  if(locked){
+    lockIds.forEach((id)=> _setDisabledWithReason($(id), true, lockReason));
+    _setDisabledWithReason($("proBtnBatchCheck"), true, lockReason);
+    _setDisabledWithReason($("proBtnBatchExport"), true, lockReason);
+  }
+
+  const bulkAllowed = tier === "pro" && !locked;
+  _setDisabledWithReason($("proBtnBatchCheck"), !bulkAllowed, locked ? lockReason : bulkReason);
+  _setDisabledWithReason($("proBtnBatchExport"), !bulkAllowed, locked ? lockReason : bulkReason);
+
+  const presetAllowed = tier !== "demo" && !locked;
+  ["sc_preset","sc_tab_preset","sc_presetManage","sc_pm_clone","sc_pm_import","sc_pm_export","sc_pm_save","sc_pm_new","sc_pm_pick","sc_pm_delete","sc_pm_sort"].forEach((id)=>{
+    _setDisabledWithReason($(id), !presetAllowed, locked ? lockReason : presetReason);
+  });
+  ["cmcd_preset","cmcd_pm_pick","cmcd_pm_new","cmcd_pm_delete","cmcd_pm_clone","cmcd_pm_import","cmcd_pm_export","cmcd_pm_save","cmcd_es_export"].forEach((id)=>{
+    _setDisabledWithReason($(id), !presetAllowed, locked ? lockReason : presetReason);
+  });
+
+  const backupAllowed = tier !== "demo" && !locked;
+  _setDisabledWithReason(document.querySelector('[data-settings-folder="backups"]'), !backupAllowed, locked ? lockReason : backupReason);
+  ["settingsCleanupNow","settingsAutoCleanup","settingsRetentionDays","settingsBackupQuotaGB"].forEach((id)=>{
+    _setDisabledWithReason($(id), !backupAllowed, locked ? lockReason : backupReason);
+  });
+}
+
+async function _refreshLicenseState(source){
+  const gate = getLicenseGate();
+  if(!gate) return __licenseState;
+  const tier = gate.getTier ? gate.getTier() : "pro";
+  if(tier === "standard" || tier === "demo"){
+    try{ await gate.ensureOnlineAndRefreshAuth(); }catch(_){ }
+  }
+  const status = gate.getStatus ? gate.getStatus() : { tier };
+  __licenseState = status || { tier };
+  _applyLicenseUiState(__licenseState);
+  return __licenseState;
+}
+
+async function _guardExportSingle(source, opts = {}){
+  const gate = getLicenseGate();
+  if(!gate) return { ok:true };
+  await _refreshLicenseState(source);
+  const res = gate.canExportSingle ? gate.canExportSingle() : { ok:true };
+  if(!res.ok){
+    _licenseToast(res.reason);
+  }
+  if(res.ok && __licenseState.tier === "demo" && !opts.silentDemoNotice){
+    _demoNotice();
+  }
+  return res;
+}
+
+function _guardBulkAction(kind){
+  const gate = getLicenseGate();
+  if(!gate) return { ok:true };
+  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+    const res = { ok:false, reason: "体験版の期限切れ、またはオンライン認証が必要です。" };
+    _licenseToast(res.reason);
+    return res;
+  }
+  const res = (kind === "check")
+    ? (gate.canBulkCheck ? gate.canBulkCheck() : { ok:true })
+    : (gate.canExportBulk ? gate.canExportBulk() : { ok:true });
+  if(!res.ok) _licenseToast(res.reason);
+  return res;
+}
+
+function _guardBulkImport(){
+  const gate = getLicenseGate();
+  if(!gate) return { ok:true };
+  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+    const res = { ok:false, reason: "体験版の期限切れ、またはオンライン認証が必要です。" };
+    _licenseToast(res.reason);
+    return res;
+  }
+  const res = gate.canBulkImport ? gate.canBulkImport() : { ok:true };
+  if(!res.ok) _licenseToast(res.reason);
+  return res;
+}
+
+function _guardPresets(){
+  const gate = getLicenseGate();
+  if(!gate) return { ok:true };
+  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+    const res = { ok:false, reason: "体験版の期限切れ、またはオンライン認証が必要です。" };
+    _licenseToast(res.reason);
+    return res;
+  }
+  const res = gate.canUsePresets ? gate.canUsePresets() : { ok:true };
+  if(!res.ok) _licenseToast(res.reason);
+  return res;
+}
+
+function _guardBackup(){
+  const gate = getLicenseGate();
+  if(!gate) return { ok:true };
+  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+    const res = { ok:false, reason: "体験版の期限切れ、またはオンライン認証が必要です。" };
+    _licenseToast(res.reason);
+    return res;
+  }
+  const res = gate.canUseBackup ? gate.canUseBackup() : { ok:true };
+  if(!res.ok) _licenseToast(res.reason);
+  return res;
+}
 
 // Only toast for major ops & errors (avoid spam)
 function maybeToastFromLog(msg){
@@ -6150,6 +6309,10 @@ function setupDragAndDrop(){
     try{
       e.preventDefault();
       hide();
+      if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+        _licenseToast("体験版の期限切れ、またはオンライン認証が必要です。");
+        return;
+      }
       const dt = e.dataTransfer;
       const files = [];
       if(dt?.files && dt.files.length){
@@ -6163,6 +6326,10 @@ function setupDragAndDrop(){
         }
       }
       if(!files.length){ return; }
+      if(files.length > 1){
+        const bulkRes = _guardBulkImport();
+        if(!bulkRes.ok) return;
+      }
       console.log(`[Pro] drop wavs=${files.length}`);
       const add = window.__wavcueProAddFiles;
       if(typeof add === "function"){
@@ -8359,7 +8526,10 @@ function setupCmcdDialog(){
 
     // default: preset select is "none" (do not auto-apply)
     const sel = $("cmcd_preset");
-    if(sel) sel.value = state.cmcdPresetId || "";
+    if(sel){
+      sel.value = state.cmcdPresetId || "";
+      sel.dataset.prevValue = sel.value || "";
+    }
   };
   const close = ()=>{ if(dlg.close) dlg.close(); else dlg.open = false; };
 
@@ -8374,7 +8544,14 @@ function setupCmcdDialog(){
   $("btnCmcdClose")?.addEventListener("click", close);
 
   $("cmcd_preset")?.addEventListener("change", (e)=>{
-    const id = (e.target && e.target.value) ? String(e.target.value) : "";
+    const guard = _guardPresets();
+    const sel = e.target;
+    const prev = sel?.dataset?.prevValue || "";
+    if(!guard.ok){
+      if(sel) sel.value = prev;
+      return;
+    }
+    const id = (sel && sel.value) ? String(sel.value) : "";
     state.cmcdPresetId = id;
     if(id) {
       undoCheckpoint();
@@ -8382,6 +8559,7 @@ function setupCmcdDialog(){
       log("OK: cmcdプリセットを適用しました");
       setCmcdTab("cmcdIn");
     }
+    if(sel) sel.dataset.prevValue = id;
   });
 
   $("btnCmcdClear")?.addEventListener("click", ()=>{
@@ -8441,6 +8619,7 @@ function setupCmcdDialog(){
   };
 
   $("cmcd_pm_pick")?.addEventListener("change", (e)=>{
+    if(!_guardPresets().ok) return;
     const sel = (e && e.target) ? e.target : $("cmcd_pm_pick");
     const v = sel ? String(sel.value || "") : "";
     try{
@@ -8468,6 +8647,7 @@ function setupCmcdDialog(){
   
   
   $("cmcd_pm_new")?.addEventListener("click", ()=>{
+    if(!_guardPresets().ok) return;
     const sel = $("cmcd_pm_pick");
     if(!sel) return;
     sel.value = "__new__";
@@ -8477,6 +8657,7 @@ function setupCmcdDialog(){
   });
 
   $("cmcd_pm_clone")?.addEventListener("click", ()=>{
+    if(!_guardPresets().ok) return;
     const srcId = String($("cmcd_pm_pick")?.value || editId || "").trim();
     if(!srcId || srcId==="__new__"){
       window.safeToast && window.safeToast("複製するプリセットを選択してください。","warn");
@@ -8500,10 +8681,12 @@ function setupCmcdDialog(){
   });
 
   $("cmcd_pm_export")?.addEventListener("click", ()=>{
+    if(!_guardPresets().ok) return;
     _cmcdOpenPresetExportSelector();
   });
 
   $("cmcd_pm_import")?.addEventListener("click", ()=>{
+    if(!_guardPresets().ok) return;
     const inp = document.createElement("input");
     inp.type = "file";
     inp.accept = "application/json,.json";
@@ -8567,6 +8750,7 @@ function setupCmcdDialog(){
 
 
   $("cmcd_pm_delete")?.addEventListener("click", ()=>{
+    if(!_guardPresets().ok) return;
     const id = String($("cmcd_pm_pick")?.value || editId || "");
     if(!id || id==="__new__") return;
     if(!confirm("このプリセットを削除します。よろしいですか？")) return;
@@ -8591,6 +8775,7 @@ function setupCmcdDialog(){
   });
 
 $("cmcd_pm_save")?.addEventListener("click", ()=>{
+    if(!_guardPresets().ok) return;
     const pickVal = $("cmcd_pm_pick")?.value || "";
     const name = String($("cmcd_pm_name")?.value || "").trim();
     if(!name){
@@ -9696,7 +9881,8 @@ async function _exportOneWithSaveImpl(options){
       verifyNotes.push("自己検証で例外が発生しました。");
     }
 
-    if(autoBackupEnabled){
+    const backupGate = _guardBackup();
+    if(autoBackupEnabled && backupGate.ok){
       try{
         const report = buildExportReportJson({
           saveRes: _saveRes,
@@ -9736,6 +9922,8 @@ async function _exportOneWithSaveImpl(options){
       }catch(e){
         log(`WARN: バックアップ/レポート生成に失敗: ${e?.name||"Error"} ${e?.message||""}`);
       }
+    }else if(autoBackupEnabled && !backupGate.ok){
+      log("INFO: バックアップはライセンス制限によりスキップされました。");
     }
 
     if(autoCleanupEnabled && autoCleanupOnExport){
@@ -9751,6 +9939,14 @@ async function _exportOneWithSaveImpl(options){
     }
 
     __exportOK = true;
+    try{
+      const gate = getLicenseGate();
+      if(gate && typeof gate.recordDemoExportSuccess === "function"){
+        gate.recordDemoExportSuccess();
+        __licenseState = gate.getStatus ? gate.getStatus() : __licenseState;
+        _applyLicenseUiState(__licenseState);
+      }
+    }catch(_){ }
 
     log("OK: 書き出し完了");
     return { ok:true, save:_saveRes };
@@ -9892,12 +10088,25 @@ if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
   // BC$ quick add
   if($("selBcLabel")) $("selBcLabel").disabled = !loaded;
   if($("btnAddBcLabel")) $("btnAddBcLabel").disabled = !loaded || !($("selBcLabel").value);
+  _applyLicenseUiState(__licenseState);
 }
 
 $("btnBrowse").addEventListener("click", ()=> $("fileInput").click());
 $("fileInput").addEventListener("change", async (e)=>{
   const files = e.target.files;
   if(!files || !files.length) return;
+  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+    _licenseToast("体験版の期限切れ、またはオンライン認証が必要です。");
+    e.target.value = "";
+    return;
+  }
+  if(files.length > 1){
+    const bulkRes = _guardBulkImport();
+    if(!bulkRes.ok){
+      e.target.value = "";
+      return;
+    }
+  }
   const add = window.__wavcueProAddFiles;
   if(typeof add === "function"){
     await add(files);
@@ -11031,6 +11240,8 @@ async function _ecRunAndShow(){
 
 async function doFinalExport(){
   try{
+    const canExport = await _guardExportSingle("export:final", { silentDemoNotice: true });
+    if(!canExport.ok) return;
     log("INFO: 書き出し（チェック後）");
     await exportWav();
   }catch(e){
@@ -11084,6 +11295,8 @@ function _ecWire(){
 // replace export click to open modal
 $("btnExport").addEventListener("click", async ()=>{
   try{
+    const canExport = await _guardExportSingle("export:start");
+    if(!canExport.ok) return;
     await _ecRunAndShow();
   }catch(e){
     log("ERR: チェック失敗: "+(e&&e.stack?e.stack:e));
@@ -11690,6 +11903,7 @@ function _qcWirePresetExportSelector(){
     ov.querySelectorAll('input[type="checkbox"][data-id]').forEach(cb=>{ cb.checked = false; });
   });
   $("sc_es_export")?.addEventListener("click", ()=>{
+    if(!_guardPresets().ok) return;
     const ids = Array.from(ov.querySelectorAll('input[type="checkbox"][data-id]'))
       .filter(cb=>cb.checked)
       .map(cb=>cb.dataset.id)
@@ -11702,6 +11916,7 @@ function _qcWirePresetExportSelector(){
 }
 
 function _qcOpenPresetExportSelector(){
+  if(!_guardPresets().ok) return;
   _qcEnsureLoaded();
   _qcWirePresetExportSelector();
   const list = Array.isArray(state.qcUserPresets) ? state.qcUserPresets : [];
@@ -11791,6 +12006,7 @@ function _cmcdWirePresetExportSelector(){
     ov.querySelectorAll('input[type="checkbox"][data-id]').forEach(cb=>{ cb.checked = false; });
   });
   $("cmcd_es_export")?.addEventListener("click", async()=>{
+    if(!_guardPresets().ok) return;
     const ids = Array.from(ov.querySelectorAll('input[type="checkbox"][data-id]'))
       .filter(cb=>cb.checked)
       .map(cb=>cb.dataset.id)
@@ -11809,6 +12025,7 @@ function _cmcdClosePresetExportSelector(){
 }
 
 function _cmcdOpenPresetExportSelector(){
+  if(!_guardPresets().ok) return;
   _cmcdEnsureLoaded();
   _cmcdWirePresetExportSelector();
   const list = Array.isArray(state.cmcdUserPresets) ? state.cmcdUserPresets : [];
@@ -13100,7 +13317,9 @@ function _scWire(){
       try{
         _qcEnsureLoaded();
         _scPopulatePresetSelect();
-        state.qcPresetId = $("sc_preset")?.value || state.qcPresetId || CFG.QC_DEFAULT_PRESET_ID;
+        const presetSel = $("sc_preset");
+        state.qcPresetId = presetSel?.value || state.qcPresetId || CFG.QC_DEFAULT_PRESET_ID;
+        if(presetSel) presetSel.dataset.prevValue = presetSel.value || "";
         _scRenderTargets(_scGetPresetById(state.qcPresetId));
         _scUpdatePresetDesc();
 
@@ -13130,12 +13349,20 @@ function _scWire(){
 
   if($("sc_preset")){
     $("sc_preset").addEventListener("change", ()=>{
-      state.qcPresetId = $("sc_preset").value;
+      const guard = _guardPresets();
+      const sel = $("sc_preset");
+      const prev = sel?.dataset?.prevValue || "";
+      if(!guard.ok){
+        if(sel) sel.value = prev;
+        return;
+      }
+      state.qcPresetId = sel?.value;
       _scRenderTargets(_scGetPresetById(state.qcPresetId));
       _scUpdatePresetDesc();
       state.qcHasRun = false;
       _scResetResultsBlank();
 // preset manager is edited explicitly via picker/new
+      if(sel) sel.dataset.prevValue = sel.value || "";
     });
 
     // keep preset form in sync when manager is open
@@ -13148,6 +13375,7 @@ function _scWire(){
   // Preset manager
   if($("sc_presetManage")){
     $("sc_presetManage").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
       const mgr = $("sc_presetMgr");
       if(!mgr) return;
       const next = (mgr.style.display==="none" || !mgr.style.display) ? "block" : "none";
@@ -13159,6 +13387,7 @@ function _scWire(){
   }
   if($("sc_pm_pick")){
     $("sc_pm_pick").addEventListener("change", ()=>{
+      if(!_guardPresets().ok) return;
       const v = ($("sc_pm_pick").value||"").trim();
       _scPmUpdatePickVisual();
       if(!v) return;
@@ -13168,16 +13397,21 @@ function _scWire(){
   }
   if($("sc_pm_new")){
     $("sc_pm_new").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
       _scPresetMgrStartNewBlank();
     });
   }
 
   if($("sc_pm_sort")){
-    $("sc_pm_sort").addEventListener("click", ()=>{ _scPmToggleSortPanel(); });
+    $("sc_pm_sort").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
+      _scPmToggleSortPanel();
+    });
   }
 
 if($("sc_pm_clone")){
     $("sc_pm_clone").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
       // Clone = copy values into "new preset" form (not saved until user presses 保存)
       const srcId = (($("sc_pm_pick")?.value||"").trim()) || (($("sc_pm_id")?.value||"").trim()) || state.qcPresetId;
       const base = _scGetPresetById(srcId);
@@ -13215,6 +13449,7 @@ if($("sc_pm_clone")){
   }
   if($("sc_pm_save")){
     $("sc_pm_save").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
       const curId = ($("sc_pm_id")?.value || "").trim();
       const pickV = ($("sc_pm_pick")?.value || "").trim();
       const isNewMode = (pickV==="__new__") || !curId;
@@ -13238,12 +13473,14 @@ if($("sc_pm_clone")){
   }
     if($("sc_pm_export")){
     $("sc_pm_export").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
       _qcEnsureLoaded();
       _qcOpenPresetExportSelector();
     });
   }
   if($("sc_pm_import")){
     $("sc_pm_import").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
       const inp = document.createElement("input");
       inp.type = "file";
       inp.accept = "application/json,.json";
@@ -13297,6 +13534,7 @@ if($("sc_pm_clone")){
   }
 if($("sc_pm_delete")){
     $("sc_pm_delete").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
       const id = $("sc_pm_id")?.value || state.qcPresetId;
       if(!id){ return; }
       if(!_qcIsUserPreset(id)){
@@ -13328,7 +13566,10 @@ if($("sc_pm_delete")){
     $("sc_tab_results").addEventListener("click", ()=>_scSetTab("results"));
   }
   if($("sc_tab_preset")){
-    $("sc_tab_preset").addEventListener("click", ()=>_scSetTab("preset"));
+    $("sc_tab_preset").addEventListener("click", ()=>{
+      if(!_guardPresets().ok) return;
+      _scSetTab("preset");
+    });
   }
 
 
@@ -13367,6 +13608,7 @@ _scWire();
    Shift+R: zoom out (vertical)
 */
 window.addEventListener("keydown", (e)=>{
+  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked) return;
   // ignore while typing in inputs/textareas/dialog
   const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
   const isTyping = (tag==="input" || tag==="textarea") || (e.target && e.target.isContentEditable);
@@ -13545,6 +13787,16 @@ function init(){
   updateButtons();
   drawAll();
   log("Ready.");
+
+  _refreshLicenseState("startup").then((status)=>{
+    if(status?.tier === "demo"){
+      if(status.isDemoLocked){
+        alert("体験版の期限切れ、またはオンライン認証が必要です。");
+      }else{
+        _demoNotice();
+      }
+    }
+  }).catch(()=>{});
 
   // 2回目：レイアウト確定後に再描画（起動直後にメーター目盛り/LRが消える対策）
   requestAnimationFrame(()=>{
@@ -15629,6 +15881,14 @@ try{
     try{
       const files = Array.from(fileList || []).filter(isWavFile);
       if(!files.length) return;
+      if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+        _licenseToast("体験版の期限切れ、またはオンライン認証が必要です。");
+        return;
+      }
+      if(files.length > 1){
+        const bulkRes = _guardBulkImport();
+        if(!bulkRes.ok) return;
+      }
       const dndGuard = (files.length > 1) ? { expected: files.length, seen: 0, startedAt: Date.now() } : null;
       if (typeof window.diagLog === "function") window.diagLog("[DND]", "start", window.diagState({ count: files.length, startedAt: dndGuard?.startedAt || null }));
       console.log(`[DND] start ${files.length}`);
@@ -16249,6 +16509,14 @@ try{
     });
   }
   async function runJob(type, idsOverride){
+    if(type === "qc"){
+      const guard = _guardBulkAction("check");
+      if(!guard.ok) return;
+    }
+    if(type === "export"){
+      const guard = _guardBulkAction("export");
+      if(!guard.ok) return;
+    }
     const usingOverride = Array.isArray(idsOverride);
     const targets = usingOverride ? idsOverride : getVisibleFileIds();
     const filterOn = project.filter.status && project.filter.status !== "all";
