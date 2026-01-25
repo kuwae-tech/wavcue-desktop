@@ -59,6 +59,15 @@
     gap:8px;
   }
   .licenseBanner.hidden{display:none}
+  .licenseTierBadge{
+    font-size:11px;
+    padding:5px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:rgba(255,255,255,.04);
+    color:var(--muted);
+    letter-spacing:0.6px;
+  }
   .appHeader{
     display:flex;
     align-items:center;
@@ -3635,7 +3644,10 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="hdrMid"></div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
-        <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
+        <div class="headerActions">
+          <div class="licenseTierBadge" id="licenseTierBadge">PRO</div>
+          <button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button>
+        </div>
   </div>
 </header>
 <div class="licenseBanner hidden" id="licenseLockBanner" role="status" aria-live="polite">
@@ -4167,8 +4179,53 @@ body, #appRoot, .appRoot, .mainLayout{
 (function(){
   "use strict";
 
+  function _ensureLicenseStateShim(){
+    try{
+      if(!window.__licenseState) window.__licenseState = {};
+      const tierRaw = (()=>{ try{ return localStorage.getItem("wavcue_tier"); }catch(_){ return null; } })();
+      if(tierRaw) window.__licenseState.tier = String(tierRaw || "").toLowerCase() || "pro";
+      const gate = window.WavCueLicenseGate || window.licenseGate || window.__licenseGate || null;
+      if(gate && typeof gate.getStatus === "function"){
+        const st = gate.getStatus();
+        if(st && st.tier) window.__licenseState.tier = String(st.tier || "").toLowerCase() || "pro";
+        if(typeof st?.isDemoLocked === "boolean") window.__licenseState.isDemoLocked = !!st.isDemoLocked;
+      }
+      if(typeof window.__licenseState.isDemoLocked !== "boolean") window.__licenseState.isDemoLocked = false;
+      if(!window.__licenseState.tier) window.__licenseState.tier = "pro";
+    }catch(e){
+      try{ console.error("[License] _ensureLicenseStateShim failed (non-fatal)", e); }catch(_){ }
+    }
+  }
+
+  function getLicenseStateSafe(){
+    try{
+      const tierRaw = (()=>{ try{ return localStorage.getItem("wavcue_tier"); }catch(_){ return null; } })();
+      const tierFromShim = window.__licenseState && window.__licenseState.tier;
+      const tier = (tierRaw || tierFromShim || "pro").toString().toLowerCase();
+      let isDemoLocked = false;
+      const gate = window.WavCueLicenseGate || window.licenseGate || window.__licenseGate || null;
+      if(gate && typeof gate.getStatus === "function"){
+        const st = gate.getStatus();
+        if(st && st.tier) {
+          const t = String(st.tier || "").toLowerCase();
+          if(t) return { tier: t, isDemoLocked: !!st.isDemoLocked };
+        }
+        isDemoLocked = !!st?.isDemoLocked;
+      }else if(window.__licenseState && typeof window.__licenseState.isDemoLocked === "boolean"){
+        isDemoLocked = window.__licenseState.isDemoLocked;
+      }
+      return { tier, isDemoLocked };
+    }catch(e){
+      try{ console.error("[License] getLicenseStateSafe failed (non-fatal)", e); }catch(_){ }
+      return { tier: "pro", isDemoLocked: false };
+    }
+  }
+
+  _ensureLicenseStateShim();
+
   function _applyLicenseUiState(){
     try{
+      _ensureLicenseStateShim();
       if(typeof _applyLicenseUiStateImpl === "function"){
         return _applyLicenseUiStateImpl.apply(this, arguments);
       }
@@ -4179,6 +4236,7 @@ body, #appRoot, .appRoot, .mainLayout{
 
   function _refreshLicenseState(){
     try{
+      _ensureLicenseStateShim();
       if(typeof _refreshLicenseStateImpl === "function"){
         return _refreshLicenseStateImpl.apply(this, arguments);
       }
@@ -4954,8 +5012,8 @@ window.safeToast = function(message, type="ok", timeout=2600){
   toast(message, type, timeout);
 };
 
-const getLicenseGate = ()=> (typeof window !== "undefined" ? window.WavCueLicenseGate : null);
-let __licenseState = { tier: "pro", isDemoLocked: false };
+  const getLicenseGate = ()=> (typeof window !== "undefined" ? window.WavCueLicenseGate : null);
+  let __licenseState = window.__licenseState || { tier: "pro", isDemoLocked: false };
 
 function _licenseToast(message){
   if(!message) return;
@@ -5014,18 +5072,26 @@ function _applyLicenseUiStateImpl(status){
   ["settingsCleanupNow","settingsAutoCleanup","settingsRetentionDays","settingsBackupQuotaGB"].forEach((id)=>{
     _setDisabledWithReason($(id), !backupAllowed, locked ? lockReason : backupReason);
   });
+
+  try{
+    const safe = getLicenseStateSafe();
+    const badge = $("licenseTierBadge");
+    const badgeTier = String(status?.tier || safe?.tier || "pro").toUpperCase();
+    if(badge) badge.textContent = badgeTier || "PRO";
+  }catch(_){ }
 }
 
 async function _refreshLicenseStateImpl(source){
   const gate = getLicenseGate();
-  if(!gate) return __licenseState;
+  if(!gate) return getLicenseStateSafe();
   const tier = gate.getTier ? gate.getTier() : "pro";
   if(tier === "standard" || tier === "demo"){
     try{ await gate.ensureOnlineAndRefreshAuth(); }catch(_){ }
   }
   const status = gate.getStatus ? gate.getStatus() : { tier };
   __licenseState = status || { tier };
-  _applyLicenseUiState(__licenseState);
+  window.__licenseState = __licenseState;
+  _applyLicenseUiState(getLicenseStateSafe());
   return __licenseState;
 }
 
@@ -5037,7 +5103,8 @@ async function _guardExportSingle(source, opts = {}){
   if(!res.ok){
     _licenseToast(res.reason);
   }
-  if(res.ok && __licenseState.tier === "demo" && !opts.silentDemoNotice){
+  const st = getLicenseStateSafe();
+  if(res.ok && st.tier === "demo" && !opts.silentDemoNotice){
     _demoNotice();
   }
   return res;
@@ -5046,7 +5113,8 @@ async function _guardExportSingle(source, opts = {}){
 function _guardBulkAction(kind){
   const gate = getLicenseGate();
   if(!gate) return { ok:true };
-  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+  const st = getLicenseStateSafe();
+  if(st.tier === "demo" && st.isDemoLocked){
     const res = { ok:false, reason: "体験版の期限切れ、またはオンライン認証が必要です。" };
     _licenseToast(res.reason);
     return res;
@@ -5061,7 +5129,8 @@ function _guardBulkAction(kind){
 function _guardBulkImport(){
   const gate = getLicenseGate();
   if(!gate) return { ok:true };
-  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+  const st = getLicenseStateSafe();
+  if(st.tier === "demo" && st.isDemoLocked){
     const res = { ok:false, reason: "体験版の期限切れ、またはオンライン認証が必要です。" };
     _licenseToast(res.reason);
     return res;
@@ -5074,7 +5143,8 @@ function _guardBulkImport(){
 function _guardPresets(){
   const gate = getLicenseGate();
   if(!gate) return { ok:true };
-  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+  const st = getLicenseStateSafe();
+  if(st.tier === "demo" && st.isDemoLocked){
     const res = { ok:false, reason: "体験版の期限切れ、またはオンライン認証が必要です。" };
     _licenseToast(res.reason);
     return res;
@@ -5087,7 +5157,8 @@ function _guardPresets(){
 function _guardBackup(){
   const gate = getLicenseGate();
   if(!gate) return { ok:true };
-  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+  const st = getLicenseStateSafe();
+  if(st.tier === "demo" && st.isDemoLocked){
     const res = { ok:false, reason: "体験版の期限切れ、またはオンライン認証が必要です。" };
     _licenseToast(res.reason);
     return res;
@@ -6329,7 +6400,9 @@ function setupDragAndDrop(){
     try{
       e.preventDefault();
       hide();
-      if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+      _ensureLicenseStateShim();
+      const st = getLicenseStateSafe();
+      if(st.tier === "demo" && st.isDemoLocked){
         _licenseToast("体験版の期限切れ、またはオンライン認証が必要です。");
         return;
       }
@@ -9964,7 +10037,8 @@ async function _exportOneWithSaveImpl(options){
       if(gate && typeof gate.recordDemoExportSuccess === "function"){
         gate.recordDemoExportSuccess();
         __licenseState = gate.getStatus ? gate.getStatus() : __licenseState;
-        _applyLicenseUiState(__licenseState);
+        window.__licenseState = __licenseState;
+        _applyLicenseUiState(getLicenseStateSafe());
       }
     }catch(_){ }
 
@@ -10109,7 +10183,7 @@ if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
   if($("selBcLabel")) $("selBcLabel").disabled = !loaded;
   if($("btnAddBcLabel")) $("btnAddBcLabel").disabled = !loaded || !($("selBcLabel").value);
   try{
-    if(typeof _applyLicenseUiState === "function") _applyLicenseUiState(__licenseState);
+    if(typeof _applyLicenseUiState === "function") _applyLicenseUiState(getLicenseStateSafe());
   }catch(_){ }
 }
 
@@ -10117,7 +10191,9 @@ $("btnBrowse").addEventListener("click", ()=> $("fileInput").click());
 $("fileInput").addEventListener("change", async (e)=>{
   const files = e.target.files;
   if(!files || !files.length) return;
-  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+  _ensureLicenseStateShim();
+  const st = getLicenseStateSafe();
+  if(st.tier === "demo" && st.isDemoLocked){
     _licenseToast("体験版の期限切れ、またはオンライン認証が必要です。");
     e.target.value = "";
     return;
@@ -13630,7 +13706,8 @@ _scWire();
    Shift+R: zoom out (vertical)
 */
 window.addEventListener("keydown", (e)=>{
-  if(__licenseState.tier === "demo" && __licenseState.isDemoLocked) return;
+  const st = getLicenseStateSafe();
+  if(st.tier === "demo" && st.isDemoLocked) return;
   // ignore while typing in inputs/textareas/dialog
   const tag = (e.target && e.target.tagName) ? e.target.tagName.toLowerCase() : "";
   const isTyping = (tag==="input" || tag==="textarea") || (e.target && e.target.isContentEditable);
@@ -15909,7 +15986,9 @@ try{
     try{
       const files = Array.from(fileList || []).filter(isWavFile);
       if(!files.length) return;
-      if(__licenseState.tier === "demo" && __licenseState.isDemoLocked){
+      _ensureLicenseStateShim();
+      const st = getLicenseStateSafe();
+      if(st.tier === "demo" && st.isDemoLocked){
         _licenseToast("体験版の期限切れ、またはオンライン認証が必要です。");
         return;
       }
