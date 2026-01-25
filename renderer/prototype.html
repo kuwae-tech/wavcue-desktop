@@ -4953,7 +4953,7 @@ function _setDisabledWithReason(el, disabled, reason){
   if(disabled && reason) el.dataset.licenseReason = reason;
   else delete el.dataset.licenseReason;
 }
-function _applyLicenseUiState(status){
+function _applyLicenseUiStateImpl(status){
   const tier = status?.tier || "pro";
   const locked = tier === "demo" && !!status?.isDemoLocked;
   const banner = $("licenseLockBanner");
@@ -5105,6 +5105,16 @@ function maybeToastFromLog(msg){
 
 /* ===== /ProTools+ v2 UX helpers ===== */
   try{ maybeToastFromLog(msg); }catch(_){ }
+}
+
+function _applyLicenseUiState(){
+  try{
+    if(typeof _applyLicenseUiStateImpl === "function"){
+      return _applyLicenseUiStateImpl.apply(this, arguments);
+    }
+  }catch(e){
+    try{ console.error("[License] _applyLicenseUiState failed (non-fatal)", e); }catch(_){ }
+  }
 }
 
 /* --- WavCue diagnostics (no behavior change) --- */
@@ -10088,7 +10098,9 @@ if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
   // BC$ quick add
   if($("selBcLabel")) $("selBcLabel").disabled = !loaded;
   if($("btnAddBcLabel")) $("btnAddBcLabel").disabled = !loaded || !($("selBcLabel").value);
-  _applyLicenseUiState(__licenseState);
+  try{
+    if(typeof _applyLicenseUiState === "function") _applyLicenseUiState(__licenseState);
+  }catch(_){ }
 }
 
 $("btnBrowse").addEventListener("click", ()=> $("fileInput").click());
