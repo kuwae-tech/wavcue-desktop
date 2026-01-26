@@ -4182,13 +4182,43 @@ function __ensureLicenseStateShim() {
     const t = String(localStorage.getItem("wavcue_tier") || "").trim().toLowerCase();
     window.__licenseState.tier = (t === "pro" || t === "standard" || t === "demo") ? t : "pro";
     if (typeof window.__licenseState.isDemoLocked !== "boolean") window.__licenseState.isDemoLocked = false;
+    return window.__licenseState;
   } catch (e) {
     try{ console.error("[LicenseShim] __ensureLicenseStateShim non-fatal", e); }catch(_){ }
     window.__licenseState = { tier: "pro", isDemoLocked: false };
+    return window.__licenseState;
   }
 }
 function _ensureLicenseStateShim(){ return __ensureLicenseStateShim(); }
 function ensureLicenseStateShim(){ return __ensureLicenseStateShim(); }
+function __getTierFromStorage() {
+  try {
+    const t = String(localStorage.getItem("wavcue_tier") || "").trim().toLowerCase();
+    if (t === "pro" || t === "standard" || t === "demo") return t;
+    return "pro";
+  } catch (_) { return "pro"; }
+}
+function __getLicenseStateSafe() {
+  try {
+    const st = __ensureLicenseStateShim();
+    return {
+      tier: (st && st.tier) ? String(st.tier).toLowerCase() : "pro",
+      isDemoLocked: !!(st && st.isDemoLocked)
+    };
+  } catch (_) {
+    return { tier: "pro", isDemoLocked: false };
+  }
+}
+function getLicenseStateSafe(){ return __getLicenseStateSafe(); }
+function _getLicenseStateSafe(){ return __getLicenseStateSafe(); }
+try {
+  window.__ensureLicenseStateShim = __ensureLicenseStateShim;
+  window._ensureLicenseStateShim = _ensureLicenseStateShim;
+  window.ensureLicenseStateShim = ensureLicenseStateShim;
+  window.__getLicenseStateSafe = __getLicenseStateSafe;
+  window._getLicenseStateSafe = _getLicenseStateSafe;
+  window.getLicenseStateSafe = getLicenseStateSafe;
+} catch (_) {}
 (function(){
   "use strict";
 
@@ -6427,7 +6457,7 @@ function setupDragAndDrop(){
     try{
       e.preventDefault();
       hide();
-      __ensureLicenseStateShim();
+      try{ __ensureLicenseStateShim(); }catch(e){ try{ console.error(e); }catch(_){ } }
       const st = __getLicenseStateSafe();
       if(st.tier === "demo" && st.isDemoLocked){
         _licenseToast("体験版の期限切れ、またはオンライン認証が必要です。");
