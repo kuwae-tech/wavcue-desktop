@@ -8809,7 +8809,9 @@ function _cmcdPmCommitSortFromDom(container){
    AUDIO_BUILD: RIFF/WAVE writer helpers
 ================================ */
 
-function buildCueChunks(buffer, cues){
+function buildCueChunks(buffer, cues, opts){
+  const options = opts || {};
+  const compatMode = !!options.compat;
   const sr = (state && state.fileSr && isFinite(state.fileSr)) ? state.fileSr : ((buffer && buffer.sampleRate)?buffer.sampleRate:48000);
   let totalSamples = (state && state.fileTotalSamples && isFinite(state.fileTotalSamples)) ? state.fileTotalSamples : ((buffer && Number.isFinite(buffer.length)) ? buffer.length : 0);
   if(!totalSamples || totalSamples<=0){
@@ -8819,14 +8821,18 @@ function buildCueChunks(buffer, cues){
 
   let exportCues = Array.isArray(cues) ? cues.slice() : [];
 
-  // sanitize IDs: keep original when possible; remap only 0/duplicates
-  try{ exportCues = normalizeCueIds(exportCues); }catch(_){ }
   const _usedIds = new Set(exportCues.map(c=> (c && isFinite(c.id)) ? (c.id>>>0) : 0).filter(id=>id!==0));
+  let _nextId = 1;
+  try{
+    const maxId = exportCues.reduce((m,c)=> Math.max(m, (c && isFinite(c.id)) ? (c.id>>>0) : 0), 0);
+    _nextId = Math.max(1, (maxId>>>0) + 1);
+  }catch(_){ _nextId = 1; }
   const _allocUnusedId = ()=>{
-    let id = 1;
-    while(id===0 || _usedIds.has(id)) id++;
+    while(_nextId===0 || _usedIds.has(_nextId)) _nextId++;
+    const id = _nextId>>>0;
     _usedIds.add(id);
-    return id>>>0;
+    _nextId++;
+    return id;
   };
 
   const atts = Array.isArray(state.attachments) ? state.attachments.slice(0, 9) : [];
@@ -8866,6 +8872,26 @@ function buildCueChunks(buffer, cues){
     return 5;
   };
 
+  const getSampleOffset = (c)=>{
+    let sampleOffset = Math.max(0, Math.min(totalSamples-1, Math.round((c.sec||0) * sr)));
+    if(isNoteCue(c)) sampleOffset = 0; // NOTE固定
+    return sampleOffset>>>0;
+  };
+
+  const compatMeta = { removedZeroOffset: 0, removedAdtlFile: 0, keptIds: 0 };
+  if(compatMode && exportCues.length){
+    const filtered = [];
+    for(const c of exportCues){
+      const sampleOffset = getSampleOffset(c);
+      if(sampleOffset === 0){
+        compatMeta.removedZeroOffset += 1;
+        continue;
+      }
+      filtered.push({ ...c, _sampleOffset: sampleOffset });
+    }
+    exportCues = filtered;
+  }
+
 
   const sorted = exportCues.slice().sort((a,b)=>{
     const ra=rank(a), rb=rank(b);
@@ -8886,8 +8912,7 @@ function buildCueChunks(buffer, cues){
 
   let p = 12;
   for(const c of sorted){
-    let sampleOffset = Math.max(0, Math.min(totalSamples-1, Math.round((c.sec||0) * sr)));
-    if(isNoteCue(c)) sampleOffset = 0; // NOTE固定
+    let sampleOffset = (compatMode && isFinite(c._sampleOffset)) ? (c._sampleOffset>>>0) : getSampleOffset(c);
 
     cueDv.setUint32(p+0, (c.id>>>0), true);        // dwName
     cueDv.setUint32(p+4, 0, true);                 // dwPosition (互換性: 常に0)
@@ -8933,8 +8958,12 @@ function buildCueChunks(buffer, cues){
       const att = atts[noteIndex-1];
       if(att && ((att.bytes && att.bytes.length) || att._storeId!=null)){
         try{
-          const bytes = (att.bytes && att.bytes.length) ? att.bytes : _pdfStoreGet(att._storeId);
-          if(bytes && bytes.length) subParts.push(pdfBuildFileSubchunk(att.name, bytes, (c.id>>>0)));
+          if(compatMode){
+            compatMeta.removedAdtlFile += 1;
+          }else{
+            const bytes = (att.bytes && att.bytes.length) ? att.bytes : _pdfStoreGet(att._storeId);
+            if(bytes && bytes.length) subParts.push(pdfBuildFileSubchunk(att.name, bytes, (c.id>>>0)));
+          }
           inserted.add(noteIndex);
         }catch(_){ }
       }
@@ -8995,7 +9024,8 @@ function buildCueChunks(buffer, cues){
     plstBuf = null;
   }
 
-return { cueChunk: cueBuf, listChunk: listBuf, plstChunk: plstBuf };
+  compatMeta.keptIds = sorted.length;
+  return { cueChunk: cueBuf, listChunk: listBuf, plstChunk: plstBuf, compatMeta };
 }
 
 
@@ -9148,7 +9178,7 @@ function encodeWavPCM16WithCues(buffer, cues){
   const bextBuf = buildBextChunk();
   const ixmlBuf = buildIXmlChunk();
   const cmcdBuf = buildCmcdChunkFixed2048();
-  const {cueChunk, listChunk, plstChunk} = buildCueChunks(buffer, cues);
+  const {cueChunk, listChunk, plstChunk} = buildCueChunks(buffer, cues, { compat: true });
 
   // data header
   const dataHdr = new ArrayBuffer(8);
@@ -9276,9 +9306,14 @@ async function buildExportWavBytes(opts){
   let cueChunk = null, listChunk = null, plstChunk = null;
 
   const hasAttach = Array.isArray(state.attachments) && state.attachments.some(a=>a && a.bytes && a.bytes.length);
+  const cueCompat = buildCueChunks(state.buffer, state.cues, { compat: true });
+  const compatMeta = cueCompat?.compatMeta || { removedZeroOffset: 0, removedAdtlFile: 0, keptIds: 0 };
+  log(`[EXPORT][cue-compat] removedZeroOffset=${compatMeta.removedZeroOffset} removedAdtlFile=${compatMeta.removedAdtlFile} keptIds=${compatMeta.keptIds}`);
   const sigNow = cueSig(state.cues);
   const canInPlaceMove =
     !hasAttach &&
+    compatMeta.removedZeroOffset === 0 &&
+    compatMeta.removedAdtlFile === 0 &&
     !!state.srcAb &&
     !!state.cuePatchMeta &&
     !!state.loadedCueSig &&
@@ -9290,14 +9325,13 @@ async function buildExportWavBytes(opts){
     cueChunk = null;
     listChunk = null;
     // plst は規格互換のため再生成（BC$NOTE除外 / 全BC$）
-    try{ plstChunk = buildCueChunks(state.buffer, state.cues).plstChunk; }catch(_){ plstChunk = null; }
+    try{ plstChunk = cueCompat?.plstChunk || null; }catch(_){ plstChunk = null; }
     log("INFO: CUEは元チャンクを更新（移動のみ / ハイブリッド）");
     if(plstChunk) log("INFO: plstを再生成（BC$NOTE除外 / 全BC$）");
   }else{
-    const built = buildCueChunks(state.buffer, state.cues);
-    cueChunk = built.cueChunk;
-    listChunk = built.listChunk;
-    plstChunk = built.plstChunk;
+    cueChunk = cueCompat?.cueChunk || null;
+    listChunk = cueCompat?.listChunk || null;
+    plstChunk = cueCompat?.plstChunk || null;
   }
 
   // data: only replace when auto-level fix was applied (PCM bytes are still PCM16)
