@@ -4176,6 +4176,19 @@ body, #appRoot, .appRoot, .mainLayout{
 <!-- ===== /Export Check ===== -->
 <script src="./licenseGate.js"></script>
 <script>
+function __ensureLicenseStateShim() {
+  try {
+    if (!window.__licenseState || typeof window.__licenseState !== "object") window.__licenseState = {};
+    const t = String(localStorage.getItem("wavcue_tier") || "").trim().toLowerCase();
+    window.__licenseState.tier = (t === "pro" || t === "standard" || t === "demo") ? t : "pro";
+    if (typeof window.__licenseState.isDemoLocked !== "boolean") window.__licenseState.isDemoLocked = false;
+  } catch (e) {
+    try{ console.error("[LicenseShim] __ensureLicenseStateShim non-fatal", e); }catch(_){ }
+    window.__licenseState = { tier: "pro", isDemoLocked: false };
+  }
+}
+function _ensureLicenseStateShim(){ return __ensureLicenseStateShim(); }
+function ensureLicenseStateShim(){ return __ensureLicenseStateShim(); }
 (function(){
   "use strict";
 
