@@ -8809,6 +8809,103 @@ function _cmcdPmCommitSortFromDom(container){
    AUDIO_BUILD: RIFF/WAVE writer helpers
 ================================ */
 
+function _cueLabelNorm(s){
+  return String(s||"").trim().replace(/\s+/g,"");
+}
+function _isNoteCueLabel(c){
+  const t = _cueLabelNorm(c && c.label);
+  return /^BC\$NOTE\(?\d+\)?$/i.test(t);
+}
+function _calcCueSampleOffset(c, sr, totalSamples){
+  let sampleOffset = Math.max(0, Math.min(totalSamples-1, Math.round((c?.sec||0) * sr)));
+  if(_isNoteCueLabel(c)) sampleOffset = 0; // NOTE固定
+  return sampleOffset;
+}
+function _collectZeroOffsetCueNames(buffer, cues){
+  const sr = (state && state.fileSr && isFinite(state.fileSr)) ? state.fileSr : ((buffer && buffer.sampleRate)?buffer.sampleRate:48000);
+  let totalSamples = (state && state.fileTotalSamples && isFinite(state.fileTotalSamples)) ? state.fileTotalSamples : ((buffer && Number.isFinite(buffer.length)) ? buffer.length : 0);
+  if(!totalSamples || totalSamples<=0){
+    const dur = (buffer && Number.isFinite(buffer.duration)) ? buffer.duration : 0;
+    totalSamples = Math.max(1, Math.round(dur * sr));
+  }
+  const names = new Set();
+  const list = Array.isArray(cues) ? cues : [];
+  for(const c of list){
+    const id = (c && isFinite(c.id)) ? (c.id>>>0) : 0;
+    if(!id) continue;
+    const sampleOffset = _calcCueSampleOffset(c, sr, totalSamples);
+    if(sampleOffset === 0) names.add(id);
+  }
+  return names;
+}
+function _filterAdtlLablForZeroOffset(listChunk, zeroNames){
+  const out = { buf: listChunk, dropped: 0, changed: false };
+  if(!listChunk || !zeroNames || !zeroNames.size) return out;
+  const u8 = (listChunk instanceof Uint8Array) ? listChunk : new Uint8Array(listChunk);
+  if(u8.length < 12) return out;
+  const dv = new DataView(u8.buffer, u8.byteOffset, u8.byteLength);
+  const str4 = (o)=>String.fromCharCode(dv.getUint8(o),dv.getUint8(o+1),dv.getUint8(o+2),dv.getUint8(o+3));
+  if(str4(0) !== "LIST") return out;
+  const size = dv.getUint32(4, true) >>> 0;
+  if(size < 4) return out;
+  const listType = str4(8);
+  if(listType !== "adtl") return out;
+  const listEnd = 8 + size;
+  if(listEnd > u8.length) return out;
+
+  const kept = [];
+  let off = 12;
+  while(off + 8 <= listEnd){
+    const sid = str4(off);
+    const sSize = dv.getUint32(off + 4, true) >>> 0;
+    const dataOff = off + 8;
+    const next = dataOff + sSize + (sSize % 2);
+    if(next > listEnd) return out;
+    let drop = false;
+    if(sid === "labl" && sSize >= 4){
+      const dwName = dv.getUint32(dataOff, true) >>> 0;
+      if(zeroNames.has(dwName)) drop = true;
+    }
+    if(drop){
+      out.dropped++;
+    }else{
+      kept.push(u8.slice(off, next));
+    }
+    off = next;
+  }
+  if(out.dropped === 0) return out;
+
+  const keptLen = kept.reduce((a,b)=>a + b.length, 0);
+  const listContentLen = 4 + keptLen;
+  const pad = listContentLen % 2;
+  const outU8 = new Uint8Array(8 + listContentLen + pad);
+  const odv = new DataView(outU8.buffer);
+  outU8[0]=76; outU8[1]=73; outU8[2]=83; outU8[3]=84; // LIST
+  odv.setUint32(4, listContentLen, true);
+  outU8[8]=97; outU8[9]=100; outU8[10]=116; outU8[11]=108; // adtl
+  let p = 12;
+  for(const part of kept){
+    outU8.set(part, p);
+    p += part.length;
+  }
+  out.buf = outU8;
+  out.changed = true;
+  return out;
+}
+function _normalizePcmFmtPayload(fmtPayload){
+  const payload = (fmtPayload instanceof Uint8Array) ? fmtPayload : (fmtPayload ? new Uint8Array(fmtPayload) : null);
+  if(!payload || payload.length < 16) return { payload, normalized:false, cbSize:null };
+  const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+  const wFormatTag = dv.getUint16(0, true) >>> 0;
+  if(payload.length >= 18){
+    const cbSize = dv.getUint16(16, true) >>> 0;
+    if(wFormatTag === 0x0001 && cbSize === 0 && payload.length > 16){
+      return { payload: payload.slice(0,16), normalized:true, cbSize };
+    }
+    return { payload, normalized:false, cbSize };
+  }
+  return { payload, normalized:false, cbSize:null };
+}
 function buildCueChunks(buffer, cues){
   const sr = (state && state.fileSr && isFinite(state.fileSr)) ? state.fileSr : ((buffer && buffer.sampleRate)?buffer.sampleRate:48000);
   let totalSamples = (state && state.fileTotalSamples && isFinite(state.fileTotalSamples)) ? state.fileTotalSamples : ((buffer && Number.isFinite(buffer.length)) ? buffer.length : 0);
@@ -8848,13 +8945,9 @@ function buildCueChunks(buffer, cues){
     }
   }
 
-  const _ecNormLbl = (s)=> String(s||"").trim().replace(/\s+/g,"");
-  const isNoteCue = (c)=>{
-    const t = _ecNormLbl(c && c.label);
-    return /^BC\$NOTE\(?\d+\)?$/i.test(t);
-  };
+  const isNoteCue = (c)=> _isNoteCueLabel(c);
   const isLabel = (c, want)=>{
-    const t = _ecNormLbl(c && c.label).toUpperCase();
+    const t = _cueLabelNorm(c && c.label).toUpperCase();
     return t === want;
   };
   const rank = (c)=>{
@@ -8884,10 +8977,11 @@ function buildCueChunks(buffer, cues){
   cueDv.setUint32(4, cueDataSize, true);
   cueDv.setUint32(8, cueCount, true);
 
+  const zeroOffsetNames = new Set();
   let p = 12;
   for(const c of sorted){
-    let sampleOffset = Math.max(0, Math.min(totalSamples-1, Math.round((c.sec||0) * sr)));
-    if(isNoteCue(c)) sampleOffset = 0; // NOTE固定
+    const sampleOffset = _calcCueSampleOffset(c, sr, totalSamples);
+    if(sampleOffset === 0) zeroOffsetNames.add((c.id>>>0));
 
     cueDv.setUint32(p+0, (c.id>>>0), true);        // dwName
     cueDv.setUint32(p+4, 0, true);                 // dwPosition (互換性: 常に0)
@@ -8958,15 +9052,15 @@ function buildCueChunks(buffer, cues){
   try{
     const bcList = sorted
       .filter(c=>{
-        const t = _ecNormLbl(c && c.label).toUpperCase();
+        const t = _cueLabelNorm(c && c.label).toUpperCase();
         return t.startsWith("BC$") && !t.startsWith("BC$NOTE") && !isNoteCue(c);
       })
       .slice()
       .sort((a,b)=>{
         const ta = (+a.sec || 0), tb = (+b.sec || 0);
         if(ta !== tb) return ta - tb;
-        const la = _ecNormLbl(a.label).toUpperCase();
-        const lb = _ecNormLbl(b.label).toUpperCase();
+        const la = _cueLabelNorm(a.label).toUpperCase();
+        const lb = _cueLabelNorm(b.label).toUpperCase();
         if(la < lb) return -1;
         if(la > lb) return 1;
         return ((a.id>>>0) - (b.id>>>0));
@@ -8995,7 +9089,7 @@ function buildCueChunks(buffer, cues){
     plstBuf = null;
   }
 
-return { cueChunk: cueBuf, listChunk: listBuf, plstChunk: plstBuf };
+return { cueChunk: cueBuf, listChunk: listBuf, plstChunk: plstBuf, zeroOffsetNames };
 }
 
 
@@ -9268,12 +9362,16 @@ async function buildExportWavBytes(opts){
 // --- build replacements (editable chunks only) ---
   const bextBuf = buildBextChunk();                        // bext (version preserved)
   const cmcdBuf = buildCmcdChunkFixed2048();               // cmcd (fixed 2048)
+  const fmtNorm = _normalizePcmFmtPayload(state.srcFmtPayload);
+  const fmtBuf = (fmtNorm && fmtNorm.normalized && fmtNorm.payload) ? _makeChunk("fmt ", fmtNorm.payload) : null;
 
   // cue / plst / LIST(adtl) (ファイル添付は LIST/adtl/file)
   // Hybrid: when ONLY moving existing cues (no add/remove/label change, no attachment),
   // patch the source 'cue ' chunk values in-place. Otherwise rebuild cue/LIST as before.
   let srcAbForBuild = state.srcAb;
   let cueChunk = null, listChunk = null, plstChunk = null;
+  let zeroOffsetNames = new Set();
+  let droppedLablCount = 0;
 
   const hasAttach = Array.isArray(state.attachments) && state.attachments.some(a=>a && a.bytes && a.bytes.length);
   const sigNow = cueSig(state.cues);
@@ -9291,6 +9389,7 @@ async function buildExportWavBytes(opts){
     listChunk = null;
     // plst は規格互換のため再生成（BC$NOTE除外 / 全BC$）
     try{ plstChunk = buildCueChunks(state.buffer, state.cues).plstChunk; }catch(_){ plstChunk = null; }
+    try{ zeroOffsetNames = _collectZeroOffsetCueNames(state.buffer, state.cues); }catch(_){ zeroOffsetNames = new Set(); }
     log("INFO: CUEは元チャンクを更新（移動のみ / ハイブリッド）");
     if(plstChunk) log("INFO: plstを再生成（BC$NOTE除外 / 全BC$）");
   }else{
@@ -9298,12 +9397,36 @@ async function buildExportWavBytes(opts){
     cueChunk = built.cueChunk;
     listChunk = built.listChunk;
     plstChunk = built.plstChunk;
+    zeroOffsetNames = built.zeroOffsetNames || new Set();
   }
 
   // data: only replace when auto-level fix was applied (PCM bytes are still PCM16)
   const dataBuf = (state.procApplied && state.procDataPayload)
     ? _makeChunk("data", state.procDataPayload)
     : null;
+
+  let filteredListChunk = null;
+  if(canInPlaceMove){
+    try{
+      const srcChunks = state.srcChunks || parseRiffChunks(state.srcAb);
+      const listItem = Array.isArray(srcChunks) ? srcChunks.find(ch=> ch.id==="LIST" && ch.listType==="adtl") : null;
+      if(listItem && srcAbForBuild){
+        const srcListChunk = new Uint8Array(srcAbForBuild.slice(listItem.off, listItem.next));
+        const filtered = _filterAdtlLablForZeroOffset(srcListChunk, zeroOffsetNames);
+        if(filtered && filtered.changed){
+          filteredListChunk = filtered.buf;
+          droppedLablCount += filtered.dropped;
+        }
+      }
+    }catch(_){ }
+  }else if(listChunk){
+    const filtered = _filterAdtlLablForZeroOffset(listChunk, zeroOffsetNames);
+    if(filtered && filtered.changed){
+      filteredListChunk = filtered.buf;
+      droppedLablCount += filtered.dropped;
+    }
+  }
+  if(filteredListChunk) listChunk = filteredListChunk;
 
   const replacements = {
     bextBuf: (bextBuf instanceof Uint8Array) ? bextBuf : new Uint8Array(bextBuf),
@@ -9312,8 +9435,11 @@ async function buildExportWavBytes(opts){
     plstBuf: plstChunk ? ((plstChunk instanceof Uint8Array) ? plstChunk : new Uint8Array(plstChunk)) : null,
     listBuf: listChunk ? ((listChunk instanceof Uint8Array) ? listChunk : new Uint8Array(listChunk)) : null,
     dataBuf: dataBuf, // Uint8Array from _makeChunk, or null
-    fmtBuf:  null,    // keep original 'fmt ' as-is
+    fmtBuf:  fmtBuf,  // normalize PCM fmt when needed
   };;
+  const pcmFmt16 = fmtNorm && fmtNorm.normalized ? 1 : 0;
+  const cbSize = (fmtNorm && Number.isFinite(fmtNorm.cbSize)) ? fmtNorm.cbSize : -1;
+  log(`[EXPORT][compat-default] droppedLablForZeroOffset=${droppedLablCount} pcmFmt16=${pcmFmt16} cbSize=${cbSize}`);
 
   // --- chunk-level rebuild (pass-through iXML + unknown chunks) ---
   let blob = null;
@@ -9323,7 +9449,8 @@ async function buildExportWavBytes(opts){
   }else{
     // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
     log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
-    const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
+    const fmtPayload = (fmtNorm && fmtNorm.payload) ? fmtNorm.payload : state.srcFmtPayload;
+    const fmtBuf  = _makeChunk("fmt ", fmtPayload);
     const pcmPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
     const dataBuf2 = _makeChunk("data", pcmPayload);
     const parts = [
