@@ -4219,6 +4219,24 @@ try {
   window._getLicenseStateSafe = _getLicenseStateSafe;
   window.getLicenseStateSafe = getLicenseStateSafe;
 } catch (_) {}
+function guardBulkImport(){
+  try { return (typeof _guardBulkImport === "function") ? _guardBulkImport() : { ok:true }; }
+  catch(e){ try{ console.error("[guardBulkImport] non-fatal", e); }catch(_){ } return { ok:true }; }
+}
+try { window.guardBulkImport = guardBulkImport; } catch(_) {}
+
+if (typeof window.guardBulkCheck !== "function") {
+  function guardBulkCheck(){ return { ok:true }; }
+  try{ window.guardBulkCheck = guardBulkCheck; }catch(_){}
+}
+if (typeof window.guardBulkExport !== "function") {
+  function guardBulkExport(){ return { ok:true }; }
+  try{ window.guardBulkExport = guardBulkExport; }catch(_){}
+}
+if (typeof window.guardExport !== "function") {
+  function guardExport(){ return { ok:true }; }
+  try{ window.guardExport = guardExport; }catch(_){}
+}
 (function(){
   "use strict";
 
@@ -6477,7 +6495,11 @@ function setupDragAndDrop(){
       }
       if(!files.length){ return; }
       if(files.length > 1){
-        const bulkRes = _guardBulkImport();
+        const g = (typeof _guardBulkImport === "function") ? _guardBulkImport
+          : (typeof guardBulkImport === "function") ? guardBulkImport
+          : (window && typeof window.guardBulkImport === "function") ? window.guardBulkImport
+          : null;
+        const bulkRes = g ? g() : { ok:true };
         if(!bulkRes.ok) return;
       }
       console.log(`[Pro] drop wavs=${files.length}`);
