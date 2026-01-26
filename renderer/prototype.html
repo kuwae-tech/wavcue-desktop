@@ -6009,6 +6009,108 @@ function rebuildWaveFromOriginal(ab, chunks, replacements){
   return new Blob(out, {type:"audio/wav"});
 }
 
+function rebuildWaveFromOriginalExport(ab, chunks, replacements){
+  const out=[];
+  const push=(b)=>out.push(b);
+  const src = new Uint8Array(ab);
+
+  // RIFF header placeholder
+  const riff=new Uint8Array(12);
+  riff.set([82,73,70,70, 0,0,0,0, 87,65,86,69]);
+  push(riff.buffer);
+
+  const keyOf = (ch)=> (ch.id==="LIST" && ch.listType==="adtl") ? "LIST:adtl" : ch.id;
+  const done = new Set();
+  let fmtChunk = null;
+  let dataChunk = null;
+  let seenData = false;
+  const preData = [];
+  const postData = [];
+
+  const asChunk = (buf)=>{
+    if(!buf) return null;
+    return (buf instanceof Uint8Array) ? buf : new Uint8Array(buf);
+  };
+  const rawChunk = (ch)=> src.slice(ch.off, ch.off + 8 + ch.size + (ch.size%2));
+  const addMeta = (bucket, chunkBuf)=>{
+    if(chunkBuf) bucket.push(chunkBuf);
+  };
+
+  for(const ch of (chunks || [])){
+    const key = keyOf(ch);
+    if(key==="cue " || key==="plst" || key==="LIST:adtl"){
+      continue; // always replace cue-related chunks
+    }
+    if(key==="fmt "){
+      if(!fmtChunk){
+        fmtChunk = asChunk(replacements && replacements.fmtBuf) || rawChunk(ch);
+      }
+      continue;
+    }
+    if(key==="data"){
+      if(!dataChunk){
+        dataChunk = asChunk(replacements && replacements.dataBuf) || rawChunk(ch);
+      }
+      seenData = true;
+      continue;
+    }
+
+    if(key==="bext"){
+      if(done.has(key)) continue;
+      const rep = asChunk(replacements && replacements.bextBuf) || rawChunk(ch);
+      addMeta(seenData ? postData : preData, rep);
+      done.add(key);
+      continue;
+    }
+    if(key==="cmcd"){
+      if(done.has(key)) continue;
+      const rep = asChunk(replacements && replacements.cmcdBuf) || rawChunk(ch);
+      addMeta(seenData ? postData : preData, rep);
+      done.add(key);
+      continue;
+    }
+    if(key==="iXML"){
+      if(done.has(key)) continue;
+      addMeta(seenData ? postData : preData, rawChunk(ch));
+      done.add(key);
+      continue;
+    }
+
+    addMeta(seenData ? postData : preData, rawChunk(ch));
+  }
+
+  if(!fmtChunk && replacements && replacements.fmtBuf){
+    fmtChunk = asChunk(replacements.fmtBuf);
+  }
+  if(!dataChunk && replacements && replacements.dataBuf){
+    dataChunk = asChunk(replacements.dataBuf);
+  }
+
+  if(replacements && replacements.bextBuf && !done.has("bext")){
+    preData.push(asChunk(replacements.bextBuf));
+    done.add("bext");
+  }
+  if(replacements && replacements.cmcdBuf && !done.has("cmcd")){
+    preData.push(asChunk(replacements.cmcdBuf));
+    done.add("cmcd");
+  }
+
+  if(fmtChunk) push(fmtChunk);
+  preData.forEach(push);
+  if(dataChunk) push(dataChunk);
+  if(replacements && replacements.cueBuf) push(asChunk(replacements.cueBuf));
+  if(replacements && replacements.plstBuf) push(asChunk(replacements.plstBuf));
+  if(replacements && replacements.listBuf) push(asChunk(replacements.listBuf));
+  postData.forEach(push);
+
+  let total=0;
+  for(const b of out) total += b.byteLength;
+  const riffSize = total - 8;
+  new DataView(out[0]).setUint32(4, riffSize, true);
+
+  return new Blob(out, {type:"audio/wav"});
+}
+
 function fmtTime(sec){
   if(!isFinite(sec)) sec = 0;
   const s = Math.max(0, sec);
@@ -9257,6 +9359,56 @@ function getProg(){
     setText(){}, setLabel(){}, setSub(){}, setDetail(){}
   };
 }
+function normalizeExportFmtPayload(fmtPayload){
+  const payload = (fmtPayload instanceof Uint8Array) ? fmtPayload : new Uint8Array(fmtPayload || []);
+  const info = {
+    pcm: false,
+    cbSize: null,
+    originalBytes: payload.byteLength,
+    normalizedBytes: payload.byteLength,
+    trimmed: false,
+    payload,
+  };
+  if(payload.byteLength < 16) return info;
+  try{
+    const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+    const tag = dv.getUint16(0, true) >>> 0;
+    if(tag !== 0x0001) return info;
+    info.pcm = true;
+    if(payload.byteLength >= 18){
+      info.cbSize = dv.getUint16(16, true) >>> 0;
+      if(info.cbSize === 0 && payload.byteLength > 16){
+        const trimmed = payload.slice(0, 16);
+        info.payload = trimmed;
+        info.trimmed = true;
+        info.normalizedBytes = trimmed.byteLength;
+      }
+    }
+  }catch(_){ }
+  return info;
+}
+function logExportChunkSummary(outAb, fmtInfo){
+  try{
+    const chunks = parseRiffChunks(outAb) || [];
+    const order = chunks.map((c)=> (c.id==="LIST" ? `LIST:${c.listType||""}` : c.id));
+    console.log("[EXPORT][chunk-order] after=", order);
+    const cueCount = chunks.filter(c=>c.id==="cue ").length;
+    const plstCount = chunks.filter(c=>c.id==="plst").length;
+    const listAdtlCount = chunks.filter(c=>c.id==="LIST" && c.listType==="adtl").length;
+    console.log(`[EXPORT][cue] cueCount=${cueCount} plstCount=${plstCount} listAdtlCount=${listAdtlCount}`);
+  }catch(_){ }
+  try{
+    if(fmtInfo && fmtInfo.pcm){
+      const cbLabel = (fmtInfo.cbSize == null) ? "none" : fmtInfo.cbSize;
+      const msg = `[EXPORT][fmt] bytes=${fmtInfo.normalizedBytes} cbSize=${cbLabel}`;
+      if(fmtInfo.cbSize != null && fmtInfo.cbSize !== 0 && fmtInfo.originalBytes >= 18){
+        console.warn(`${msg} warn=cbSize_nonzero`);
+      }else{
+        console.log(msg);
+      }
+    }
+  }catch(_){ }
+}
 async function buildExportWavBytes(opts){
   const targetFileId = opts?.fileId;
   if(targetFileId && typeof setActiveFile === "function" && state.activeFileId !== targetFileId){
@@ -9270,41 +9422,20 @@ async function buildExportWavBytes(opts){
   const cmcdBuf = buildCmcdChunkFixed2048();               // cmcd (fixed 2048)
 
   // cue / plst / LIST(adtl) (ファイル添付は LIST/adtl/file)
-  // Hybrid: when ONLY moving existing cues (no add/remove/label change, no attachment),
-  // patch the source 'cue ' chunk values in-place. Otherwise rebuild cue/LIST as before.
-  let srcAbForBuild = state.srcAb;
+  // Always rebuild and replace to avoid duplicates and fix chunk order.
   let cueChunk = null, listChunk = null, plstChunk = null;
-
-  const hasAttach = Array.isArray(state.attachments) && state.attachments.some(a=>a && a.bytes && a.bytes.length);
-  const sigNow = cueSig(state.cues);
-  const canInPlaceMove =
-    !hasAttach &&
-    !!state.srcAb &&
-    !!state.cuePatchMeta &&
-    !!state.loadedCueSig &&
-    (sigNow === state.loadedCueSig);
-
-  if(canInPlaceMove){
-    // Patch the existing 'cue ' chunk(s) sample offsets (no size/order changes)
-    srcAbForBuild = applyCueInPlacePatch(state.srcAb, state.cuePatchMeta, state.cues, ((state.fileSr && isFinite(state.fileSr)) ? state.fileSr : state.buffer.sampleRate));
-    cueChunk = null;
-    listChunk = null;
-    // plst は規格互換のため再生成（BC$NOTE除外 / 全BC$）
-    try{ plstChunk = buildCueChunks(state.buffer, state.cues).plstChunk; }catch(_){ plstChunk = null; }
-    log("INFO: CUEは元チャンクを更新（移動のみ / ハイブリッド）");
-    if(plstChunk) log("INFO: plstを再生成（BC$NOTE除外 / 全BC$）");
-  }else{
-    const built = buildCueChunks(state.buffer, state.cues);
-    cueChunk = built.cueChunk;
-    listChunk = built.listChunk;
-    plstChunk = built.plstChunk;
-  }
+  const built = buildCueChunks(state.buffer, state.cues);
+  cueChunk = built.cueChunk;
+  listChunk = built.listChunk;
+  plstChunk = built.plstChunk;
 
   // data: only replace when auto-level fix was applied (PCM bytes are still PCM16)
   const dataBuf = (state.procApplied && state.procDataPayload)
     ? _makeChunk("data", state.procDataPayload)
     : null;
 
+  const fmtInfo = normalizeExportFmtPayload(state.srcFmtPayload);
+  const fmtPayload = fmtInfo.payload;
   const replacements = {
     bextBuf: (bextBuf instanceof Uint8Array) ? bextBuf : new Uint8Array(bextBuf),
     cmcdBuf: (cmcdBuf instanceof Uint8Array) ? cmcdBuf : new Uint8Array(cmcdBuf),
@@ -9312,25 +9443,25 @@ async function buildExportWavBytes(opts){
     plstBuf: plstChunk ? ((plstChunk instanceof Uint8Array) ? plstChunk : new Uint8Array(plstChunk)) : null,
     listBuf: listChunk ? ((listChunk instanceof Uint8Array) ? listChunk : new Uint8Array(listChunk)) : null,
     dataBuf: dataBuf, // Uint8Array from _makeChunk, or null
-    fmtBuf:  null,    // keep original 'fmt ' as-is
-  };;
+    fmtBuf:  _makeChunk("fmt ", fmtPayload),
+  };
 
   // --- chunk-level rebuild (pass-through iXML + unknown chunks) ---
   let blob = null;
   const chunks = state.srcChunks || parseRiffChunks(state.srcAb);
   if(state.srcAb && chunks && Array.isArray(chunks) && chunks.length){
-    blob = rebuildWaveFromOriginal(srcAbForBuild || state.srcAb, chunks, replacements);
+    blob = rebuildWaveFromOriginalExport(state.srcAb, chunks, replacements);
   }else{
     // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
     log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
-    const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
+    const fmtBuf  = _makeChunk("fmt ", fmtPayload);
     const pcmPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
     const dataBuf2 = _makeChunk("data", pcmPayload);
     const parts = [
-      new Uint8Array(bextBuf),
       fmtBuf,
-      dataBuf2,
+      new Uint8Array(bextBuf),
       new Uint8Array(cmcdBuf),
+      dataBuf2,
       new Uint8Array(cueChunk),
       ...(plstChunk ? [new Uint8Array(plstChunk)] : []),
       new Uint8Array(listChunk),
@@ -9339,6 +9470,7 @@ async function buildExportWavBytes(opts){
     blob = new Blob([outAb], {type:"audio/wav"});
   }
   const outAb = await blob.arrayBuffer();
+  logExportChunkSummary(outAb, fmtInfo);
   return new Uint8Array(outAb);
 }
 function buildExportReportJson(params){
