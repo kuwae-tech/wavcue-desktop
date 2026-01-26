@@ -3844,6 +3844,16 @@ body, #appRoot, .appRoot, .mainLayout{
 <div class="ecKey" id="ec_k_lblenc">ラベル文字</div><div class="ecVal" id="ec_lblenc">—</div>
 </div>
 <div class="fieldBlock" style="margin-top:14px">
+<label>CUE互換（チャンク順）</label>
+<select id="exportChunkOrderMode">
+  <option value="preserve">元順維持（デフォルト）</option>
+  <option value="compat_data_after">互換：CUE等をdataの後ろ（推奨）</option>
+</select>
+<div class="muted" style="font-size:12px;line-height:1.4;margin-top:6px">
+  cue/LIST/plst を data チャンクの後ろへ配置します（他チャンクは元順優先）。
+</div>
+</div>
+<div class="fieldBlock" style="margin-top:14px">
 <label style="display:flex;align-items:center;justify-content:space-between;gap:8px">
 <span>CUE（TIME / 種別）</span>
 <span class="muted" style="font-size:12px">（一覧）</span>
@@ -5921,7 +5931,8 @@ function rebuildWaveFromOriginalCanonical(origAb, chunks, replacements){
   return new Blob(out, {type:"audio/wav"});
 }
 
-function rebuildWaveFromOriginal(ab, chunks, replacements){
+function rebuildWaveFromOriginal(ab, chunks, replacements, options){
+  const orderMode = (options && options.chunkOrderMode === "compat_data_after") ? "compat_data_after" : "preserve";
   const out=[];
   const push=(b)=>out.push(b);
 
@@ -5932,6 +5943,7 @@ function rebuildWaveFromOriginal(ab, chunks, replacements){
 
   const done={ "fmt ":false, "data":false, "cue ":false, "plst":false, "LIST:adtl":false, "bext":false, "cmcd":false };
   let insertedBeforeData = false;
+  let insertedAfterData = false;
 
   const insertMissingBeforeData = ()=>{
     if(insertedBeforeData) return;
@@ -5939,6 +5951,23 @@ function rebuildWaveFromOriginal(ab, chunks, replacements){
     const order = [
       ["bext", "bextBuf"],
       ["cmcd", "cmcdBuf"],
+    ];
+    if(orderMode !== "compat_data_after"){
+      order.push(["cue ", "cueBuf"], ["plst", "plstBuf"], ["LIST:adtl", "listBuf"]);
+    }
+    for(const [key, prop] of order){
+      const buf = replacements ? replacements[prop] : null;
+      if(buf && !done[key]){
+        push(buf);
+        done[key]=true;
+      }
+    }
+  };
+
+  const insertCueAfterData = ()=>{
+    if(insertedAfterData) return;
+    insertedAfterData = true;
+    const order = [
       ["cue ", "cueBuf"],
       ["plst", "plstBuf"],
       ["LIST:adtl", "listBuf"],
@@ -5969,10 +5998,15 @@ function rebuildWaveFromOriginal(ab, chunks, replacements){
       (key==="cmcd")?(replacements && replacements.cmcdBuf):
       null;
 
+    if(orderMode === "compat_data_after" && (key==="cue " || key==="plst" || key==="LIST:adtl")){
+      continue;
+    }
+
     // Replacement takes precedence (first occurrence only)
     if(rep && (Object.prototype.hasOwnProperty.call(done, key)) && !done[key]){
       push(rep);
       done[key]=true;
+      if(orderMode === "compat_data_after" && key==="data") insertCueAfterData();
       continue;
     }
 
@@ -5981,6 +6015,7 @@ function rebuildWaveFromOriginal(ab, chunks, replacements){
       if(done[key]) continue;
       push(ab.slice(ch.off, ch.next));
       done[key]=true;
+      if(orderMode === "compat_data_after" && key==="data") insertCueAfterData();
       continue;
     }
 
@@ -5991,15 +6026,18 @@ function rebuildWaveFromOriginal(ab, chunks, replacements){
 
   // If there was no data chunk encountered, still insert missing chunks once.
   insertMissingBeforeData();
+  if(orderMode === "compat_data_after") insertCueAfterData();
 
   const appendIf=(key,buf)=>{ if(buf && !done[key]){ push(buf); done[key]=true; } };
   appendIf("fmt ", replacements && replacements.fmtBuf);
   appendIf("data", replacements && replacements.dataBuf);
   appendIf("bext", replacements && replacements.bextBuf);
   appendIf("cmcd", replacements && replacements.cmcdBuf);
-  appendIf("cue ", replacements && replacements.cueBuf);
-  appendIf("plst", replacements && replacements.plstBuf);
-  appendIf("LIST:adtl", replacements && replacements.listBuf);
+  if(orderMode !== "compat_data_after"){
+    appendIf("cue ", replacements && replacements.cueBuf);
+    appendIf("plst", replacements && replacements.plstBuf);
+    appendIf("LIST:adtl", replacements && replacements.listBuf);
+  }
 
   let total=0;
   for(const b of out) total += b.byteLength;
@@ -9195,7 +9233,37 @@ function encodeWavPCM16WithCues(buffer, cues){
 }
 
 
+const EXPORT_CHUNK_ORDER_STORAGE_KEY = "wavcue_export_chunk_order_mode";
+const EXPORT_CHUNK_ORDER_DEFAULT = "preserve";
+const EXPORT_CHUNK_ORDER_KEYS = ["fmt ","bext","iXML","data","cue ","LIST:adtl","plst"];
+
+function getExportChunkOrderMode(){
+  let mode = EXPORT_CHUNK_ORDER_DEFAULT;
+  try{
+    const raw = localStorage.getItem(EXPORT_CHUNK_ORDER_STORAGE_KEY);
+    if(raw === "compat_data_after") mode = raw;
+  }catch(_){}
+  try{ if(typeof state === "object" && state) state.exportChunkOrderMode = mode; }catch(_){}
+  return mode;
+}
+function setExportChunkOrderMode(mode){
+  const next = (mode === "compat_data_after") ? mode : EXPORT_CHUNK_ORDER_DEFAULT;
+  try{ localStorage.setItem(EXPORT_CHUNK_ORDER_STORAGE_KEY, next); }catch(_){}
+  try{ if(typeof state === "object" && state) state.exportChunkOrderMode = next; }catch(_){}
+  return next;
+}
+function _exportChunkOrderList(chunks){
+  if(!Array.isArray(chunks)) return [];
+  const out = [];
+  for(const ch of chunks){
+    const key = (ch.id==="LIST" && ch.listType==="adtl") ? "LIST:adtl" : ch.id;
+    if(EXPORT_CHUNK_ORDER_KEYS.includes(key)) out.push(key);
+  }
+  return out;
+}
+
 function exportStrategySummary(){
+  const chunkOrderMode = getExportChunkOrderMode();
   const hasAttach = Array.isArray(state.attachments) && state.attachments.some(a=>a && a.bytes && a.bytes.length);
   const sigNow = cueSig(state.cues);
   const canInPlaceMove =
@@ -9203,7 +9271,8 @@ function exportStrategySummary(){
     !!state.srcAb &&
     !!state.cuePatchMeta &&
     !!state.loadedCueSig &&
-    (sigNow === state.loadedCueSig);
+    (sigNow === state.loadedCueSig) &&
+    (chunkOrderMode === "preserve");
 
   const reasons = [];
   if(hasAttach) reasons.push("添付あり");
@@ -9211,6 +9280,7 @@ function exportStrategySummary(){
   if(!state.cuePatchMeta) reasons.push("in-place用メタ不足");
   if(!state.loadedCueSig) reasons.push("ロード署名なし");
   if(state.loadedCueSig && sigNow !== state.loadedCueSig) reasons.push("CUE編集あり（追加/削除/ラベル/順序など）");
+  if(chunkOrderMode !== "preserve") reasons.push(`チャンク順モード=${chunkOrderMode}`);
 
   const chunksOk = Array.isArray(state.srcChunks) && state.srcChunks.length;
   const unknownCount = (()=>{ 
@@ -9262,6 +9332,7 @@ async function buildExportWavBytes(opts){
   if(targetFileId && typeof setActiveFile === "function" && state.activeFileId !== targetFileId){
     await setActiveFile(targetFileId, { force:true });
   }
+  const chunkOrderMode = getExportChunkOrderMode();
   if(!state.buffer || !state.srcFmtPayload || !state.srcDataPayload){
     throw _exportMakeError("書き出し前提データがありません", true);
   }
@@ -9282,7 +9353,8 @@ async function buildExportWavBytes(opts){
     !!state.srcAb &&
     !!state.cuePatchMeta &&
     !!state.loadedCueSig &&
-    (sigNow === state.loadedCueSig);
+    (sigNow === state.loadedCueSig) &&
+    (chunkOrderMode === "preserve");
 
   if(canInPlaceMove){
     // Patch the existing 'cue ' chunk(s) sample offsets (no size/order changes)
@@ -9319,7 +9391,7 @@ async function buildExportWavBytes(opts){
   let blob = null;
   const chunks = state.srcChunks || parseRiffChunks(state.srcAb);
   if(state.srcAb && chunks && Array.isArray(chunks) && chunks.length){
-    blob = rebuildWaveFromOriginal(srcAbForBuild || state.srcAb, chunks, replacements);
+    blob = rebuildWaveFromOriginal(srcAbForBuild || state.srcAb, chunks, replacements, { chunkOrderMode });
   }else{
     // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
     log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
@@ -9339,6 +9411,12 @@ async function buildExportWavBytes(opts){
     blob = new Blob([outAb], {type:"audio/wav"});
   }
   const outAb = await blob.arrayBuffer();
+  try{
+    const beforeOrder = _exportChunkOrderList(chunks || []);
+    const outChunks = parseRiffChunks(outAb);
+    const afterOrder = _exportChunkOrderList(outChunks || []);
+    console.log(`[EXPORT][chunk-order] mode=${chunkOrderMode} before=${JSON.stringify(beforeOrder)} after=${JSON.stringify(afterOrder)}`);
+  }catch(_){}
   return new Uint8Array(outAb);
 }
 function buildExportReportJson(params){
@@ -10834,6 +10912,10 @@ async function _ecRunAndShow(){
   const dlg = $("exportCheckDialog");
   if(!dlg) return;
   const qcResult = getLastQcForCurrentFile();
+  const chunkOrderSelect = $("exportChunkOrderMode");
+  if(chunkOrderSelect){
+    chunkOrderSelect.value = getExportChunkOrderMode();
+  }
 
   if(!state.buffer){
     _ecSet("ec_range", "—");
@@ -11044,6 +11126,14 @@ function _ecWire(){
   if(!dlg) return;
 
   const close = ()=>{ _dialogCloseWithGuard(dlg); };
+
+  const chunkOrderSelect = $("exportChunkOrderMode");
+  if(chunkOrderSelect && !chunkOrderSelect.dataset.bound){
+    chunkOrderSelect.dataset.bound = "1";
+    chunkOrderSelect.addEventListener("change", ()=>{
+      setExportChunkOrderMode(chunkOrderSelect.value);
+    });
+  }
 
   // Close when clicking outside the modal content (dialog backdrop)
   dlg.addEventListener("click", (e)=>{
@@ -12971,7 +13061,7 @@ async function _scApplyAutoFix(){
   const chunks = state.srcChunks || (srcAb ? parseRiffChunks(srcAb) : null);
   if(srcAb && chunks && Array.isArray(chunks) && chunks.length){
     try{
-      const rebuiltBlob = rebuildWaveFromOriginal(srcAb, chunks, replacements);
+      const rebuiltBlob = rebuildWaveFromOriginal(srcAb, chunks, replacements, { chunkOrderMode: "preserve" });
       rebuiltAb = await rebuiltBlob.arrayBuffer();
       rebuiltBytesLen = rebuiltAb.byteLength;
       dataReplaceOk = true;
