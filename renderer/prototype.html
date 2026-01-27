@@ -5903,17 +5903,16 @@ function rebuildWaveFromOriginalCanonical(origAb, chunks, replacements){
 
   // canonical order
   if(replacements.bextBuf) push(replacements.bextBuf);
-  push(replacements.fmtBuf);
-  push(replacements.dataBuf);
+  if(replacements.fmtBuf) push(replacements.fmtBuf);
   if(replacements.ixmlBuf) push(replacements.ixmlBuf);
+  if(replacements.dataBuf) push(replacements.dataBuf);
   if(replacements.cmcdBuf) push(replacements.cmcdBuf);
-
-  // extras inserted here (after main metadata, before cue)
-  for(const ex of extras) push(ex);
-
   if(replacements.cueBuf) push(replacements.cueBuf);
   if(replacements.plstBuf) push(replacements.plstBuf);
   if(replacements.listBuf) push(replacements.listBuf);
+
+  // extras appended last (preserve unknown chunks)
+  for(const ex of extras) push(ex);
 
   const total = out.reduce((a,b)=>a+b.length,0);
   dv.setUint32(4, total-8, true);
@@ -5930,76 +5929,80 @@ function rebuildWaveFromOriginal(ab, chunks, replacements){
   riff.set([82,73,70,70, 0,0,0,0, 87,65,86,69]);
   push(riff.buffer);
 
-  const done={ "fmt ":false, "data":false, "cue ":false, "plst":false, "LIST:adtl":false, "bext":false, "cmcd":false };
-  let insertedBeforeData = false;
+  const preExtras = [];
+  const postExtras = [];
+  const ixmlChunks = [];
+  let sawData = false;
 
-  const insertMissingBeforeData = ()=>{
-    if(insertedBeforeData) return;
-    insertedBeforeData = true;
-    const order = [
-      ["bext", "bextBuf"],
-      ["cmcd", "cmcdBuf"],
-      ["cue ", "cueBuf"],
-      ["plst", "plstBuf"],
-      ["LIST:adtl", "listBuf"],
-    ];
-    for(const [key, prop] of order){
-      const buf = replacements ? replacements[prop] : null;
-      if(buf && !done[key]){
-        push(buf);
-        done[key]=true;
-      }
-    }
-  };
+  const pickRep = (key)=>(
+    (key==="fmt ")?(replacements && replacements.fmtBuf):
+    (key==="data")?(replacements && replacements.dataBuf):
+    (key==="cue ")?(replacements && replacements.cueBuf):
+    (key==="plst")?(replacements && replacements.plstBuf):
+    (key==="LIST:adtl")?(replacements && replacements.listBuf):
+    (key==="bext")?(replacements && replacements.bextBuf):
+    (key==="cmcd")?(replacements && replacements.cmcdBuf):
+    null
+  );
+
+  const dataSlot = { buf:null };
+  const metaSlots = { bext:null, fmt:null, cmcd:null, cue:null, plst:null, list:null };
 
   for(const ch of (chunks||[])){
     const key = (ch.id==="LIST" && ch.listType==="adtl") ? "LIST:adtl" : ch.id;
+    if(key==="data"){
+      if(!dataSlot.buf){
+        dataSlot.buf = pickRep(key) || ab.slice(ch.off, ch.next);
+      }
+      sawData = true;
+      continue;
+    }
 
-    // If we need to add new metadata chunks that did not exist in the source,
-    // put them right before the first 'data' chunk for maximum compatibility.
-    if(key==="data") insertMissingBeforeData();
+    if(key==="iXML"){
+      ixmlChunks.push(ab.slice(ch.off, ch.next));
+      continue;
+    }
 
-    const rep =
-      (key==="fmt ")?(replacements && replacements.fmtBuf):
-      (key==="data")?(replacements && replacements.dataBuf):
-      (key==="cue ")?(replacements && replacements.cueBuf):
-      (key==="plst")?(replacements && replacements.plstBuf):
-      (key==="LIST:adtl")?(replacements && replacements.listBuf):
-      (key==="bext")?(replacements && replacements.bextBuf):
-      (key==="cmcd")?(replacements && replacements.cmcdBuf):
+    const slotKey =
+      (key==="bext") ? "bext" :
+      (key==="fmt ") ? "fmt" :
+      (key==="cmcd") ? "cmcd" :
+      (key==="cue ") ? "cue" :
+      (key==="plst") ? "plst" :
+      (key==="LIST:adtl") ? "list" :
       null;
-
-    // Replacement takes precedence (first occurrence only)
-    if(rep && (Object.prototype.hasOwnProperty.call(done, key)) && !done[key]){
-      push(rep);
-      done[key]=true;
+    if(slotKey){
+      if(!metaSlots[slotKey]){
+        metaSlots[slotKey] = pickRep(key) || ab.slice(ch.off, ch.next);
+      }
       continue;
     }
 
-    // For canonical keys, keep only the first occurrence (prevents duplication/override bugs).
-    if(Object.prototype.hasOwnProperty.call(done, key)){
-      if(done[key]) continue;
-      push(ab.slice(ch.off, ch.next));
-      done[key]=true;
-      continue;
-    }
-
-    // Non-canonical: keep as-is
-    push(ab.slice(ch.off, ch.next));
+    const raw = ab.slice(ch.off, ch.next);
+    if(sawData) postExtras.push(raw);
+    else preExtras.push(raw);
   }
 
+  if(replacements){
+    if(!metaSlots.bext && replacements.bextBuf) metaSlots.bext = replacements.bextBuf;
+    if(!metaSlots.fmt && replacements.fmtBuf) metaSlots.fmt = replacements.fmtBuf;
+    if(!dataSlot.buf && replacements.dataBuf) dataSlot.buf = replacements.dataBuf;
+    if(!metaSlots.cmcd && replacements.cmcdBuf) metaSlots.cmcd = replacements.cmcdBuf;
+    if(!metaSlots.cue && replacements.cueBuf) metaSlots.cue = replacements.cueBuf;
+    if(!metaSlots.plst && replacements.plstBuf) metaSlots.plst = replacements.plstBuf;
+    if(!metaSlots.list && replacements.listBuf) metaSlots.list = replacements.listBuf;
+  }
 
-  // If there was no data chunk encountered, still insert missing chunks once.
-  insertMissingBeforeData();
-
-  const appendIf=(key,buf)=>{ if(buf && !done[key]){ push(buf); done[key]=true; } };
-  appendIf("fmt ", replacements && replacements.fmtBuf);
-  appendIf("data", replacements && replacements.dataBuf);
-  appendIf("bext", replacements && replacements.bextBuf);
-  appendIf("cmcd", replacements && replacements.cmcdBuf);
-  appendIf("cue ", replacements && replacements.cueBuf);
-  appendIf("plst", replacements && replacements.plstBuf);
-  appendIf("LIST:adtl", replacements && replacements.listBuf);
+  if(metaSlots.bext) push(metaSlots.bext);
+  if(metaSlots.fmt) push(metaSlots.fmt);
+  for(const x of ixmlChunks) push(x);
+  for(const ex of preExtras) push(ex);
+  if(dataSlot.buf) push(dataSlot.buf);
+  if(metaSlots.cmcd) push(metaSlots.cmcd);
+  if(metaSlots.cue) push(metaSlots.cue);
+  if(metaSlots.plst) push(metaSlots.plst);
+  if(metaSlots.list) push(metaSlots.list);
+  for(const ex of postExtras) push(ex);
 
   let total=0;
   for(const b of out) total += b.byteLength;
@@ -8809,6 +8812,24 @@ function _cmcdPmCommitSortFromDom(container){
    AUDIO_BUILD: RIFF/WAVE writer helpers
 ================================ */
 
+function normalizePcmFmtPayload(payloadU8){
+  const base = (payloadU8 instanceof Uint8Array) ? payloadU8 : new Uint8Array(payloadU8 || []);
+  let normalized = false;
+  let payload = base;
+  try{
+    if(payload.byteLength >= 18){
+      const dv = new DataView(payload.buffer, payload.byteOffset, payload.byteLength);
+      const wFormatTag = dv.getUint16(0, true);
+      const cbSize = dv.getUint16(16, true);
+      if(wFormatTag === 1 && cbSize === 0 && payload.byteLength > 16){
+        payload = payload.slice(0, 16);
+        normalized = true;
+      }
+    }
+  }catch(_){ }
+  return { payload, normalized };
+}
+
 function buildCueChunks(buffer, cues){
   const sr = (state && state.fileSr && isFinite(state.fileSr)) ? state.fileSr : ((buffer && buffer.sampleRate)?buffer.sampleRate:48000);
   let totalSamples = (state && state.fileTotalSamples && isFinite(state.fileTotalSamples)) ? state.fileTotalSamples : ((buffer && Number.isFinite(buffer.length)) ? buffer.length : 0);
@@ -8899,8 +8920,9 @@ function buildCueChunks(buffer, cues){
   }
 
   // ---- LIST/adtl ----
-  const subParts = [];
-  const inserted = new Set(); // noteIndex inserted
+  const lablParts = [];
+  const fileParts = [];
+  const noteCueIds = new Map(); // noteIndex -> cueId
   for(const c of sorted){
     let labelText = (c.label || "").toString().trim();
 
@@ -8912,6 +8934,7 @@ function buildCueChunks(buffer, cues){
       if(isFinite(n) && n>=1 && n<=9){
         noteIndex = n;
         labelText = `BC$NOTE${n}`;
+        noteCueIds.set(n, (c.id>>>0));
       }
     }
 
@@ -8926,21 +8949,25 @@ function buildCueChunks(buffer, cues){
     dv.setUint32(4, lablSize, true);
     dv.setUint32(8, (c.id>>>0), true);
     new Uint8Array(lablBuf, 12, labelBytes.length).set(labelBytes);
-    subParts.push(new Uint8Array(lablBuf));
+    lablParts.push(new Uint8Array(lablBuf));
+  }
 
-    // 添付がある場合は、NOTE1..NOTE9 直後に file サブチャンクを配置（順序＝リストの順序）
-    if(hasAttach && noteIndex!=null && !inserted.has(noteIndex)){
-      const att = atts[noteIndex-1];
+  // 添付がある場合は NOTE順に file サブチャンクを最後へまとめる
+  if(hasAttach){
+    for(let i=1;i<=atts.length;i++){
+      const att = atts[i-1];
+      const cueId = noteCueIds.get(i);
+      if(!cueId) continue;
       if(att && ((att.bytes && att.bytes.length) || att._storeId!=null)){
         try{
           const bytes = (att.bytes && att.bytes.length) ? att.bytes : _pdfStoreGet(att._storeId);
-          if(bytes && bytes.length) subParts.push(pdfBuildFileSubchunk(att.name, bytes, (c.id>>>0)));
-          inserted.add(noteIndex);
+          if(bytes && bytes.length) fileParts.push(pdfBuildFileSubchunk(att.name, bytes, cueId));
         }catch(_){ }
       }
     }
   }
 
+  const subParts = [...lablParts, ...fileParts];
   const listContentLen = 4 + subParts.reduce((a,b)=>a+b.length,0);
   const listBuf = new ArrayBuffer(8 + listContentLen + (listContentLen % 2));
   const ldv = new DataView(listBuf);
@@ -9172,9 +9199,9 @@ function encodeWavPCM16WithCues(buffer, cues){
   const parts = [
     ...(bextBuf?[bextBuf]:[]),
     fmtBuf,
+    ...(ixmlBuf?[ixmlBuf]:[]),
     dataHdr,
     audioBuf,
-        ...(ixmlBuf?[ixmlBuf]:[]),
     ...(cmcdBuf?[cmcdBuf]:[]),
     ...(cueChunk?[cueChunk]:[]),
     ...(plstChunk?[plstChunk]:[]),
@@ -9265,6 +9292,9 @@ async function buildExportWavBytes(opts){
   if(!state.buffer || !state.srcFmtPayload || !state.srcDataPayload){
     throw _exportMakeError("書き出し前提データがありません", true);
   }
+  const fmtNorm = normalizePcmFmtPayload(state.srcFmtPayload);
+  const fmtPayload = fmtNorm.payload;
+  const fmt16Normalized = fmtNorm.normalized ? 1 : 0;
 // --- build replacements (editable chunks only) ---
   const bextBuf = buildBextChunk();                        // bext (version preserved)
   const cmcdBuf = buildCmcdChunkFixed2048();               // cmcd (fixed 2048)
@@ -9312,8 +9342,12 @@ async function buildExportWavBytes(opts){
     plstBuf: plstChunk ? ((plstChunk instanceof Uint8Array) ? plstChunk : new Uint8Array(plstChunk)) : null,
     listBuf: listChunk ? ((listChunk instanceof Uint8Array) ? listChunk : new Uint8Array(listChunk)) : null,
     dataBuf: dataBuf, // Uint8Array from _makeChunk, or null
-    fmtBuf:  null,    // keep original 'fmt ' as-is
+    fmtBuf:  fmtNorm.normalized ? _makeChunk("fmt ", fmtPayload) : null, // normalize PCM fmt=16 when cbSize=0
   };;
+
+  try{
+    console.log(`[EXPORT][layout] order=data>cmcd>cue>plst>adtl(labl-first,file-last) fmt16=${fmt16Normalized}`);
+  }catch(_){ }
 
   // --- chunk-level rebuild (pass-through iXML + unknown chunks) ---
   let blob = null;
@@ -9323,7 +9357,7 @@ async function buildExportWavBytes(opts){
   }else{
     // Fallback: canonical rebuild (rare). This may drop unknown chunks, so keep as last resort.
     log("WARN: チャンク解析に失敗したため、互換性保持が一部制限される可能性があります。");
-    const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
+    const fmtBuf  = _makeChunk("fmt ", fmtPayload);
     const pcmPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
     const dataBuf2 = _makeChunk("data", pcmPayload);
     const parts = [
@@ -12826,7 +12860,8 @@ async function _scUpdatePreviewAudio(){
     const suggestedPayload = (state.procApplied && state.procDataPayload) ? state.procDataPayload : state.srcDataPayload;
 
     const bextBuf = buildBextChunk();
-    const fmtBuf  = _makeChunk("fmt ", state.srcFmtPayload);
+    const fmtNorm = normalizePcmFmtPayload(state.srcFmtPayload);
+    const fmtBuf  = _makeChunk("fmt ", fmtNorm.payload);
     const dataBuf = _makeChunk("data", suggestedPayload);
     const cmcdBuf = buildCmcdChunkFixed2048();
     const {cueChunk, listChunk, plstChunk} = buildCueChunks(state.buffer, state.cues);
