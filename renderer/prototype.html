@@ -4386,7 +4386,7 @@ const LicenseCore = (()=> {
   const tierRank = { demo: 0, standard: 1, pro: 2 };
   const LICENSE_TEXT = Object.freeze({
     exportStandardRequired: "書き出しはStandard以上で利用できます。",
-    exportAuthExpired: "認証が期限切れです。再認証してください（1時間ごと）。",
+    exportAuthExpired: "認証が確認できないため書き出しのみ停止しています。",
     bulkImportPro: "一括読み込みはProで利用できます。",
     bulkCheckPro: "一括チェックはProで利用できます。",
     bulkExportPro: "一括書き出しはProで利用できます。",
@@ -4402,7 +4402,7 @@ const LicenseCore = (()=> {
     bulkCheck: { minTier: "pro", reason: "pro-only" },
     bulkExport: { minTier: "pro", reason: "pro-only" },
     history: { minTier: "pro", reason: "pro-only" },
-    exportSingle: { minTier: "standard", reason: "standard-required" },
+    exportSingle: { minTier: "demo", reason: "standard-required" },
     preset: { minTier: "standard", reason: "standard-required" },
     backup: { minTier: "standard", reason: "standard-required" },
   };
@@ -4514,8 +4514,18 @@ const LicenseCore = (()=> {
     const t = String(raw || "").toLowerCase();
     if(!t) return null;
     if(t.includes("pro")) return "pro";
-    if(t.includes("standard") || t.includes("std")) return "standard";
+    if(t.includes("standard") || t.includes("std") || t.includes("wavcue_standard")) return "standard";
     if(t.includes("demo") || t.includes("trial") || t.includes("free")) return "demo";
+    return null;
+  };
+
+  const normalizeKeyTier = (rawKey)=>{
+    const t = String(rawKey || "").trim().toLowerCase();
+    if(!t) return null;
+    if(t === "wavcue_standard_test" || t === "wavcue_standard") return "standard";
+    if(t.includes("standard") || t.includes("wavcue_standard")) return "standard";
+    if(t.includes("pro")) return "pro";
+    if(t.includes("demo")) return "demo";
     return null;
   };
 
@@ -4697,13 +4707,19 @@ const LicenseCore = (()=> {
     try{
       const value = String(key || "").trim();
       if(!value) return { ok: false, reason: "empty" };
+      const keyTier = normalizeKeyTier(value);
+      console.log(`[License] keyType=${keyTier || "unknown"} key=${value}`);
       try{ localStorage?.setItem?.(LS_KEY_LAST, value); }catch(_){}
       const fns = [
         window.wavcue?.setLicenseKey,
         window.wavcue?.activateLicense,
         window.wavcue?.setLicense,
       ].filter((fn)=> typeof fn === "function");
-      if(!fns.length) return { ok: true };
+      if(!fns.length){
+        if(keyTier) setCache({ tier: keyTier }, "activationKey");
+        console.log(`[License] decideTier=${keyTier || "unknown"} resultTier=${stateCache.tier}`);
+        return { ok: true };
+      }
       const res = fns[0](value);
       let next = res;
       if(res && typeof res.then === "function"){
@@ -4715,10 +4731,14 @@ const LicenseCore = (()=> {
         }
       }
       const norm = normalizeState(next);
+      const decidedTier = norm?.tier || keyTier;
       if(norm){
         setCache(norm, "activation");
-        if(norm.tier === "standard") touchStandardLastOnlineOkAt(Date.now());
+      }else if(decidedTier){
+        setCache({ tier: decidedTier }, "activationKey");
       }
+      if(decidedTier === "standard") touchStandardLastOnlineOkAt(Date.now());
+      console.log(`[License] decideTier=${decidedTier || "unknown"} resultTier=${stateCache.tier}`);
       return { ok: true };
     }catch(e){
       console.error("[License] non-fatal", e);
@@ -4746,6 +4766,40 @@ const LicenseCore = (()=> {
 
   const peekState = ()=> getStateSafeInternal({ touchOnline: false });
 
+  const debug = {
+    resetDemo: ()=>{
+      resetDemoTrial();
+      console.log("[License][Debug] resetDemo");
+    },
+    forceDemoExpired: ()=>{
+      const expiredAt = Date.now() - (DEMO_TRIAL_MS + 1000);
+      writeNumber(LS_DEMO_ACTIVATED_AT, expiredAt);
+      console.log("[License][Debug] forceDemoExpired", expiredAt);
+    },
+    setDemoExportOkCount: (n)=>{
+      const count = setDemoExportOkCount(n);
+      console.log("[License][Debug] setDemoExportOkCount", count);
+      return count;
+    },
+    setStandardLastOnlineOkAt: (ms)=>{
+      const stamp = Number.isFinite(ms) ? ms : Date.now();
+      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
+      console.log("[License][Debug] setStandardLastOnlineOkAt", stamp);
+      return stamp;
+    },
+    forceStandardAuthStale: ()=>{
+      const stamp = Date.now() - (STANDARD_AUTH_FRESH_MS + 1000);
+      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
+      console.log("[License][Debug] forceStandardAuthStale", stamp);
+      return stamp;
+    },
+    getDebugState: ()=>{
+      const st = getStateSafeInternal({ touchOnline: false });
+      console.log("[License][Debug] state", st);
+      return st;
+    },
+  };
+
   return {
     init,
     getStateSafe,
@@ -4758,6 +4812,7 @@ const LicenseCore = (()=> {
     resetDemoTrial,
     peekState,
     LICENSE_TEXT,
+    debug,
   };
 })();
 window.WavCueLicense = {
@@ -4768,6 +4823,7 @@ window.WavCueLicense = {
   onChange: LicenseCore.onChange,
   resetDemoTrial: LicenseCore.resetDemoTrial,
   recordExportOk: LicenseCore.recordExportOk,
+  debug: LicenseCore.debug,
 };
 LicenseCore.init();
 
