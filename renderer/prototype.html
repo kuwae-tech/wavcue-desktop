@@ -2600,6 +2600,52 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proFileDockLeft{ display:flex; gap:6px; flex-wrap:nowrap; }
 .proFileDockRight{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; justify-content:flex-end; }
+.proOnlyWrap{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.proOnlyWrap .proBadge{
+  display: none;
+  font-size: 10px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(251,191,36,.65);
+  color: rgba(251,191,36,.95);
+  background: rgba(15,23,42,.6);
+}
+.proOnlyWrap .proTooltip{
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translate(-50%, -4px);
+  opacity: 0;
+  padding: 6px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+  white-space: nowrap;
+  color: rgba(229,231,235,.92);
+  background: rgba(15,23,42,.92);
+  border: 1px solid rgba(148,163,184,.2);
+  pointer-events: none;
+  transition: opacity .12s ease, transform .12s ease;
+  box-shadow: 0 8px 18px rgba(0,0,0,.35);
+  z-index: 6;
+}
+.proOnlyWrap.proOnlyDisabled .btn{
+  opacity: .45;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.proOnlyWrap.proOnlyDisabled .proBadge{
+  display: inline-flex;
+}
+.proOnlyWrap.proOnlyDisabled:hover .proTooltip{
+  opacity: 1;
+  transform: translate(-50%, -6px);
+}
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
 #proFilterStatus{
@@ -3657,8 +3703,22 @@ body, #appRoot, .appRoot, .mainLayout{
 <div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
-      <button id="proBtnBatchCheck" class="btn">一括チェック</button>
-      <button id="proBtnBatchExport" class="btn">まとめて書き出し</button>
+      <div class="proOnlyWrap" id="proBtnBulkImportWrap">
+        <button id="proBtnBulkImport" class="btn" type="button">一括読み込み</button>
+        <span class="proBadge">PRO</span>
+        <span class="proTooltip">Proで利用できます</span>
+        <input accept=".wav,audio/wav,audio/wave" hidden="" id="proBulkInput" multiple="" type="file"/>
+      </div>
+      <div class="proOnlyWrap" id="proBtnBatchCheckWrap">
+        <button id="proBtnBatchCheck" class="btn" type="button">一括チェック</button>
+        <span class="proBadge">PRO</span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
+      <div class="proOnlyWrap" id="proBtnBatchExportWrap">
+        <button id="proBtnBatchExport" class="btn" type="button">まとめて書き出し</button>
+        <span class="proBadge">PRO</span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
     </div>
     <div class="proFileDockRight">
       <div class="proFilterWrap">
@@ -4463,6 +4523,7 @@ window.WavCueLicense = {
 LicenseCore.init();
 
 let _tierBadgeLast = null;
+let _proUiTierLast = null;
 const updateTierBadge = (state)=>{
   try{
     const badge = document.getElementById("tierBadge");
@@ -4483,11 +4544,40 @@ const updateTierBadge = (state)=>{
   }
 };
 
+const applyProUi = (state)=>{
+  try{
+    const tierRaw = state && state.tier ? state.tier : "demo";
+    const tier = String(tierRaw).toLowerCase();
+    const isPro = tier === "pro";
+    const configs = [
+      { wrapId: "proBtnBulkImportWrap", btnId: "proBtnBulkImport" },
+      { wrapId: "proBtnBatchCheckWrap", btnId: "proBtnBatchCheck" },
+      { wrapId: "proBtnBatchExportWrap", btnId: "proBtnBatchExport" },
+    ];
+    configs.forEach(({ wrapId, btnId })=>{
+      const wrap = document.getElementById(wrapId);
+      const btn = document.getElementById(btnId);
+      if(btn) btn.disabled = !isPro;
+      if(wrap) wrap.classList.toggle("proOnlyDisabled", !isPro);
+    });
+    if(tier !== _proUiTierLast){
+      console.log(`[ProUI] tier=${tier} bulkButtons=${isPro ? "enabled" : "disabled"}`);
+      _proUiTierLast = tier;
+    }
+  }catch(e){
+    console.error("[ProUI] non-fatal", e);
+  }
+};
+
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
   console.error("[License] non-fatal", e);
 });
+Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyProUi).catch((e)=>{
+  console.error("[ProUI] non-fatal", e);
+});
 if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> updateTierBadge(st));
+  window.WavCueLicense.onChange((st)=> applyProUi(st));
 }
 
 const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
@@ -7303,8 +7393,8 @@ function resizeCanvas(elOrId){
   const r = measureEl.getBoundingClientRect();
 
   const dpr = window.devicePixelRatio || 1;
-  const w = Math.max(1, Math.floor(r.width * dpr));
-  const h = Math.max(1, Math.floor(r.height * dpr));
+  const w = Math.max(1, Math.ceil(r.width * dpr));
+  const h = Math.max(1, Math.ceil(r.height * dpr));
 
   const changed = (el.width !== w) || (el.height !== h);
 
@@ -7470,7 +7560,7 @@ function drawWaveform(){
   const W = wave.getBoundingClientRect().width;
   const H = wave.getBoundingClientRect().height;
 
-  wctx.clearRect(0,0,W,H);
+  clearCanvasFull(wave);
   wctx.fillStyle = "rgba(0,0,0,.10)";
   wctx.fillRect(0,0,W,H);
 
@@ -17029,6 +17119,26 @@ try{
       project.filter.status = e.target.value||'all';
       render();
       console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
+    });
+
+    $('proBtnBulkImport')?.addEventListener('click', ()=>{
+      const gate = guardBulkImport({ source: "button" });
+      if(!gate.ok){
+        if(window.safeToast) window.safeToast("一括読み込みはProで利用できます。", "warn");
+        return;
+      }
+      $('proBulkInput')?.click();
+    });
+    $('proBulkInput')?.addEventListener('change', async (e)=>{
+      const files = e.target.files;
+      if(!files || !files.length) return;
+      const add = window.__wavcueProAddFiles;
+      if(typeof add === "function"){
+        await add(files);
+      }else{
+        await loadFile(files[0]);
+      }
+      e.target.value = "";
     });
 
     $('proBtnBatchCheck')?.addEventListener('click', ()=> {
