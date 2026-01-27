@@ -136,6 +136,20 @@
     border-color:rgba(34,197,94,.45);
     color:rgba(187,247,208,.95);
   }
+  #licenseBanner{
+    display:none;
+    margin:8px 16px 0;
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid rgba(248,113,113,.45);
+    background:rgba(248,113,113,.12);
+    color:rgba(254,202,202,.95);
+    font-size:13px;
+    font-weight:600;
+  }
+  #licenseBanner.show{
+    display:block;
+  }
   .brand{
     display:flex;
     align-items:center;
@@ -2657,14 +2671,19 @@ body, #appRoot, .appRoot, .mainLayout{
   box-shadow: 0 8px 18px rgba(0,0,0,.35);
   z-index: 6;
 }
-.proOnlyWrap.proOnlyDisabled .btn{
-  opacity: .45;
-  cursor: not-allowed;
-  pointer-events: none;
-}
-.proOnlyWrap.proOnlyDisabled .proBadge{
-  display: inline-flex;
-}
+  .proOnlyWrap.proOnlyDisabled .btn{
+    opacity: .45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .proOnlyWrap.proOnlyDisabled .proJobMini{
+    opacity: .45;
+    cursor: not-allowed;
+    pointer-events: none;
+  }
+  .proOnlyWrap.proOnlyDisabled .proBadge{
+    display: inline-flex;
+  }
 .proOnlyWrap.proOnlyDisabled:hover .proTooltip{
   opacity: 1;
   transform: translate(-50%, -6px);
@@ -3746,6 +3765,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
+<div id="licenseBanner" role="status" aria-live="polite"></div>
 <div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
@@ -3777,8 +3797,12 @@ body, #appRoot, .appRoot, .mainLayout{
           <option value="exported">書き出し済み</option>
         </select>
       </div>
-      <div id="proJobMini" class="proJobMini" title="履歴">
-        <span id="proJobMiniText">履歴</span>
+      <div class="proOnlyWrap" id="proJobMiniWrap">
+        <div id="proJobMini" class="proJobMini" title="履歴">
+          <span id="proJobMiniText">履歴</span>
+        </div>
+        <span class="proBadge">PRO</span>
+        <span class="proTooltip">Proで利用できます</span>
       </div>
     </div>
   </div>
@@ -4174,6 +4198,7 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="settingsGrid">
       <section class="settingsCard" style="grid-column:1/-1">
         <h3>バックアップ管理</h3>
+        <div class="muted" id="settingsBackupDemoNote" style="display:none;margin-top:-4px;margin-bottom:8px;">Demoではバックアップ機能は利用できません。</div>
         <div class="settingsBlock">
           <div class="settingsBlockTitle">状態・操作</div>
           <div class="row" style="gap:8px;flex-wrap:wrap">
@@ -4359,17 +4384,36 @@ body, #appRoot, .appRoot, .mainLayout{
 const LicenseCore = (()=> {
   const listeners = new Set();
   const tierRank = { demo: 0, standard: 1, pro: 2 };
+  const LICENSE_TEXT = Object.freeze({
+    exportStandardRequired: "書き出しはStandard以上で利用できます。",
+    exportAuthExpired: "認証が期限切れです。再認証してください（1時間ごと）。",
+    bulkImportPro: "一括読み込みはProで利用できます。",
+    bulkCheckPro: "一括チェックはProで利用できます。",
+    bulkExportPro: "一括書き出しはProで利用できます。",
+    historyPro: "履歴はProで利用できます。",
+    presetDemo: "プリセットはStandard以上で利用できます。",
+    backupDemo: "Demoではバックアップ機能は利用できません。",
+    demoNotice: "体験版です。1週間・書き出し20回までお試しできます。",
+    demoLockedBanner: "体験版の利用期限が終了しました。ライセンスをご購入ください。",
+    demoLockedToast: "体験版の利用期限が終了しました。ライセンスをご購入ください。",
+  });
   const policy = {
     bulkImport: { minTier: "pro", reason: "pro-only" },
     bulkCheck: { minTier: "pro", reason: "pro-only" },
     bulkExport: { minTier: "pro", reason: "pro-only" },
-    export: { minTier: "standard", reason: "standard-required" },
+    history: { minTier: "pro", reason: "pro-only" },
+    exportSingle: { minTier: "standard", reason: "standard-required" },
+    preset: { minTier: "standard", reason: "standard-required" },
+    backup: { minTier: "standard", reason: "standard-required" },
   };
   const stateCache = {
     tier: "demo",
     source: "fallback",
     updatedAt: Date.now(),
   };
+  const DEMO_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
+  const DEMO_EXPORT_MAX = 20;
+  const STANDARD_AUTH_FRESH_MS = 60 * 60 * 1000;
   const LS_STATE_KEYS = [
     "wavcue_license_state",
     "wavcue_license",
@@ -4377,6 +4421,94 @@ const LicenseCore = (()=> {
     "wavcue_license_info",
   ];
   const LS_KEY_LAST = "wavcue_license_key";
+  const LS_DEMO_ACTIVATED_AT = "wavcue_demo_activated_at";
+  const LS_DEMO_EXPORT_OK_COUNT = "wavcue_demo_export_ok_count";
+  const LS_STANDARD_LAST_ONLINE_OK_AT = "wavcue_standard_last_online_ok_at";
+  let _demoLogKey = "";
+  let _standardLogKey = "";
+
+  const readNumber = (key)=>{
+    try{
+      const raw = localStorage?.getItem?.(key);
+      if(raw == null) return null;
+      const num = Number(raw);
+      return Number.isFinite(num) ? num : null;
+    }catch(_){ return null; }
+  };
+  const writeNumber = (key, value)=>{
+    try{
+      if(!localStorage?.setItem) return;
+      if(value == null) localStorage.removeItem(key);
+      else localStorage.setItem(key, String(Math.trunc(value)));
+    }catch(_){}
+  };
+  const readDemoActivatedAt = ()=> readNumber(LS_DEMO_ACTIVATED_AT);
+  const ensureDemoActivatedAt = (now)=>{
+    const existing = readDemoActivatedAt();
+    if(existing) return existing;
+    const stamp = Number.isFinite(now) ? now : Date.now();
+    writeNumber(LS_DEMO_ACTIVATED_AT, stamp);
+    return stamp;
+  };
+  const readDemoExportOkCount = ()=> readNumber(LS_DEMO_EXPORT_OK_COUNT) || 0;
+  const setDemoExportOkCount = (count)=>{
+    const safe = Math.max(0, Math.trunc(count || 0));
+    writeNumber(LS_DEMO_EXPORT_OK_COUNT, safe);
+    return safe;
+  };
+  const bumpDemoExportOkCount = ()=>{
+    const next = setDemoExportOkCount(readDemoExportOkCount() + 1);
+    return next;
+  };
+  const readStandardLastOnlineOkAt = ()=> readNumber(LS_STANDARD_LAST_ONLINE_OK_AT);
+  const touchStandardLastOnlineOkAt = (now)=>{
+    const stamp = Number.isFinite(now) ? now : Date.now();
+    writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
+    return stamp;
+  };
+  const getDemoInfo = (now, ensureActivation)=>{
+    const stamp = Number.isFinite(now) ? now : Date.now();
+    const activatedAt = ensureActivation ? ensureDemoActivatedAt(stamp) : readDemoActivatedAt();
+    const exportOkCount = readDemoExportOkCount();
+    const expiresAt = activatedAt ? (activatedAt + DEMO_TRIAL_MS) : null;
+    const remainingMs = expiresAt ? Math.max(0, expiresAt - stamp) : DEMO_TRIAL_MS;
+    const remainingDays = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+    const remainingExports = Math.max(0, DEMO_EXPORT_MAX - exportOkCount);
+    const isExpired = !!(expiresAt && stamp > expiresAt);
+    const isLocked = isExpired || remainingExports <= 0;
+    const logKey = `${activatedAt}|${expiresAt}|${remainingDays}|${exportOkCount}`;
+    if(logKey !== _demoLogKey){
+      _demoLogKey = logKey;
+      console.log(`[Demo] activatedAt=${activatedAt || "n/a"} expiresAt=${expiresAt || "n/a"} remainingDays=${remainingDays} exportOkCount=${exportOkCount}`);
+    }
+    return {
+      activatedAt,
+      expiresAt,
+      remainingDays,
+      exportOkCount,
+      remainingExports,
+      isExpired,
+      isLocked,
+    };
+  };
+  const getStandardInfo = (now)=>{
+    const stamp = Number.isFinite(now) ? now : Date.now();
+    const lastOnlineOkAt = readStandardLastOnlineOkAt();
+    const elapsed = lastOnlineOkAt ? Math.max(0, stamp - lastOnlineOkAt) : STANDARD_AUTH_FRESH_MS + 1;
+    const remainingMs = Math.max(0, STANDARD_AUTH_FRESH_MS - elapsed);
+    const remainingMinutes = Math.max(0, Math.ceil(remainingMs / (60 * 1000)));
+    const isAuthFresh = remainingMs > 0;
+    const logKey = `${lastOnlineOkAt}|${isAuthFresh}|${remainingMinutes}`;
+    if(logKey !== _standardLogKey){
+      _standardLogKey = logKey;
+      console.log(`[Standard] authFresh=${isAuthFresh ? 1 : 0} lastOnlineOkAt=${lastOnlineOkAt || "n/a"}`);
+    }
+    return {
+      isAuthFresh,
+      lastOnlineOkAt,
+      remainingMinutes,
+    };
+  };
 
   const normalizeTier = (raw)=>{
     const t = String(raw || "").toLowerCase();
@@ -4490,26 +4622,67 @@ const LicenseCore = (()=> {
     return { ...stateCache };
   };
 
-  const getStateSafe = ()=>{
+  const buildState = (base, options = {})=>{
+    const now = Date.now();
+    const tier = (base && base.tier) ? base.tier : "demo";
+    if(options.touchOnline && tier === "standard"){
+      touchStandardLastOnlineOkAt(now);
+    }
+    const demo = getDemoInfo(now, tier === "demo");
+    const standard = getStandardInfo(now);
+    return { ...base, tier, demo, standard };
+  };
+
+  const getStateSafeInternal = (options = {})=>{
     try{
       const local = readLocalState();
-      if(local) return setCache(local, "localStorage");
+      if(local) return buildState(setCache(local, "localStorage"), options);
       const sync = readWindowSync();
-      if(sync) return setCache(sync, "window");
-      return { ...stateCache };
+      if(sync) return buildState(setCache(sync, "window"), options);
+      return buildState({ ...stateCache }, options);
     }catch(e){
       console.error("[License] non-fatal", e);
-      return { tier: "demo", source: "fallback", updatedAt: Date.now() };
+      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
     }
+  };
+  const getStateSafe = ()=> getStateSafeInternal({ touchOnline: true });
+
+  const isDemoLocked = (st)=> {
+    const info = st?.demo || getDemoInfo(Date.now(), true);
+    return !!info?.isLocked;
+  };
+  const isStandardAuthFresh = (st)=>{
+    const info = st?.standard || getStandardInfo(Date.now());
+    return !!info?.isAuthFresh;
   };
 
   const guard = (action, ctx)=>{
     try{
-      const st = getStateSafe();
+      const st = getStateSafeInternal({ touchOnline: false });
       const tier = (st && st.tier) ? st.tier : "demo";
       const rule = policy[action] || { minTier: "demo" };
-      const ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
-      const reason = ok ? undefined : (rule.reason || "restricted");
+      let ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
+      let reason = ok ? undefined : (rule.reason || "restricted");
+      if(action === "exportSingle" && tier === "standard" && !isStandardAuthFresh(st)){
+        ok = false;
+        reason = "standard-auth-expired";
+      }
+      if(action === "exportSingle" && tier === "demo" && isDemoLocked(st)){
+        ok = false;
+        reason = "demo-locked";
+      }
+      if(action === "preset" && tier === "demo"){
+        ok = false;
+        reason = "demo-locked";
+      }
+      if(action === "backup" && tier === "demo"){
+        ok = false;
+        reason = "demo-locked";
+      }
+      if(action === "history" && tier !== "pro"){
+        ok = false;
+        reason = "pro-only";
+      }
       const res = { ok, tier, reason };
       const reasonTxt = reason ? ` reason=${reason}` : "";
       console.log(`[License] tier=${tier} action=${action} ok=${ok ? 1 : 0}${reasonTxt}`);
@@ -4542,7 +4715,10 @@ const LicenseCore = (()=> {
         }
       }
       const norm = normalizeState(next);
-      if(norm) setCache(norm, "activation");
+      if(norm){
+        setCache(norm, "activation");
+        if(norm.tier === "standard") touchStandardLastOnlineOkAt(Date.now());
+      }
       return { ok: true };
     }catch(e){
       console.error("[License] non-fatal", e);
@@ -4556,7 +4732,33 @@ const LicenseCore = (()=> {
     return ()=> listeners.delete(fn);
   };
 
-  return { init, getStateSafe, guard, setKeySafe, onChange };
+  const resetDemoTrial = ()=>{
+    writeNumber(LS_DEMO_ACTIVATED_AT, null);
+    writeNumber(LS_DEMO_EXPORT_OK_COUNT, null);
+    console.log("[Demo] reset");
+  };
+
+  const recordExportOk = ()=>{
+    const st = getStateSafeInternal({ touchOnline: false });
+    if(st?.tier !== "demo") return null;
+    return bumpDemoExportOkCount();
+  };
+
+  const peekState = ()=> getStateSafeInternal({ touchOnline: false });
+
+  return {
+    init,
+    getStateSafe,
+    guard,
+    setKeySafe,
+    onChange,
+    isDemoLocked,
+    isStandardAuthFresh,
+    recordExportOk,
+    resetDemoTrial,
+    peekState,
+    LICENSE_TEXT,
+  };
 })();
 window.WavCueLicense = {
   init: LicenseCore.init,
@@ -4564,9 +4766,12 @@ window.WavCueLicense = {
   guard: LicenseCore.guard,
   setKeySafe: LicenseCore.setKeySafe,
   onChange: LicenseCore.onChange,
+  resetDemoTrial: LicenseCore.resetDemoTrial,
+  recordExportOk: LicenseCore.recordExportOk,
 };
 LicenseCore.init();
 
+const LICENSE_TEXT = LicenseCore.LICENSE_TEXT;
 let _tierBadgeLast = null;
 let _proUiTierLast = null;
 const updateTierBadge = (state)=>{
@@ -4598,11 +4803,12 @@ const applyProUi = (state)=>{
       { wrapId: "proBtnBulkImportWrap", btnId: "proBtnBulkImport" },
       { wrapId: "proBtnBatchCheckWrap", btnId: "proBtnBatchCheck" },
       { wrapId: "proBtnBatchExportWrap", btnId: "proBtnBatchExport" },
+      { wrapId: "proJobMiniWrap", btnId: "proJobMini" },
     ];
     configs.forEach(({ wrapId, btnId })=>{
       const wrap = document.getElementById(wrapId);
       const btn = document.getElementById(btnId);
-      if(btn) btn.disabled = !isPro;
+      if(btn && "disabled" in btn) btn.disabled = !isPro;
       if(wrap) wrap.classList.toggle("proOnlyDisabled", !isPro);
     });
     if(tier !== _proUiTierLast){
@@ -4614,30 +4820,124 @@ const applyProUi = (state)=>{
   }
 };
 
+let _demoStartupNoticeShown = false;
+let _demoExportNoticeShown = false;
+const applyLicenseUi = (state)=>{
+  try{
+    const tierRaw = state && state.tier ? state.tier : "demo";
+    const tier = String(tierRaw).toLowerCase();
+    const demoInfo = state?.demo;
+    const isDemo = tier === "demo";
+    const isDemoLocked = isDemo && !!demoInfo?.isLocked;
+    const banner = document.getElementById("licenseBanner");
+    if(banner){
+      banner.textContent = isDemoLocked ? LICENSE_TEXT.demoLockedBanner : "";
+      banner.classList.toggle("show", isDemoLocked);
+    }
+    if(isDemo && !_demoStartupNoticeShown){
+      _demoStartupNoticeShown = true;
+      if(window.safeToast) window.safeToast(LICENSE_TEXT.demoNotice, "info");
+    }
+    const setDisabled = (el, disabled)=>{
+      if(!el || !("disabled" in el)) return;
+      el.disabled = !!disabled;
+    };
+    const lockEditEls = [
+      "btnExport",
+      "btnStdCheck",
+      "btnAddCustom",
+      "btnAddPair",
+      "btnAddBcLabel",
+      "selBcLabel",
+      "customLabel",
+      "pairSeconds",
+    ].map(id=> document.getElementById(id));
+    lockEditEls.forEach(el=> setDisabled(el, isDemoLocked));
+
+    const presetDisabled = isDemo;
+    const presetEls = [
+      "sc_tab_preset",
+      "sc_presetManage",
+      "sc_pm_pick",
+      "sc_pm_new",
+      "sc_pm_sort",
+      "sc_pm_clone",
+      "sc_pm_import",
+      "sc_pm_export",
+      "sc_pm_save",
+      "sc_pm_delete",
+      "sc_pm_id",
+      "sc_pm_desc",
+      "sc_pm_name",
+      "sc_pm_target",
+      "sc_pm_tol",
+      "sc_pm_tpmax",
+      "sc_pm_srsel",
+      "sc_pm_bitssel",
+      "sc_pm_chsel",
+      "sc_pm_silmin",
+      "sc_pm_silmax",
+    ].map(id=> document.getElementById(id));
+    presetEls.forEach(el=> setDisabled(el, presetDisabled));
+
+    const backupDisabled = isDemo;
+    const backupEls = [
+      "settingsCleanupNow",
+      "settingsResetRecommended",
+      "settingsAutoCleanup",
+      "settingsRetentionDays",
+      "settingsBackupQuotaGB",
+      "settingsMinKeepCount",
+      "settingsDeleteMethod",
+      "settingsSave",
+      "settingsCleanupConfirmRun",
+    ].map(id=> document.getElementById(id));
+    backupEls.forEach(el=> setDisabled(el, backupDisabled));
+    document.querySelectorAll("[data-settings-folder]").forEach((el)=> setDisabled(el, backupDisabled));
+    const demoNote = document.getElementById("settingsBackupDemoNote");
+    if(demoNote) demoNote.style.display = backupDisabled ? "block" : "none";
+  }catch(e){
+    console.error("[License] non-fatal", e);
+  }
+};
+
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
   console.error("[License] non-fatal", e);
 });
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyProUi).catch((e)=>{
   console.error("[ProUI] non-fatal", e);
 });
+Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyLicenseUi).catch((e)=>{
+  console.error("[License] non-fatal", e);
+});
 if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> updateTierBadge(st));
   window.WavCueLicense.onChange((st)=> applyProUi(st));
+  window.WavCueLicense.onChange((st)=> applyLicenseUi(st));
 }
 
 const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
 const guardBulkCheck = (ctx)=> LicenseCore.guard("bulkCheck", ctx);
 const guardBulkExport = (ctx)=> LicenseCore.guard("bulkExport", ctx);
-const guardExport = (ctx)=> LicenseCore.guard("export", ctx);
+const guardExport = (ctx)=> LicenseCore.guard("exportSingle", ctx);
+const guardHistory = (ctx)=> LicenseCore.guard("history", ctx);
+const guardPreset = (ctx)=> LicenseCore.guard("preset", ctx);
+const guardBackup = (ctx)=> LicenseCore.guard("backup", ctx);
 window.guardBulkImport = guardBulkImport;
 window.guardBulkCheck = guardBulkCheck;
 window.guardBulkExport = guardBulkExport;
 window.guardExport = guardExport;
+window.guardHistory = guardHistory;
+window.guardPreset = guardPreset;
+window.guardBackup = guardBackup;
 window._guardBulkImport = guardBulkImport;
 window._guardBulkCheck = guardBulkCheck;
 window._guardBulkExport = guardBulkExport;
 window._guardExport = guardExport;
 window._guardExportSingle = guardExport;
+window._guardHistory = guardHistory;
+window._guardPreset = guardPreset;
+window._guardBackup = guardBackup;
 
 (() => {
 "use strict";
@@ -6471,6 +6771,7 @@ function _getCueById(id){
 function moveCueToTime(cueId, targetSec, jumpAfter, commitReason="cue:move"){
   const cue = _getCueById(cueId);
   if(!cue || !state.buffer) return;
+  if(isDemoEditLocked()){ warnDemoLocked(); return; }
 
   const dur = state.buffer.duration || 0;
   let t = clamp(targetSec, 0, dur);
@@ -6588,7 +6889,7 @@ function setupDragAndDrop(){
       if(files.length > 1){
         const gate = guardBulkImport({ count: files.length, source: "dnd" });
         if(!gate.ok){
-          if(window.safeToast) window.safeToast("一括読み込みはProで利用できます。", "warn");
+          if(window.safeToast) window.safeToast(LICENSE_TEXT.bulkImportPro, "warn");
           return;
         }
       }
@@ -7191,8 +7492,20 @@ function pause(){
 }
 
 /* Cues */
+const isDemoEditLocked = ()=>{
+  try{
+    const st = LicenseCore.peekState?.();
+    return st?.tier === "demo" && !!st?.demo?.isLocked;
+  }catch(_){
+    return false;
+  }
+};
+const warnDemoLocked = ()=>{
+  if(window.safeToast) window.safeToast(LICENSE_TEXT.demoLockedToast, "warn");
+};
 function addCue(label){
   if(!state.buffer) return;
+  if(isDemoEditLocked()){ warnDemoLocked(); return; }
 
   // JPPA-1-2018: cue-point max 99
   if(Array.isArray(state.cues) && state.cues.length >= 99){
@@ -7223,6 +7536,7 @@ function addCue(label){
 
 function addStartStopCues(){
   if(!state.buffer) return;
+  if(isDemoEditLocked()){ warnDemoLocked(); return; }
   undoCheckpoint();
   const dur = state.buffer.duration;
   const beforeCount = Array.isArray(state.cues) ? state.cues.length : 0;
@@ -7261,6 +7575,7 @@ function addStartStopCues(){
 
 function addCuePair(){
   if(!state.buffer) return;
+  if(isDemoEditLocked()){ warnDemoLocked(); return; }
   undoCheckpoint();
   const beforeCount = Array.isArray(state.cues) ? state.cues.length : 0;
   const sec0 = currentPlayheadSec();
@@ -7301,6 +7616,7 @@ function addCuePair(){
 }
 
 function deleteCue(id){
+  if(isDemoEditLocked()){ warnDemoLocked(); return; }
   undoCheckpoint();
   const beforeCount = Array.isArray(state.cues) ? state.cues.length : 0;
   const target = state.cues.find(c=>c.id===id) || null;
@@ -10054,6 +10370,12 @@ async function _exportOneWithSaveImpl(options){
       autoCleanupEnabled = settings?.autoCleanup ?? true;
       autoCleanupOnExport = settings?.autoCleanup ?? true;
     }catch(_){ }
+    const backupGate = guardBackup({ source: "export" });
+    if(!backupGate.ok){
+      autoBackupEnabled = false;
+      autoCleanupEnabled = false;
+      autoCleanupOnExport = false;
+    }
     try{ scheduleDiffUpdate(true); }catch(_){ }
 
     const fallbackName = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
@@ -10211,6 +10533,7 @@ async function _exportOneWithSaveImpl(options){
     }
 
     __exportOK = true;
+    try{ window.WavCueLicense?.recordExportOk?.(); }catch(_){}
 
     log("OK: 書き出し完了");
     return { ok:true, save:_saveRes };
@@ -10247,8 +10570,16 @@ async function exportOneWithSave(options){
 
 async function exportWav(){
   const gate = guardExport({ source: "singleExport" });
+  if(gate?.tier === "demo" && !_demoExportNoticeShown){
+    _demoExportNoticeShown = true;
+    if(window.safeToast) window.safeToast(LICENSE_TEXT.demoNotice, "info");
+  }
   if(!gate.ok){
-    if(window.safeToast) window.safeToast("書き出しはStandard以上で利用できます。", "warn");
+    if(window.safeToast){
+      if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.exportAuthExpired, "warn");
+      else if(gate.reason === "demo-locked") window.safeToast(LICENSE_TEXT.demoLockedToast, "warn");
+      else window.safeToast(LICENSE_TEXT.exportStandardRequired, "warn");
+    }
     return;
   }
   const suggested = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
@@ -10343,20 +10674,22 @@ window.exportOneWithSave = WavCueExportCore.exportOneWithSave;
 function updateButtons(){
 if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
   const loaded = !!state.buffer;
+  const st = LicenseCore.peekState?.();
+  const demoLocked = st?.tier === "demo" && !!st?.demo?.isLocked;
   $("btnPlay").disabled = !loaded || state.isPlaying;
   $("btnPause").disabled = !loaded || !state.isPlaying;
   $("btnZoomIn").disabled = !loaded;
   $("btnZoomOut").disabled = !loaded;
   $("btnVZoomIn").disabled = !loaded;
   $("btnVZoomOut").disabled = !loaded;
-  $("btnExport").disabled = !loaded;
-  if($("btnStdCheck")) $("btnStdCheck").disabled = !loaded;
-  $("btnAddCustom").disabled = !loaded;
-  $("btnAddPair").disabled = !loaded;
+  $("btnExport").disabled = !loaded || demoLocked;
+  if($("btnStdCheck")) $("btnStdCheck").disabled = !loaded || demoLocked;
+  $("btnAddCustom").disabled = !loaded || demoLocked;
+  $("btnAddPair").disabled = !loaded || demoLocked;
 
   // BC$ quick add
-  if($("selBcLabel")) $("selBcLabel").disabled = !loaded;
-  if($("btnAddBcLabel")) $("btnAddBcLabel").disabled = !loaded || !($("selBcLabel").value);
+  if($("selBcLabel")) $("selBcLabel").disabled = !loaded || demoLocked;
+  if($("btnAddBcLabel")) $("btnAddBcLabel").disabled = !loaded || demoLocked || !($("selBcLabel").value);
 }
 
 $("btnBrowse").addEventListener("click", ()=> $("fileInput").click());
@@ -10543,6 +10876,11 @@ document.querySelectorAll("[data-settings-folder]").forEach((button)=>{
   button.addEventListener("click", async ()=>{
     const kind = button.dataset.settingsFolder;
     if(!kind || !window.wavcue?.openFolder) return;
+    const gate = guardBackup({ source: "settings:folder" });
+    if(!gate.ok){
+      if(window.safeToast) window.safeToast(LICENSE_TEXT.backupDemo, "warn");
+      return;
+    }
     const result = await window.wavcue.openFolder(kind);
     const labelMap = { backups: "バックアップ" };
     const label = labelMap[kind] || kind;
@@ -10556,6 +10894,11 @@ document.querySelectorAll("[data-settings-folder]").forEach((button)=>{
 
 $("settingsCleanupNow")?.addEventListener("click", async ()=>{
   if(!window.wavcue?.runCompleteCleanup) return;
+  const gate = guardBackup({ source: "settings:cleanup" });
+  if(!gate.ok){
+    if(window.safeToast) window.safeToast(LICENSE_TEXT.backupDemo, "warn");
+    return;
+  }
   openCleanupConfirm();
 });
 
@@ -10567,6 +10910,11 @@ window.wavcue?.onCleanupProgress?.((payload)=>{
 
 settingsCleanupConfirmRun?.addEventListener("click", async ()=>{
   if(!window.wavcue?.runCompleteCleanup) return;
+  const gate = guardBackup({ source: "settings:cleanup" });
+  if(!gate.ok){
+    if(window.safeToast) window.safeToast(LICENSE_TEXT.backupDemo, "warn");
+    return;
+  }
   closeCleanupConfirm();
   if(settingsCleanupProgress) settingsCleanupProgress.textContent = "完全クリーンアップを開始しています...";
   settingsLogAdd("完全クリーンアップを開始しました。");
@@ -10584,6 +10932,11 @@ settingsCleanupConfirmRun?.addEventListener("click", async ()=>{
 
 settingsResetRecommended?.addEventListener("click", async ()=>{
   if(typeof window.wavcue?.setSettings !== "function") return;
+  const gate = guardBackup({ source: "settings:reset" });
+  if(!gate.ok){
+    if(window.safeToast) window.safeToast(LICENSE_TEXT.backupDemo, "warn");
+    return;
+  }
   try{
     await window.wavcue.setSettings(RECOMMENDED_SETTINGS);
     await refreshSettingsData();
@@ -10606,6 +10959,11 @@ settingsResetRecommended?.addEventListener("click", async ()=>{
 
 async function onSaveSettingsClicked(){
   try{
+    const gate = guardBackup({ source: "settings:save" });
+    if(!gate.ok){
+      if(window.safeToast) window.safeToast(LICENSE_TEXT.backupDemo, "warn");
+      return;
+    }
     const patch = {
       autoBackupEnabled: !!cachedAutoBackupEnabled,
       retentionDays: Number(settingsRetentionDays?.value || 30),
@@ -11549,6 +11907,19 @@ function _ecWire(){
 // replace export click to open modal
 $("btnExport").addEventListener("click", async ()=>{
   try{
+    const gate = guardExport({ source: "exportButton" });
+    if(gate?.tier === "demo" && !_demoExportNoticeShown){
+      _demoExportNoticeShown = true;
+      if(window.safeToast) window.safeToast(LICENSE_TEXT.demoNotice, "info");
+    }
+    if(!gate.ok){
+      if(window.safeToast){
+        if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.exportAuthExpired, "warn");
+        else if(gate.reason === "demo-locked") window.safeToast(LICENSE_TEXT.demoLockedToast, "warn");
+        else window.safeToast(LICENSE_TEXT.exportStandardRequired, "warn");
+      }
+      return;
+    }
     await _ecRunAndShow();
   }catch(e){
     log("ERR: チェック失敗: "+(e&&e.stack?e.stack:e));
@@ -13596,6 +13967,12 @@ function _scWire(){
 
   if($("sc_preset")){
     $("sc_preset").addEventListener("change", ()=>{
+      const gate = guardPreset({ source: "preset:select" });
+      if(!gate.ok){
+        if(window.safeToast) window.safeToast(LICENSE_TEXT.presetDemo, "warn");
+        if(state.qcPresetId && $("sc_preset")) $("sc_preset").value = state.qcPresetId;
+        return;
+      }
       state.qcPresetId = $("sc_preset").value;
       _scRenderTargets(_scGetPresetById(state.qcPresetId));
       _scUpdatePresetDesc();
@@ -13611,9 +13988,19 @@ function _scWire(){
     }
   }
 
+  const ensurePresetAllowed = ()=>{
+    const gate = guardPreset({ source: "preset" });
+    if(!gate.ok){
+      if(window.safeToast) window.safeToast(LICENSE_TEXT.presetDemo, "warn");
+      return false;
+    }
+    return true;
+  };
+
   // Preset manager
   if($("sc_presetManage")){
     $("sc_presetManage").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
       const mgr = $("sc_presetMgr");
       if(!mgr) return;
       const next = (mgr.style.display==="none" || !mgr.style.display) ? "block" : "none";
@@ -13625,6 +14012,7 @@ function _scWire(){
   }
   if($("sc_pm_pick")){
     $("sc_pm_pick").addEventListener("change", ()=>{
+      if(!ensurePresetAllowed()) return;
       const v = ($("sc_pm_pick").value||"").trim();
       _scPmUpdatePickVisual();
       if(!v) return;
@@ -13634,16 +14022,21 @@ function _scWire(){
   }
   if($("sc_pm_new")){
     $("sc_pm_new").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
       _scPresetMgrStartNewBlank();
     });
   }
 
   if($("sc_pm_sort")){
-    $("sc_pm_sort").addEventListener("click", ()=>{ _scPmToggleSortPanel(); });
+    $("sc_pm_sort").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
+      _scPmToggleSortPanel();
+    });
   }
 
 if($("sc_pm_clone")){
     $("sc_pm_clone").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
       // Clone = copy values into "new preset" form (not saved until user presses 保存)
       const srcId = (($("sc_pm_pick")?.value||"").trim()) || (($("sc_pm_id")?.value||"").trim()) || state.qcPresetId;
       const base = _scGetPresetById(srcId);
@@ -13681,6 +14074,7 @@ if($("sc_pm_clone")){
   }
   if($("sc_pm_save")){
     $("sc_pm_save").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
       const curId = ($("sc_pm_id")?.value || "").trim();
       const pickV = ($("sc_pm_pick")?.value || "").trim();
       const isNewMode = (pickV==="__new__") || !curId;
@@ -13704,12 +14098,14 @@ if($("sc_pm_clone")){
   }
     if($("sc_pm_export")){
     $("sc_pm_export").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
       _qcEnsureLoaded();
       _qcOpenPresetExportSelector();
     });
   }
   if($("sc_pm_import")){
     $("sc_pm_import").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
       const inp = document.createElement("input");
       inp.type = "file";
       inp.accept = "application/json,.json";
@@ -13763,6 +14159,7 @@ if($("sc_pm_clone")){
   }
 if($("sc_pm_delete")){
     $("sc_pm_delete").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
       const id = $("sc_pm_id")?.value || state.qcPresetId;
       if(!id){ return; }
       if(!_qcIsUserPreset(id)){
@@ -13794,7 +14191,10 @@ if($("sc_pm_delete")){
     $("sc_tab_results").addEventListener("click", ()=>_scSetTab("results"));
   }
   if($("sc_tab_preset")){
-    $("sc_tab_preset").addEventListener("click", ()=>_scSetTab("preset"));
+    $("sc_tab_preset").addEventListener("click", ()=>{
+      if(!ensurePresetAllowed()) return;
+      _scSetTab("preset");
+    });
   }
 
 
@@ -13808,6 +14208,7 @@ if($("sc_pm_delete")){
   if($("sc_fix")){
     const btnFix = $("sc_fix");
     btnFix.addEventListener("click", async ()=>{
+      if(isDemoEditLocked()){ warnDemoLocked(); return; }
       if(btnFix.disabled) return;
       btnFix.disabled = true;
       try{
@@ -16721,8 +17122,8 @@ try{
     if(!gate.ok){
       if(window.safeToast){
         const msg = (type === "export")
-          ? "一括書き出しはProで利用できます。"
-          : "一括チェックはProで利用できます。";
+          ? LICENSE_TEXT.bulkExportPro
+          : LICENSE_TEXT.bulkCheckPro;
         window.safeToast(msg, "warn");
       }
       return;
@@ -17169,7 +17570,7 @@ try{
     $('proBtnBulkImport')?.addEventListener('click', ()=>{
       const gate = guardBulkImport({ source: "button" });
       if(!gate.ok){
-        if(window.safeToast) window.safeToast("一括読み込みはProで利用できます。", "warn");
+        if(window.safeToast) window.safeToast(LICENSE_TEXT.bulkImportPro, "warn");
         return;
       }
       $('proBulkInput')?.click();
@@ -17193,7 +17594,14 @@ try{
       runJob('export').catch((e)=> console.error("[BulkExport] runJob error", e));
     });
 
-    $('proJobMini')?.addEventListener('click', ()=> showJob(true));
+    $('proJobMini')?.addEventListener('click', ()=>{
+      const gate = guardHistory({ source: "history" });
+      if(!gate.ok){
+        if(window.safeToast) window.safeToast(LICENSE_TEXT.historyPro, "warn");
+        return;
+      }
+      showJob(true);
+    });
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
     if(!project.historyTriggerLogged){
       project.historyTriggerLogged = true;
