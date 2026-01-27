@@ -2598,13 +2598,34 @@ body, #appRoot, .appRoot, .mainLayout{
   border-bottom:1px solid rgba(255,255,255,0.08);
   flex-wrap:nowrap;
 }
-.proFileDockLeft{ display:flex; gap:6px; flex-wrap:nowrap; }
-.proFileDockRight{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; justify-content:flex-end; }
+.proFileDockLeft{ display:flex; gap:6px; flex-wrap:nowrap; flex:1 1 auto; min-width:0; overflow:hidden; }
+.proFileDockRight{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; justify-content:flex-end; min-width:0; }
 .proOnlyWrap{
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.proOnlyWrap .btn{
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  padding: 9px 8px;
+}
+.proOnlyWrap .btnLabel{
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  word-break: keep-all;
+  display: block;
 }
 .proOnlyWrap .proBadge{
   display: none;
@@ -2615,6 +2636,8 @@ body, #appRoot, .appRoot, .mainLayout{
   border: 1px solid rgba(251,191,36,.65);
   color: rgba(251,191,36,.95);
   background: rgba(15,23,42,.6);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .proOnlyWrap .proTooltip{
   position: absolute;
@@ -2648,6 +2671,7 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
+.proFilterWrap{ min-width: 0; flex: 1 1 auto; }
 #proFilterStatus{
   appearance: none;
   -webkit-appearance: none;
@@ -2659,6 +2683,8 @@ body, #appRoot, .appRoot, .mainLayout{
   background: rgba(255,255,255,.06);
   color: rgba(240,242,246,.95);
   outline: none;
+  min-width: 0;
+  max-width: 100%;
 }
 #proFilterStatus:focus{
   border-color: rgba(103,167,255,.55);
@@ -2793,11 +2819,31 @@ body, #appRoot, .appRoot, .mainLayout{
 .proCueBtn{ border-color:rgba(56,189,248,.45); color:#bae6fd; }
 .proClipBtn{ border-color:rgba(255,255,255,0.2); }
 .miniIcon{ width:12px; height:12px; display:inline-block; }
+.proFileDockTop .btn,
+.proFileDockTop .proJobMini{
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
 .proJobMini{
   font-size:12px; padding:2px 10px; border-radius:999px;
   background:rgba(255,255,255,0.10);
   user-select:none; cursor:pointer;
   border:1px solid rgba(255,255,255,0.10);
+  display:inline-flex;
+  align-items:center;
+  line-height:1.2;
+  min-width:44px;
+  flex:0 0 auto;
+}
+#proJobMiniText{
+  white-space: nowrap;
+  word-break: keep-all;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }
 .proGlobalPopover{
   position:fixed;
@@ -3704,18 +3750,18 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <div class="proOnlyWrap" id="proBtnBulkImportWrap">
-        <button id="proBtnBulkImport" class="btn" type="button">一括読み込み</button>
+        <button id="proBtnBulkImport" class="btn" type="button"><span class="btnLabel">一括読み込み</span></button>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
         <input accept=".wav,audio/wav,audio/wave" hidden="" id="proBulkInput" multiple="" type="file"/>
       </div>
       <div class="proOnlyWrap" id="proBtnBatchCheckWrap">
-        <button id="proBtnBatchCheck" class="btn" type="button">一括チェック</button>
+        <button id="proBtnBatchCheck" class="btn" type="button"><span class="btnLabel">一括チェック</span></button>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
       <div class="proOnlyWrap" id="proBtnBatchExportWrap">
-        <button id="proBtnBatchExport" class="btn" type="button">まとめて書き出し</button>
+        <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
@@ -4135,7 +4181,6 @@ body, #appRoot, .appRoot, .mainLayout{
             <button class="btn danger" id="settingsCleanupNow" type="button">今すぐ完全クリーンアップ</button>
             <button class="btn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
           </div>
-          <div class="settingsHint">保存ルールを無視してバックアップを可能な限り削除します</div>
           <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
           <div class="muted" id="settingsCleanupResult"></div>
           <div class="muted" id="settingsCleanupProgress"></div>
