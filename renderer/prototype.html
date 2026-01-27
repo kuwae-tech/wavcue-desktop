@@ -2598,13 +2598,32 @@ body, #appRoot, .appRoot, .mainLayout{
   border-bottom:1px solid rgba(255,255,255,0.08);
   flex-wrap:nowrap;
 }
-.proFileDockLeft{ display:flex; gap:6px; flex-wrap:nowrap; }
+.proFileDockLeft{ display:flex; gap:6px; flex-wrap:nowrap; flex:1 1 auto; min-width:0; overflow:hidden; }
 .proFileDockRight{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; justify-content:flex-end; }
 .proOnlyWrap{
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+.proOnlyWrap .btn{
+  flex: 0 1 auto;
+  min-width: 0;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.2;
+  padding: 9px 8px;
+}
+.proOnlyWrap .btnLabel{
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
 }
 .proOnlyWrap .proBadge{
   display: none;
@@ -2615,6 +2634,8 @@ body, #appRoot, .appRoot, .mainLayout{
   border: 1px solid rgba(251,191,36,.65);
   color: rgba(251,191,36,.95);
   background: rgba(15,23,42,.6);
+  flex: 0 0 auto;
+  white-space: nowrap;
 }
 .proOnlyWrap .proTooltip{
   position: absolute;
@@ -3704,18 +3725,18 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <div class="proOnlyWrap" id="proBtnBulkImportWrap">
-        <button id="proBtnBulkImport" class="btn" type="button">一括読み込み</button>
+        <button id="proBtnBulkImport" class="btn" type="button"><span class="btnLabel">一括読み込み</span></button>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
         <input accept=".wav,audio/wav,audio/wave" hidden="" id="proBulkInput" multiple="" type="file"/>
       </div>
       <div class="proOnlyWrap" id="proBtnBatchCheckWrap">
-        <button id="proBtnBatchCheck" class="btn" type="button">一括チェック</button>
+        <button id="proBtnBatchCheck" class="btn" type="button"><span class="btnLabel">一括チェック</span></button>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
       <div class="proOnlyWrap" id="proBtnBatchExportWrap">
-        <button id="proBtnBatchExport" class="btn" type="button">まとめて書き出し</button>
+        <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
