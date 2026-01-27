@@ -23,6 +23,8 @@ const store = new Store({
       autoCleanupOnQuit: false,
       autoCleanupOnStartup: false,
       autoBackupEnabled: true,
+      licenseKey: '',
+      licenseTier: 'demo',
       retentionDays: 30,
       backupQuotaGB: 5,
       minKeepCount: 20,
@@ -439,6 +441,44 @@ ipcMain.handle('window:is-maximized', (event) => {
 
 ipcMain.handle('settings:get', () => getSettings());
 ipcMain.handle('settings:set', (_event, patch) => setSettings(patch || {}));
+ipcMain.handle('license:get-state', () => {
+  const settings = getSettings() || {};
+  const tier = settings.licenseTier || 'demo';
+  return { tier };
+});
+ipcMain.handle('license:set-key', (_event, rawKey) => {
+  try {
+    const key = String(rawKey || '').trim();
+    let tier = 'demo';
+    let ok = true;
+    let reason;
+    if (!key) {
+      ok = false;
+      reason = 'empty';
+    } else if (key === 'WAVCUE_PRO_TEST') {
+      tier = 'pro';
+    } else if (key === 'WAVCUE_STD_TEST') {
+      tier = 'standard';
+    } else if (key === 'WAVCUE_DEMO') {
+      tier = 'demo';
+    } else {
+      ok = false;
+      reason = 'invalid';
+    }
+    setSettings({ licenseKey: key, licenseTier: tier });
+    return { ok, tier, reason };
+  } catch (error) {
+    return { ok: false, tier: 'demo', reason: 'exception' };
+  }
+});
+ipcMain.handle('license:clear', () => {
+  try {
+    setSettings({ licenseKey: '', licenseTier: 'demo' });
+    return { ok: true, tier: 'demo' };
+  } catch (error) {
+    return { ok: false, tier: 'demo', reason: 'exception' };
+  }
+});
 ipcMain.handle('settings:ensure-default-folders', () => ensureDefaultFolders());
 ipcMain.handle('settings:open-folder', async (_event, kind) => {
   if (kind === 'reports') {

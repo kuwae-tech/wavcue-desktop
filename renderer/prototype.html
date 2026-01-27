@@ -4220,6 +4220,234 @@ body, #appRoot, .appRoot, .mainLayout{
   };
 })();
 
+/* ===============================
+   License Core (single safe API)
+================================ */
+const LicenseCore = (()=> {
+  const listeners = new Set();
+  const tierRank = { demo: 0, standard: 1, pro: 2 };
+  const policy = {
+    bulkImport: { minTier: "pro", reason: "pro-only" },
+    bulkCheck: { minTier: "pro", reason: "pro-only" },
+    bulkExport: { minTier: "pro", reason: "pro-only" },
+    export: { minTier: "standard", reason: "standard-required" },
+  };
+  const stateCache = {
+    tier: "demo",
+    source: "fallback",
+    updatedAt: Date.now(),
+  };
+  const LS_STATE_KEYS = [
+    "wavcue_license_state",
+    "wavcue_license",
+    "wavcue_license_v1",
+    "wavcue_license_info",
+  ];
+  const LS_KEY_LAST = "wavcue_license_key";
+
+  const normalizeTier = (raw)=>{
+    const t = String(raw || "").toLowerCase();
+    if(!t) return null;
+    if(t.includes("pro")) return "pro";
+    if(t.includes("standard") || t.includes("std")) return "standard";
+    if(t.includes("demo") || t.includes("trial") || t.includes("free")) return "demo";
+    return null;
+  };
+
+  const normalizeState = (raw)=>{
+    if(!raw) return null;
+    if(typeof raw === "string"){
+      const tier = normalizeTier(raw);
+      return tier ? { tier } : null;
+    }
+    if(typeof raw === "object"){
+      const tier =
+        normalizeTier(raw.tier) ||
+        normalizeTier(raw.plan) ||
+        normalizeTier(raw.type) ||
+        normalizeTier(raw.licenseTier) ||
+        normalizeTier(raw.level) ||
+        normalizeTier(raw.product) ||
+        null;
+      const inferred =
+        tier ||
+        (raw.isPro ? "pro" : null) ||
+        (raw.isStandard ? "standard" : null) ||
+        (raw.isDemo ? "demo" : null);
+      return inferred ? { tier: inferred } : null;
+    }
+    return null;
+  };
+
+  const setCache = (next, source)=>{
+    if(!next || !next.tier) return stateCache;
+    stateCache.tier = next.tier;
+    stateCache.source = source || stateCache.source;
+    stateCache.updatedAt = Date.now();
+    listeners.forEach((fn)=>{ try{ fn({ ...stateCache }); }catch(_){ } });
+    return { ...stateCache };
+  };
+
+  const readLocalState = ()=>{
+    try{
+      if(!window.localStorage) return null;
+      for(const key of LS_STATE_KEYS){
+        const raw = localStorage.getItem(key);
+        if(!raw) continue;
+        try{
+          const parsed = JSON.parse(raw);
+          const norm = normalizeState(parsed);
+          if(norm) return norm;
+        }catch(_){
+          const norm = normalizeState(raw);
+          if(norm) return norm;
+        }
+      }
+    }catch(_){}
+    return null;
+  };
+
+  const readWindowSync = ()=>{
+    try{
+      const candidates = [
+        window.__wavcueLicenseState,
+        window.WavCue?.licenseState,
+        window.WavCue?.license,
+        window.wavcue?.licenseState,
+        window.wavcue?.licenseInfo,
+      ];
+      for(const raw of candidates){
+        const norm = normalizeState(raw);
+        if(norm) return norm;
+      }
+    }catch(_){}
+    return null;
+  };
+
+  const readWindowAsync = async ()=>{
+    const fns = [
+      window.wavcue?.getLicenseStateSafe,
+      window.wavcue?.getLicenseState,
+      window.wavcue?.getLicenseInfo,
+    ].filter((fn)=> typeof fn === "function");
+    for(const fn of fns){
+      try{
+        const res = await fn();
+        const norm = normalizeState(res);
+        if(norm) return norm;
+      }catch(_){}
+    }
+    return null;
+  };
+
+  const init = ()=>{
+    try{
+      const local = readLocalState();
+      if(local) setCache(local, "localStorage");
+      const sync = readWindowSync();
+      if(sync) setCache(sync, "window");
+      void readWindowAsync().then((asyncState)=>{
+        if(asyncState) setCache(asyncState, "windowAsync");
+      }).catch((e)=>{
+        console.error("[License] non-fatal", e);
+      });
+    }catch(e){
+      console.error("[License] non-fatal", e);
+    }
+    return { ...stateCache };
+  };
+
+  const getStateSafe = ()=>{
+    try{
+      const local = readLocalState();
+      if(local) return setCache(local, "localStorage");
+      const sync = readWindowSync();
+      if(sync) return setCache(sync, "window");
+      return { ...stateCache };
+    }catch(e){
+      console.error("[License] non-fatal", e);
+      return { tier: "demo", source: "fallback", updatedAt: Date.now() };
+    }
+  };
+
+  const guard = (action, ctx)=>{
+    try{
+      const st = getStateSafe();
+      const tier = (st && st.tier) ? st.tier : "demo";
+      const rule = policy[action] || { minTier: "demo" };
+      const ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
+      const reason = ok ? undefined : (rule.reason || "restricted");
+      const res = { ok, tier, reason };
+      const reasonTxt = reason ? ` reason=${reason}` : "";
+      console.log(`[License] tier=${tier} action=${action} ok=${ok ? 1 : 0}${reasonTxt}`);
+      return res;
+    }catch(e){
+      console.error("[License] non-fatal", e);
+      return { ok: true, tier: "demo" };
+    }
+  };
+
+  const setKeySafe = (key)=>{
+    try{
+      const value = String(key || "").trim();
+      if(!value) return { ok: false, reason: "empty" };
+      try{ localStorage?.setItem?.(LS_KEY_LAST, value); }catch(_){}
+      const fns = [
+        window.wavcue?.setLicenseKey,
+        window.wavcue?.activateLicense,
+        window.wavcue?.setLicense,
+      ].filter((fn)=> typeof fn === "function");
+      if(!fns.length) return { ok: true };
+      const res = fns[0](value);
+      if(res && typeof res.then === "function"){
+        res.then((next)=>{
+          const norm = normalizeState(next);
+          if(norm) setCache(norm, "activation");
+        }).catch((e)=>{
+          console.error("[License] non-fatal", e);
+        });
+      }else{
+        const norm = normalizeState(res);
+        if(norm) setCache(norm, "activation");
+      }
+      return { ok: true };
+    }catch(e){
+      console.error("[License] non-fatal", e);
+      return { ok: false, reason: "exception" };
+    }
+  };
+
+  const onChange = (fn)=>{
+    if(typeof fn !== "function") return ()=>{};
+    listeners.add(fn);
+    return ()=> listeners.delete(fn);
+  };
+
+  return { init, getStateSafe, guard, setKeySafe, onChange };
+})();
+window.WavCueLicense = {
+  init: LicenseCore.init,
+  getStateSafe: LicenseCore.getStateSafe,
+  guard: LicenseCore.guard,
+  setKeySafe: LicenseCore.setKeySafe,
+  onChange: LicenseCore.onChange,
+};
+LicenseCore.init();
+
+const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
+const guardBulkCheck = (ctx)=> LicenseCore.guard("bulkCheck", ctx);
+const guardBulkExport = (ctx)=> LicenseCore.guard("bulkExport", ctx);
+const guardExport = (ctx)=> LicenseCore.guard("export", ctx);
+window.guardBulkImport = guardBulkImport;
+window.guardBulkCheck = guardBulkCheck;
+window.guardBulkExport = guardBulkExport;
+window.guardExport = guardExport;
+window._guardBulkImport = guardBulkImport;
+window._guardBulkCheck = guardBulkCheck;
+window._guardBulkExport = guardBulkExport;
+window._guardExport = guardExport;
+window._guardExportSingle = guardExport;
+
 (() => {
 "use strict";
 
@@ -6166,6 +6394,13 @@ function setupDragAndDrop(){
         }
       }
       if(!files.length){ return; }
+      if(files.length > 1){
+        const gate = guardBulkImport({ count: files.length, source: "dnd" });
+        if(!gate.ok){
+          if(window.safeToast) window.safeToast("一括読み込みはProで利用できます。", "warn");
+          return;
+        }
+      }
       console.log(`[Pro] drop wavs=${files.length}`);
       const add = window.__wavcueProAddFiles;
       if(typeof add === "function"){
@@ -9820,6 +10055,11 @@ async function exportOneWithSave(options){
 }
 
 async function exportWav(){
+  const gate = guardExport({ source: "singleExport" });
+  if(!gate.ok){
+    if(window.safeToast) window.safeToast("書き出しはStandard以上で利用できます。", "warn");
+    return;
+  }
   const suggested = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
   await exportOneWithSave({
     saveHandler: _saveBlobWithFallback,
@@ -16284,6 +16524,18 @@ try{
     });
   }
   async function runJob(type, idsOverride){
+    const gate = (type === "export")
+      ? guardBulkExport({ source: "bulk", mode: type })
+      : guardBulkCheck({ source: "bulk", mode: type });
+    if(!gate.ok){
+      if(window.safeToast){
+        const msg = (type === "export")
+          ? "一括書き出しはProで利用できます。"
+          : "一括チェックはProで利用できます。";
+        window.safeToast(msg, "warn");
+      }
+      return;
+    }
     const usingOverride = Array.isArray(idsOverride);
     const targets = usingOverride ? idsOverride : getVisibleFileIds();
     const filterOn = project.filter.status && project.filter.status !== "all";

@@ -107,6 +107,21 @@ if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', injectWindowsDragStyles, { once: true });
 }
 
+const licenseSetKey = async (key) => {
+  try {
+    const res = await ipcRenderer.invoke('license:set-key', key);
+    const raw = String(key || '').trim();
+    const masked = raw
+      ? `${raw.slice(0, 4)}…(${raw.length})`
+      : '(empty)';
+    console.log(`[LicenseBridge] set key=${masked} tier=${res?.tier || 'demo'}`);
+    return res || { ok: false, tier: 'demo', reason: 'no-response' };
+  } catch (error) {
+    console.log('[LicenseBridge] set key=(error) tier=demo');
+    return { ok: false, tier: 'demo', reason: 'exception' };
+  }
+};
+
 contextBridge.exposeInMainWorld('wavcue', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
   setSettings: (patch) => ipcRenderer.invoke('settings:set', patch),
@@ -115,6 +130,23 @@ contextBridge.exposeInMainWorld('wavcue', {
   runCleanupNow: () => ipcRenderer.invoke('settings:run-cleanup-now'),
   runCompleteCleanup: () => ipcRenderer.invoke('settings:run-complete-cleanup'),
   getBackupStatus: () => ipcRenderer.invoke('settings:get-backup-status'),
+  setLicenseKey: licenseSetKey,
+  activateLicense: licenseSetKey,
+  setLicense: licenseSetKey,
+  getLicenseState: async () => {
+    try {
+      return await ipcRenderer.invoke('license:get-state');
+    } catch (error) {
+      return { tier: 'demo' };
+    }
+  },
+  clearLicenseKey: async () => {
+    try {
+      return await ipcRenderer.invoke('license:clear');
+    } catch (error) {
+      return { ok: false, tier: 'demo', reason: 'exception' };
+    }
+  },
   pickExportFolder: () => ipcRenderer.invoke('export:pickFolder'),
   writeFileBase64: (payload) => ipcRenderer.invoke('export:writeFileBase64', payload),
   saveExportFile: (payload) => ipcRenderer.invoke('export:saveFile', payload),
