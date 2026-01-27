@@ -109,6 +109,33 @@
   .headerActions .btnIcon{
     margin-right: 0;
   }
+  #tierBadge{
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.4px;
+    padding:4px 8px;
+    border-radius:999px;
+    border:1px solid rgba(148,163,184,.4);
+    background:rgba(148,163,184,.12);
+    color:rgba(226,232,240,.95);
+    text-transform:uppercase;
+    line-height:1;
+  }
+  #tierBadge.tierBadge--demo{
+    background:rgba(148,163,184,.16);
+    border-color:rgba(148,163,184,.4);
+    color:rgba(226,232,240,.92);
+  }
+  #tierBadge.tierBadge--standard{
+    background:rgba(59,130,246,.18);
+    border-color:rgba(59,130,246,.45);
+    color:rgba(191,219,254,.95);
+  }
+  #tierBadge.tierBadge--pro{
+    background:rgba(34,197,94,.18);
+    border-color:rgba(34,197,94,.45);
+    color:rgba(187,247,208,.95);
+  }
   .brand{
     display:flex;
     align-items:center;
@@ -3623,6 +3650,7 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="hdrMid"></div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
+    <span id="tierBadge" class="tierBadge--demo">DEMO</span>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
@@ -4387,7 +4415,7 @@ const LicenseCore = (()=> {
     }
   };
 
-  const setKeySafe = (key)=>{
+  const setKeySafe = async (key)=>{
     try{
       const value = String(key || "").trim();
       if(!value) return { ok: false, reason: "empty" };
@@ -4399,17 +4427,17 @@ const LicenseCore = (()=> {
       ].filter((fn)=> typeof fn === "function");
       if(!fns.length) return { ok: true };
       const res = fns[0](value);
+      let next = res;
       if(res && typeof res.then === "function"){
-        res.then((next)=>{
-          const norm = normalizeState(next);
-          if(norm) setCache(norm, "activation");
-        }).catch((e)=>{
+        try{
+          next = await res;
+        }catch(e){
           console.error("[License] non-fatal", e);
-        });
-      }else{
-        const norm = normalizeState(res);
-        if(norm) setCache(norm, "activation");
+          return { ok: false, reason: "activation-failed" };
+        }
       }
+      const norm = normalizeState(next);
+      if(norm) setCache(norm, "activation");
       return { ok: true };
     }catch(e){
       console.error("[License] non-fatal", e);
@@ -4433,6 +4461,34 @@ window.WavCueLicense = {
   onChange: LicenseCore.onChange,
 };
 LicenseCore.init();
+
+let _tierBadgeLast = null;
+const updateTierBadge = (state)=>{
+  try{
+    const badge = document.getElementById("tierBadge");
+    if(!badge) return;
+    const tierRaw = state && state.tier ? state.tier : "demo";
+    const tier = String(tierRaw).toLowerCase();
+    const label = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
+    badge.textContent = label;
+    badge.classList.remove("tierBadge--demo", "tierBadge--standard", "tierBadge--pro");
+    const cls = tier === "pro" ? "tierBadge--pro" : tier === "standard" ? "tierBadge--standard" : "tierBadge--demo";
+    badge.classList.add(cls);
+    if(tier !== _tierBadgeLast){
+      console.log(`[TierBadge] tier=${tier}`);
+      _tierBadgeLast = tier;
+    }
+  }catch(e){
+    console.error("[License] non-fatal", e);
+  }
+};
+
+Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
+  console.error("[License] non-fatal", e);
+});
+if(typeof window.WavCueLicense?.onChange === "function"){
+  window.WavCueLicense.onChange((st)=> updateTierBadge(st));
+}
 
 const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
 const guardBulkCheck = (ctx)=> LicenseCore.guard("bulkCheck", ctx);
