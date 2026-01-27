@@ -4394,8 +4394,11 @@ const LicenseCore = (()=> {
     presetDemo: "プリセットはStandard以上で利用できます。",
     backupDemo: "Demoではバックアップ機能は利用できません。",
     demoNotice: "体験版です。1週間・書き出し20回までお試しできます。",
-    demoLockedBanner: "体験版の利用期限が終了しました。ライセンスをご購入ください。",
-    demoLockedToast: "体験版の利用期限が終了しました。ライセンスをご購入ください。",
+    demoExpiredBanner: "体験版の利用期限が終了しました。ライセンスを購入ください。",
+    demoExportLimitBanner: "体験版の書き出し回数（20回）に達しました。ライセンスを購入ください。",
+    demoExpiredToast: "体験版の利用期限が終了しました。ライセンスを購入ください。",
+    demoExportLimitToast: "体験版の書き出し回数（20回）に達しました。ライセンスを購入ください。",
+    standardAuthToast: "認証が切れました。ネット接続を確認して再認証してください。",
   });
   const policy = {
     bulkImport: { minTier: "pro", reason: "pro-only" },
@@ -4473,7 +4476,11 @@ const LicenseCore = (()=> {
     const remainingDays = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
     const remainingExports = Math.max(0, DEMO_EXPORT_MAX - exportOkCount);
     const isExpired = !!(expiresAt && stamp > expiresAt);
-    const isLocked = isExpired || remainingExports <= 0;
+    const isExportLimit = remainingExports <= 0;
+    const isLocked = isExpired || isExportLimit;
+    const demoBlockedReason = isExpired
+      ? "demo_expired"
+      : (isExportLimit ? "demo_export_limit" : null);
     return {
       activatedAt,
       expiresAt,
@@ -4481,7 +4488,9 @@ const LicenseCore = (()=> {
       exportOkCount,
       remainingExports,
       isExpired,
+      isExportLimit,
       isLocked,
+      demoBlockedReason,
     };
   };
   const getStandardInfo = (now)=>{
@@ -4490,11 +4499,16 @@ const LicenseCore = (()=> {
     const elapsed = lastOnlineOkAt ? Math.max(0, stamp - lastOnlineOkAt) : STANDARD_AUTH_FRESH_MS + 1;
     const remainingMs = Math.max(0, STANDARD_AUTH_FRESH_MS - elapsed);
     const remainingMinutes = Math.max(0, Math.ceil(remainingMs / (60 * 1000)));
-    const isAuthFresh = remainingMs > 0;
+    const expiresAt = lastOnlineOkAt ? (lastOnlineOkAt + STANDARD_AUTH_FRESH_MS) : null;
+    const isValidNow = remainingMs > 0;
     return {
-      isAuthFresh,
-      lastOnlineOkAt,
-      remainingMinutes,
+      auth: {
+        lastOkAt: lastOnlineOkAt,
+        expiresAt,
+        isValidNow,
+        remainingMinutes,
+      },
+      exportBlockedReason: isValidNow ? null : "standard_auth_expired",
     };
   };
 
@@ -4615,12 +4629,12 @@ const LicenseCore = (()=> {
 
   const init = ()=>{
     try{
-      const local = readLocalState();
-      if(local) setCache(local, "localStorage");
-      const sync = readWindowSync();
-      if(sync) setCache(sync, "window");
+      _refreshState("init", { touchOnline: true });
       void readWindowAsync().then((asyncState)=>{
-        if(asyncState) setCache(asyncState, "windowAsync");
+        if(asyncState){
+          setCache(asyncState, "windowAsync");
+          _refreshState("async", { touchOnline: true });
+        }
       }).catch((e)=>{
         console.error("[License] non-fatal", e);
       });
@@ -4644,16 +4658,40 @@ const LicenseCore = (()=> {
   const getStateSafeInternal = (options = {})=>{
     try{
       const local = readLocalState();
-      if(local) return buildState(setCache(local, "localStorage"), options);
+      if(local) return buildState({ ...stateCache, ...local }, options);
       const sync = readWindowSync();
-      if(sync) return buildState(setCache(sync, "window"), options);
+      if(sync) return buildState({ ...stateCache, ...sync }, options);
       return buildState({ ...stateCache }, options);
     }catch(e){
       console.error("[License] non-fatal", e);
       return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
     }
   };
-  const getStateSafe = ()=> getStateSafeInternal({ touchOnline: true });
+
+  let _lastRefreshSummary = "";
+  const _refreshState = (reason, options = {})=>{
+    const next = getStateSafeInternal({ touchOnline: options.touchOnline });
+    stateCache.tier = next.tier;
+    stateCache.source = reason || stateCache.source;
+    stateCache.updatedAt = Date.now();
+    const payload = { ...stateCache, demo: next.demo, standard: next.standard };
+    listeners.forEach((fn)=>{ try{ fn(payload); }catch(_){ } });
+
+    const demoBlocked = next.demo?.demoBlockedReason || "none";
+    const stdValid = (next.standard?.auth?.isValidNow === false) ? "false" : "true";
+    const stdExpires = next.standard?.auth?.expiresAt || "n/a";
+    const summary = `${next.tier}|${demoBlocked}|${stdValid}|${stdExpires}`;
+    const isChange = summary !== _lastRefreshSummary;
+    const shouldLog = (reason === "debug" || reason === "key")
+      || (reason === "tick" && isChange);
+    if(shouldLog){
+      console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} demoBlocked=${demoBlocked} stdAuthValid=${stdValid} stdExpiresAt=${stdExpires}`);
+    }
+    if(isChange) _lastRefreshSummary = summary;
+    return payload;
+  };
+
+  const getStateSafe = ()=> _refreshState("get", { touchOnline: true });
 
   const isDemoLocked = (st)=> {
     const info = st?.demo || getDemoInfo(Date.now(), true);
@@ -4661,7 +4699,7 @@ const LicenseCore = (()=> {
   };
   const isStandardAuthFresh = (st)=>{
     const info = st?.standard || getStandardInfo(Date.now());
-    return !!info?.isAuthFresh;
+    return !!info?.auth?.isValidNow;
   };
 
   const guard = (action, ctx)=>{
@@ -4677,7 +4715,7 @@ const LicenseCore = (()=> {
       }
       if(action === "exportSingle" && tier === "demo" && isDemoLocked(st)){
         ok = false;
-        reason = "demo-locked";
+        reason = st?.demo?.demoBlockedReason || "demo_expired";
       }
       if(action === "preset" && tier === "demo"){
         ok = false;
@@ -4714,6 +4752,7 @@ const LicenseCore = (()=> {
       ].filter((fn)=> typeof fn === "function");
       if(!fns.length){
         if(keyTier) setCache({ tier: keyTier }, "activationKey");
+        _refreshState("key", { touchOnline: true });
         return { ok: true };
       }
       const res = fns[0](value);
@@ -4730,6 +4769,7 @@ const LicenseCore = (()=> {
       const decidedTier = decideTier(keyTier, norm?.tier);
       setCache({ tier: decidedTier }, norm ? "activation" : "activationKey");
       if(decidedTier === "standard") touchStandardLastOnlineOkAt(Date.now());
+      _refreshState("key", { touchOnline: true });
       return { ok: true };
     }catch(e){
       console.error("[License] non-fatal", e);
@@ -4756,65 +4796,88 @@ const LicenseCore = (()=> {
 
   const peekState = ()=> getStateSafeInternal({ touchOnline: false });
 
-  const notifyDebugChange = ()=>{
-    const st = getStateSafeInternal({ touchOnline: false });
-    stateCache.tier = st.tier;
-    stateCache.source = "debug";
-    stateCache.updatedAt = Date.now();
-    listeners.forEach((fn)=>{ try{ fn({ ...stateCache, demo: st.demo, standard: st.standard }); }catch(_){ } });
-    return st;
-  };
-
   const debug = {
     resetDemo: ()=>{
       resetDemoTrial();
-      notifyDebugChange();
+      _refreshState("debug", { touchOnline: false });
       console.log("[LicenseDebug] resetDemo");
     },
     setDemoActivatedAt: (ts)=>{
       const stamp = Number.isFinite(ts) ? ts : Date.now();
       writeNumber(LS_DEMO_ACTIVATED_AT, stamp);
-      notifyDebugChange();
+      _refreshState("debug", { touchOnline: false });
       console.log("[LicenseDebug] setDemoActivatedAt", stamp);
       return stamp;
     },
     forceDemoExpired: ()=>{
       const expiredAt = Date.now() - (DEMO_TRIAL_MS + 1000);
       writeNumber(LS_DEMO_ACTIVATED_AT, expiredAt);
-      notifyDebugChange();
+      _refreshState("debug", { touchOnline: false });
       console.log("[LicenseDebug] forceDemoExpired", expiredAt);
     },
     setDemoExportOkCount: (n)=>{
       const count = setDemoExportOkCount(n);
-      notifyDebugChange();
+      _refreshState("debug", { touchOnline: false });
       console.log("[LicenseDebug] setDemoExportOkCount", count);
       return count;
     },
     setStandardLastOnlineOkAt: (ms)=>{
       const stamp = Number.isFinite(ms) ? ms : Date.now();
       writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      notifyDebugChange();
+      _refreshState("debug", { touchOnline: false });
       console.log("[LicenseDebug] setStandardLastOnlineOkAt", stamp);
       return stamp;
     },
     setStandardAuthFresh: (fresh)=>{
       const stamp = fresh ? Date.now() : (Date.now() - (STANDARD_AUTH_FRESH_MS + 1000));
       writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      notifyDebugChange();
+      _refreshState("debug", { touchOnline: false });
       console.log("[LicenseDebug] setStandardAuthFresh", !!fresh);
       return stamp;
     },
     forceStandardAuthStale: ()=>{
       const stamp = Date.now() - (STANDARD_AUTH_FRESH_MS + 1000);
       writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      notifyDebugChange();
+      _refreshState("debug", { touchOnline: false });
       console.log("[LicenseDebug] forceStandardAuthStale", stamp);
       return stamp;
     },
     getDebugState: ()=>{
-      const st = getStateSafeInternal({ touchOnline: false });
+      const st = _refreshState("debug", { touchOnline: false });
       console.log("[LicenseDebug] state", st);
       return st;
+    },
+    expireDemoNow: ()=>{
+      const expiredAt = Date.now() - (DEMO_TRIAL_MS + 1000);
+      writeNumber(LS_DEMO_ACTIVATED_AT, expiredAt);
+      _refreshState("debug", { touchOnline: false });
+      console.log("[LicenseDebug] expireDemoNow");
+      return expiredAt;
+    },
+    resetDemoLimits: ()=>{
+      const now = Date.now();
+      writeNumber(LS_DEMO_ACTIVATED_AT, now);
+      writeNumber(LS_DEMO_EXPORT_OK_COUNT, 0);
+      _refreshState("debug", { touchOnline: false });
+      console.log("[LicenseDebug] resetDemoLimits");
+      return now;
+    },
+    setStandardAuthLastOkAt: (ms)=>{
+      const stamp = Number.isFinite(ms) ? ms : Date.now();
+      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
+      _refreshState("debug", { touchOnline: false });
+      console.log("[LicenseDebug] setStandardAuthLastOkAt", stamp);
+      return stamp;
+    },
+    expireStandardAuthNow: ()=>{
+      const stamp = Date.now() - (STANDARD_AUTH_FRESH_MS + 1000);
+      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
+      _refreshState("debug", { touchOnline: false });
+      console.log("[LicenseDebug] expireStandardAuthNow");
+      return stamp;
+    },
+    refreshLicense: ()=>{
+      return _refreshState("debug", { touchOnline: false });
     },
   };
 
@@ -4831,6 +4894,7 @@ const LicenseCore = (()=> {
     peekState,
     LICENSE_TEXT,
     debug,
+    refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
 })();
 window.WavCueLicense = {
@@ -4846,8 +4910,14 @@ window.WavCueLicense = {
   __debugSetDemoExportOkCount: LicenseCore.debug.setDemoExportOkCount,
   __debugSetStandardLastOnlineOkAt: LicenseCore.debug.setStandardLastOnlineOkAt,
   __debugSetStandardAuthFresh: LicenseCore.debug.setStandardAuthFresh,
+  __debugExpireDemoNow: LicenseCore.debug.expireDemoNow,
+  __debugResetDemoLimits: LicenseCore.debug.resetDemoLimits,
+  __debugSetStandardAuthLastOkAt: LicenseCore.debug.setStandardAuthLastOkAt,
+  __debugExpireStandardAuthNow: LicenseCore.debug.expireStandardAuthNow,
+  __debugRefreshLicense: LicenseCore.debug.refreshLicense,
 };
 LicenseCore.init();
+setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
 
 const LICENSE_TEXT = LicenseCore.LICENSE_TEXT;
 let _tierBadgeLast = null;
@@ -4906,11 +4976,19 @@ const applyLicenseUi = (state)=>{
     const tier = String(tierRaw).toLowerCase();
     const demoInfo = state?.demo;
     const isDemo = tier === "demo";
+    const demoBlockedReason = demoInfo?.demoBlockedReason || null;
     const isDemoLocked = isDemo && !!demoInfo?.isLocked;
+    const standardAuthValid = (tier === "standard") ? (state?.standard?.auth?.isValidNow !== false) : true;
     const banner = document.getElementById("licenseBanner");
     if(banner){
-      banner.textContent = isDemoLocked ? LICENSE_TEXT.demoLockedBanner : "";
-      banner.classList.toggle("show", isDemoLocked);
+      let bannerText = "";
+      if(isDemoLocked){
+        bannerText = (demoBlockedReason === "demo_export_limit")
+          ? LICENSE_TEXT.demoExportLimitBanner
+          : LICENSE_TEXT.demoExpiredBanner;
+      }
+      banner.textContent = bannerText;
+      banner.classList.toggle("show", !!bannerText);
     }
     if(isDemo && !_demoStartupNoticeShown){
       _demoStartupNoticeShown = true;
@@ -4931,6 +5009,9 @@ const applyLicenseUi = (state)=>{
       "pairSeconds",
     ].map(id=> document.getElementById(id));
     lockEditEls.forEach(el=> setDisabled(el, isDemoLocked));
+    if(tier === "standard"){
+      setDisabled(document.getElementById("btnExport"), !standardAuthValid);
+    }
 
     const presetDisabled = isDemo;
     const presetEls = [
@@ -7579,7 +7660,11 @@ const isDemoEditLocked = ()=>{
   }
 };
 const warnDemoLocked = ()=>{
-  if(window.safeToast) window.safeToast(LICENSE_TEXT.demoLockedToast, "warn");
+  if(!window.safeToast) return;
+  const st = LicenseCore.peekState?.();
+  const reason = st?.demo?.demoBlockedReason || "demo_expired";
+  if(reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
+  else window.safeToast(LICENSE_TEXT.demoExpiredToast, "warn");
 };
 function addCue(label){
   if(!state.buffer) return;
@@ -10654,8 +10739,9 @@ async function exportWav(){
   }
   if(!gate.ok){
     if(window.safeToast){
-      if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.exportAuthExpired, "warn");
-      else if(gate.reason === "demo-locked") window.safeToast(LICENSE_TEXT.demoLockedToast, "warn");
+      if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
+      else if(gate.reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
+      else if(gate.reason === "demo_expired") window.safeToast(LICENSE_TEXT.demoExpiredToast, "warn");
       else window.safeToast(LICENSE_TEXT.exportStandardRequired, "warn");
     }
     return;
@@ -10754,13 +10840,14 @@ if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
   const loaded = !!state.buffer;
   const st = LicenseCore.peekState?.();
   const demoLocked = st?.tier === "demo" && !!st?.demo?.isLocked;
+  const standardAuthValid = st?.tier === "standard" ? (st?.standard?.auth?.isValidNow !== false) : true;
   $("btnPlay").disabled = !loaded || state.isPlaying;
   $("btnPause").disabled = !loaded || !state.isPlaying;
   $("btnZoomIn").disabled = !loaded;
   $("btnZoomOut").disabled = !loaded;
   $("btnVZoomIn").disabled = !loaded;
   $("btnVZoomOut").disabled = !loaded;
-  $("btnExport").disabled = !loaded || demoLocked;
+  $("btnExport").disabled = !loaded || demoLocked || !standardAuthValid;
   if($("btnStdCheck")) $("btnStdCheck").disabled = !loaded || demoLocked;
   $("btnAddCustom").disabled = !loaded || demoLocked;
   $("btnAddPair").disabled = !loaded || demoLocked;
@@ -11992,8 +12079,9 @@ $("btnExport").addEventListener("click", async ()=>{
     }
     if(!gate.ok){
       if(window.safeToast){
-        if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.exportAuthExpired, "warn");
-        else if(gate.reason === "demo-locked") window.safeToast(LICENSE_TEXT.demoLockedToast, "warn");
+        if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
+        else if(gate.reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
+        else if(gate.reason === "demo_expired") window.safeToast(LICENSE_TEXT.demoExpiredToast, "warn");
         else window.safeToast(LICENSE_TEXT.exportStandardRequired, "warn");
       }
       return;
