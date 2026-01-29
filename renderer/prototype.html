@@ -147,6 +147,11 @@
     font-size:13px;
     font-weight:600;
   }
+  #licenseBanner.licenseBanner--standard{
+    border-color:rgba(251,191,36,.45);
+    background:rgba(251,191,36,.14);
+    color:rgba(254,243,199,.98);
+  }
   #licenseBanner.show{
     display:block;
   }
@@ -4398,7 +4403,8 @@ const LicenseCore = (()=> {
     demoExportLimitBanner: "体験版の書き出し回数（20回）に達しました。ライセンスを購入ください。",
     demoExpiredToast: "体験版の利用期限が終了しました。ライセンスを購入ください。",
     demoExportLimitToast: "体験版の書き出し回数（20回）に達しました。ライセンスを購入ください。",
-    standardAuthToast: "認証が切れました。ネット接続を確認して再認証してください。",
+    standardAuthToast: "Standard認証が切れました。書き出しのみ停止します。",
+    standardAuthBanner: "認証が切れています（書き出しのみ停止）。ネット接続を確認して再認証してください。",
   });
   const policy = {
     bulkImport: { minTier: "pro", reason: "pro-only" },
@@ -4414,6 +4420,7 @@ const LicenseCore = (()=> {
     source: "fallback",
     updatedAt: Date.now(),
   };
+  let _lastStdAuthValid = null;
   const DEMO_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
   const DEMO_EXPORT_MAX = 20;
   const STANDARD_AUTH_FRESH_MS = 60 * 60 * 1000;
@@ -4652,6 +4659,12 @@ const LicenseCore = (()=> {
     }
     const demo = getDemoInfo(now, tier === "demo");
     const standard = getStandardInfo(now);
+    if(tier === "standard"){
+      const stdValid = standard?.auth?.isValidNow !== false;
+      standard.exportBlockedReason = stdValid ? null : "standard_auth_expired";
+    }else{
+      standard.exportBlockedReason = null;
+    }
     return { ...base, tier, demo, standard };
   };
 
@@ -4680,12 +4693,24 @@ const LicenseCore = (()=> {
     const demoBlocked = next.demo?.demoBlockedReason || "none";
     const stdValid = (next.standard?.auth?.isValidNow === false) ? "false" : "true";
     const stdExpires = next.standard?.auth?.expiresAt || "n/a";
-    const summary = `${next.tier}|${demoBlocked}|${stdValid}|${stdExpires}`;
+    const stdBlocked = next.standard?.exportBlockedReason || "none";
+    const summary = `${next.tier}|${demoBlocked}|${stdValid}|${stdExpires}|${stdBlocked}`;
     const isChange = summary !== _lastRefreshSummary;
     const shouldLog = (reason === "debug" || reason === "key")
       || (reason === "tick" && isChange);
     if(shouldLog){
-      console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} demoBlocked=${demoBlocked} stdAuthValid=${stdValid} stdExpiresAt=${stdExpires}`);
+      console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} demoBlocked=${demoBlocked} stdAuthValid=${stdValid} stdExpiresAt=${stdExpires} stdExportBlocked=${stdBlocked}`);
+    }
+    if(next.tier === "standard"){
+      const currStdValid = next.standard?.auth?.isValidNow !== false;
+      if(_lastStdAuthValid === true && currStdValid === false){
+        if(typeof window.safeToast === "function"){
+          window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
+        }
+      }
+      _lastStdAuthValid = currStdValid;
+    }else{
+      _lastStdAuthValid = null;
     }
     if(isChange) _lastRefreshSummary = summary;
     return payload;
@@ -4982,12 +5007,17 @@ const applyLicenseUi = (state)=>{
     const banner = document.getElementById("licenseBanner");
     if(banner){
       let bannerText = "";
+      let isStandardBanner = false;
       if(isDemoLocked){
         bannerText = (demoBlockedReason === "demo_export_limit")
           ? LICENSE_TEXT.demoExportLimitBanner
           : LICENSE_TEXT.demoExpiredBanner;
+      }else if(tier === "standard" && !standardAuthValid){
+        bannerText = LICENSE_TEXT.standardAuthBanner;
+        isStandardBanner = true;
       }
       banner.textContent = bannerText;
+      banner.classList.toggle("licenseBanner--standard", isStandardBanner);
       banner.classList.toggle("show", !!bannerText);
     }
     if(isDemo && !_demoStartupNoticeShown){
