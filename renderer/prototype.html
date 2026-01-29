@@ -80,7 +80,7 @@
     min-width: 0;
     max-width: 55vw;
     overflow-x: auto;
-    overflow-y: visible;
+    overflow-y: hidden;
     white-space: nowrap;
     -webkit-app-region: no-drag;
   }
@@ -121,11 +121,6 @@
     text-transform:uppercase;
     line-height:1;
   }
-  #tierBadge .tierBadgeLabel{
-    display: inline-flex;
-    align-items: center;
-    line-height: 1;
-  }
   #tierBadge.tierBadge--demo{
     background:rgba(148,163,184,.16);
     border-color:rgba(148,163,184,.4);
@@ -140,34 +135,6 @@
     background:rgba(34,197,94,.18);
     border-color:rgba(34,197,94,.45);
     color:rgba(187,247,208,.95);
-  }
-  .demoRemainingAnchor{
-    position: relative;
-  }
-  .demoRemaining{
-    position: absolute;
-    left: 50%;
-    bottom: 100%;
-    transform: translate(-50%, -6px);
-    font-size: 11px;
-    line-height: 1;
-    letter-spacing: .2px;
-    opacity: .82;
-    color: rgba(226,232,240,.92);
-    white-space: nowrap;
-    pointer-events: none;
-    z-index: 4;
-    display: none;
-    align-items: center;
-    gap: 2px;
-  }
-  .demoRemaining.is-visible{
-    display: inline-flex;
-  }
-  .demoRemainingValue--low{
-    font-weight: 600;
-    color: rgba(255,255,255,.98);
-    text-shadow: 0 0 6px rgba(255,255,255,.28);
   }
   #licenseBanner{
     display:none;
@@ -185,6 +152,17 @@
     background:rgba(251,191,36,.14);
     color:rgba(254,243,199,.98);
   }
+  #licenseBanner.licenseBanner--demo{
+    border-color:rgba(148,163,184,.4);
+    background:rgba(148,163,184,.12);
+    color:rgba(226,232,240,.92);
+  }
+  #licenseBanner.licenseBanner--withChip{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
   #licenseBanner.licenseBanner--grace{
     align-items:center;
     justify-content:space-between;
@@ -201,10 +179,34 @@
     opacity:.85;
     white-space:nowrap;
   }
+  #licenseBanner .demoRemainingChip{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    font-size:11px;
+    font-weight:600;
+    padding:4px 8px;
+    border-radius:999px;
+    border:1px solid rgba(148,163,184,.35);
+    background:rgba(148,163,184,.12);
+    color:rgba(226,232,240,.9);
+    white-space:nowrap;
+  }
+  #licenseBanner .demoRemainingValue{
+    font-weight:600;
+  }
+  #licenseBanner .demoRemainingValue--low{
+    font-weight:700;
+    color:rgba(255,255,255,.98);
+    text-shadow:0 0 6px rgba(255,255,255,.28);
+  }
   #licenseBanner.show{
     display:block;
   }
   #licenseBanner.licenseBanner--grace.show{
+    display:flex;
+  }
+  #licenseBanner.licenseBanner--withChip.show{
     display:flex;
   }
   .brand{
@@ -3846,8 +3848,8 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
   <div class="hdrMid"></div>
   <div class="hdrRight">
-    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good demoRemainingAnchor" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し<span aria-hidden="true" class="demoRemaining demoRemaining--exports" id="demoRemainingExports"><span class="demoRemainingLabel">残り：</span><span class="demoRemainingValue" id="demoRemainingExportsValue">-</span><span class="demoRemainingSuffix">回</span></span></button></div>
-    <span id="tierBadge" class="tierBadge--demo demoRemainingAnchor"><span class="tierBadgeLabel">DEMO</span><span aria-hidden="true" class="demoRemaining demoRemaining--days" id="demoRemainingDays"><span class="demoRemainingLabel">残り：</span><span class="demoRemainingValue" id="demoRemainingDaysValue">-</span><span class="demoRemainingSuffix">日</span></span></span>
+    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
+    <span id="tierBadge" class="tierBadge--demo">DEMO</span>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
@@ -5128,12 +5130,10 @@ const updateTierBadge = (state)=>{
   try{
     const badge = document.getElementById("tierBadge");
     if(!badge) return;
-    const labelEl = badge.querySelector(".tierBadgeLabel");
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
     const label = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
-    if(labelEl) labelEl.textContent = label;
-    else badge.textContent = label;
+    badge.textContent = label;
     badge.classList.remove("tierBadge--demo", "tierBadge--standard", "tierBadge--pro");
     const cls = tier === "pro" ? "tierBadge--pro" : tier === "standard" ? "tierBadge--standard" : "tierBadge--demo";
     badge.classList.add(cls);
@@ -5174,35 +5174,74 @@ const applyProUi = (state)=>{
 
 let _demoStartupNoticeShown = false;
 let _demoExportNoticeShown = false;
-const updateDemoRemainingUi = (state)=>{
+const buildDemoRemainingParts = (remainingDays, remainingExports)=>{
+  const parts = [];
+  if(Number.isFinite(remainingDays)){
+    parts.push({ label: "日", value: remainingDays });
+  }
+  if(Number.isFinite(remainingExports)){
+    parts.push({ label: "回", value: remainingExports });
+  }
+  return parts;
+};
+const renderDemoRemainingNode = (parts)=>{
+  const root = document.createElement("span");
+  root.className = "demoRemainingText";
+  const label = document.createElement("span");
+  label.textContent = "DEMO 残り：";
+  root.appendChild(label);
+  parts.forEach((part, idx)=>{
+    const value = document.createElement("span");
+    value.className = "demoRemainingValue";
+    if(Number(part.value) <= 1) value.classList.add("demoRemainingValue--low");
+    value.textContent = String(part.value);
+    const suffix = document.createElement("span");
+    suffix.textContent = part.label;
+    root.appendChild(value);
+    root.appendChild(suffix);
+    if(idx < parts.length - 1){
+      const sep = document.createElement("span");
+      sep.textContent = " / ";
+      root.appendChild(sep);
+    }
+  });
+  return root;
+};
+const renderDemoRemainingChip = (parts)=>{
+  const chip = document.createElement("span");
+  chip.className = "demoRemainingChip";
+  const inner = renderDemoRemainingNode(parts);
+  chip.appendChild(inner);
+  return chip;
+};
+const updateDemoRemainingBanner = (state)=>{
   try{
-    const exportRemaining = document.getElementById("demoRemainingExports");
-    const exportRemainingValue = document.getElementById("demoRemainingExportsValue");
-    const daysRemaining = document.getElementById("demoRemainingDays");
-    const daysRemainingValue = document.getElementById("demoRemainingDaysValue");
-    const hasExportsEl = !!(exportRemaining && exportRemainingValue);
-    const hasDaysEl = !!(daysRemaining && daysRemainingValue);
+    const banner = document.getElementById("licenseBanner");
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
     const demoInfo = state?.demo;
     const isDemo = tier === "demo";
+    const isDemoLocked = isDemo && !!demoInfo?.isLocked;
     const remainingExports = Number.isFinite(demoInfo?.remainingExports) ? demoInfo.remainingExports : null;
     const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
-    console.debug("[DemoRemainingUI] update", { tier, remainingExports, remainingDays, hasExportsEl, hasDaysEl });
-    if(!exportRemaining || !exportRemainingValue || !daysRemaining || !daysRemainingValue) return;
-    if(!isDemo || remainingExports == null || remainingDays == null){
-      exportRemaining.classList.remove("is-visible");
-      daysRemaining.classList.remove("is-visible");
-      exportRemainingValue.classList.remove("demoRemainingValue--low");
-      daysRemainingValue.classList.remove("demoRemainingValue--low");
-      return;
+    const parts = buildDemoRemainingParts(remainingDays, remainingExports);
+    const hasRemaining = parts.length > 0;
+    const showDemoRemaining = isDemo && !isDemoLocked && hasRemaining;
+    const bannerMeta = state?.standard?.auth || {};
+    const standardInGrace = tier === "standard" && !!bannerMeta.isInGrace;
+    const standardHardExpired = tier === "standard" && !!bannerMeta.isHardExpired;
+    const hasStandardBanner = standardInGrace || standardHardExpired;
+    const hasDemoLockBanner = isDemoLocked;
+    let mode = "none";
+    if(hasStandardBanner || hasDemoLockBanner){
+      mode = showDemoRemaining ? "chip" : "banner";
+    }else if(showDemoRemaining){
+      mode = "demo";
     }
-    exportRemaining.classList.add("is-visible");
-    daysRemaining.classList.add("is-visible");
-    exportRemainingValue.textContent = String(remainingExports);
-    daysRemainingValue.textContent = String(remainingDays);
-    exportRemainingValue.classList.toggle("demoRemainingValue--low", remainingExports === 1);
-    daysRemainingValue.classList.toggle("demoRemainingValue--low", remainingDays === 1);
+    console.debug("[DemoRemainingBanner] update", { tier, remainingDays, remainingExports, rendered: mode !== "none", mode });
+    if(!banner) return;
+    if(mode === "none") return;
+    // Banner content is assembled in applyLicenseUi after this helper.
   }catch(e){
     console.error("[DemoRemainingUI] non-fatal", e);
   }
@@ -5215,6 +5254,10 @@ const applyLicenseUi = (state)=>{
     const isDemo = tier === "demo";
     const demoBlockedReason = demoInfo?.demoBlockedReason || null;
     const isDemoLocked = isDemo && !!demoInfo?.isLocked;
+    const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
+    const remainingExports = Number.isFinite(demoInfo?.remainingExports) ? demoInfo.remainingExports : null;
+    const demoParts = buildDemoRemainingParts(remainingDays, remainingExports);
+    const showDemoRemaining = isDemo && !isDemoLocked && demoParts.length > 0;
     const standardAuth = state?.standard?.auth || {};
     const standardInGrace = tier === "standard" && !!standardAuth.isInGrace;
     const standardHardExpired = tier === "standard" && !!standardAuth.isHardExpired;
@@ -5225,6 +5268,8 @@ const applyLicenseUi = (state)=>{
       let bannerMeta = "";
       let isStandardBanner = false;
       let isGraceBanner = false;
+      let isDemoBanner = false;
+      let hasChip = false;
       if(isDemoLocked){
         bannerText = (demoBlockedReason === "demo_export_limit")
           ? LICENSE_TEXT.demoExportLimitBanner
@@ -5252,10 +5297,19 @@ const applyLicenseUi = (state)=>{
           metaSpan.textContent = bannerMeta;
           banner.appendChild(metaSpan);
         }
+        if(showDemoRemaining){
+          banner.appendChild(renderDemoRemainingChip(demoParts));
+          hasChip = true;
+        }
+      }else if(showDemoRemaining){
+        banner.appendChild(renderDemoRemainingNode(demoParts));
+        isDemoBanner = true;
       }
       banner.classList.toggle("licenseBanner--standard", isStandardBanner);
       banner.classList.toggle("licenseBanner--grace", isGraceBanner);
-      banner.classList.toggle("show", !!bannerText);
+      banner.classList.toggle("licenseBanner--demo", isDemoBanner);
+      banner.classList.toggle("licenseBanner--withChip", hasChip);
+      banner.classList.toggle("show", !!bannerText || isDemoBanner);
     }
     if(isDemo && !_demoStartupNoticeShown){
       _demoStartupNoticeShown = true;
@@ -5325,7 +5379,7 @@ const applyLicenseUi = (state)=>{
   }catch(e){
     console.error("[License] non-fatal", e);
   }
-  try{ updateDemoRemainingUi(state); }catch(_){}
+  try{ updateDemoRemainingBanner(state); }catch(_){}
 };
 
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
@@ -10985,12 +11039,21 @@ async function _exportOneWithSaveImpl(options){
     }
 
     __exportOK = true;
+    let demoRemainingExportsAfter = null;
     try{ window.WavCueLicense?.recordExportOk?.(); }catch(_){}
     try{
       const stAfter = window.WavCueLicense?.getStateSafe?.();
-      if(stAfter) updateDemoRemainingUi(stAfter);
+      const remaining = stAfter?.demo?.remainingExports;
+      if(stAfter?.tier === "demo" && Number.isFinite(remaining)){
+        demoRemainingExportsAfter = remaining;
+      }
+      if(stAfter) applyLicenseUi(stAfter);
     }catch(_){}
-    log("OK: 書き出し完了");
+    if(demoRemainingExportsAfter != null){
+      log(`OK: 書き出しが完了しました（残り：${demoRemainingExportsAfter}回）`);
+    }else{
+      log("OK: 書き出し完了");
+    }
     return { ok:true, save:_saveRes };
   }catch(e){
     log(`ERROR: Export failed: ${e?.name||"Error"} ${e?.message||""}`);
