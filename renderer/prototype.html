@@ -350,7 +350,7 @@
   .scopeBox{
     border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.12);
   }
-  .meterBox{height:180px}
+  .meterBox{height:100%}
   .scopeBox{
     flex:1;
     min-width:0;
@@ -2809,17 +2809,57 @@ body, #appRoot, .appRoot, .mainLayout{
   box-shadow: 0 0 0 3px rgba(103,167,255,.18);
 }
 .proFilterWrap::after{
-  content: "▾";
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-52%);
-  pointer-events: none;
-  color: rgba(240,242,246,.65);
-  font-size: 12px;
+  content: none;
 }
-.proOnlyWrap.proOnlyDisabled.proFilterWrap::after{
-  opacity: .45;
+#proFilterSelectWrap{
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.proSelectNative{
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+#proFilterBtn.proSelectBtn{
+  height: 32px;
+  padding: 9px 10px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.proSelectChevron{ opacity: .8; }
+.proSelectMenu{
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  min-width: 160px;
+  z-index: 9999;
+  background: rgba(18,20,24,.98);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 12px 30px rgba(0,0,0,.35);
+  padding: 6px;
+}
+.proSelectItem{
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  color: var(--text);
+  padding: 8px 10px;
+  border-radius: 10px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.proSelectItem:hover{
+  background: rgba(255,255,255,.06);
+}
+.proSelectItem.isActive{
+  background: rgba(255,255,255,.10);
+  outline: 1px solid rgba(255,255,255,.12);
 }
 .proBottomRow,
 .bottomRow{
@@ -3404,7 +3444,7 @@ body, #appRoot, .appRoot, .mainLayout{
     max-height: 190px;
     flex: 0 0 190px;      /* “高さ”として固定。幅固定にはしない */
     box-sizing: border-box;
-    padding: 5px 10px;
+    padding: 5px 10px !important;
     overflow: hidden;     /* 行全体ははみ出しさせない */
   }
 
@@ -3438,6 +3478,9 @@ body, #appRoot, .appRoot, .mainLayout{
     height: 100% !important;
     min-height: 0 !important;
     max-height: none !important;
+  }
+  .bottomRow .fileListBox{
+    height: 100% !important;
   }
 
   /* ファイルリスト：残り幅全部。min-width:0 を必ず入れる（これが無いと width:0 が起きやすい） */
@@ -3552,6 +3595,11 @@ body, #appRoot, .appRoot, .mainLayout{
     height: 100% !important;
     border-radius: 12px !important;
     overflow: hidden !important;
+  }
+  .bottomRow .imagerBox,
+  .bottomRow .proImagerBox{
+    height: calc(100% - 6px) !important;
+    align-self: flex-start;
   }
 
   /* ファイルリスト：残り全部。幅0禁止。左下見切れ対策で内側padding */
@@ -3909,14 +3957,28 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div class="proFileDockRight">
       <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
-        <select id="proFilterStatus" class="proSelect btn">
-          <option value="all">全て</option>
-          <option value="unverified">未確認</option>
-          <option value="ok">規格OK</option>
-          <option value="ng">規格NG</option>
-          <option value="unexported">未書き出し</option>
-          <option value="exported">書き出し済み</option>
-        </select>
+        <div class="proSelectWrap" id="proFilterSelectWrap">
+          <button id="proFilterBtn" class="btn proSelectBtn" type="button" aria-haspopup="listbox" aria-expanded="false">
+            <span id="proFilterBtnLabel">全て</span>
+            <span class="proSelectChevron">▾</span>
+          </button>
+          <div id="proFilterMenu" class="proSelectMenu" role="listbox" aria-label="フィルター" hidden>
+            <button class="proSelectItem" type="button" data-value="all">全て</button>
+            <button class="proSelectItem" type="button" data-value="unverified">未確認</button>
+            <button class="proSelectItem" type="button" data-value="ok">規格OK</button>
+            <button class="proSelectItem" type="button" data-value="ng">規格NG</button>
+            <button class="proSelectItem" type="button" data-value="unexported">未書き出し</button>
+            <button class="proSelectItem" type="button" data-value="exported">書き出し済み</button>
+          </div>
+          <select id="proFilterStatus" class="proSelectNative" tabindex="-1" aria-hidden="true">
+            <option value="all">全て</option>
+            <option value="unverified">未確認</option>
+            <option value="ok">規格OK</option>
+            <option value="ng">規格NG</option>
+            <option value="unexported">未書き出し</option>
+            <option value="exported">書き出し済み</option>
+          </select>
+        </div>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
@@ -5191,12 +5253,12 @@ const applyProUi = (state)=>{
         const isSelect = btn.tagName === "SELECT";
         if(isSelect){
           btn.disabled = false;
+          btn.setAttribute("aria-hidden", "true");
+          btn.tabIndex = -1;
           if(!isPro){
             btn.setAttribute("aria-disabled", "true");
-            btn.tabIndex = -1;
           }else{
             btn.removeAttribute("aria-disabled");
-            btn.removeAttribute("tabindex");
           }
         }else if("disabled" in btn){
           btn.disabled = !isPro;
@@ -18131,6 +18193,59 @@ try{
       render();
       console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
     });
+    (function initProFilterCustom(){
+      const sel = document.getElementById('proFilterStatus');
+      const btn = document.getElementById('proFilterBtn');
+      const label = document.getElementById('proFilterBtnLabel');
+      const menu = document.getElementById('proFilterMenu');
+      const wrap = document.getElementById('proFilterSelectWrap') || document.getElementById('proFilterWrap');
+      if(!sel || !btn || !label || !menu || !wrap) return;
+
+      const close = ()=>{
+        menu.hidden = true;
+        btn.setAttribute('aria-expanded','false');
+      };
+      const open = ()=>{
+        menu.hidden = false;
+        btn.setAttribute('aria-expanded','true');
+      };
+      const sync = ()=>{
+        const opt = sel.options[sel.selectedIndex];
+        label.textContent = opt ? opt.textContent : '全て';
+        menu.querySelectorAll('.proSelectItem').forEach(el=>{
+          el.classList.toggle('isActive', el.getAttribute('data-value') === sel.value);
+        });
+      };
+
+      sync();
+
+      btn.addEventListener('click', (e)=>{
+        if(wrap.classList.contains('proOnlyDisabled')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        if(menu.hidden) open(); else close();
+      });
+
+      menu.addEventListener('click', (e)=>{
+        const item = e.target.closest('.proSelectItem');
+        if(!item) return;
+        const v = item.getAttribute('data-value') || 'all';
+        sel.value = v;
+        sel.dispatchEvent(new Event('change', { bubbles:true }));
+        sync();
+        close();
+      });
+
+      document.addEventListener('click', (e)=>{
+        if(menu.hidden) return;
+        if(!wrap.contains(e.target)) close();
+      });
+      document.addEventListener('keydown', (e)=>{
+        if(e.key === 'Escape') close();
+      });
+
+      sel.addEventListener('change', ()=>{ sync(); });
+    })();
 
     $('proBtnBulkImport')?.addEventListener('click', ()=>{
       const gate = guardBulkImport({ source: "button" });
