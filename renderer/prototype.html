@@ -152,6 +152,17 @@
     background:rgba(251,191,36,.14);
     color:rgba(254,243,199,.98);
   }
+  #licenseBanner.licenseBanner--demo{
+    border-color:rgba(148,163,184,.4);
+    background:rgba(148,163,184,.12);
+    color:rgba(226,232,240,.92);
+  }
+  #licenseBanner.licenseBanner--withChip{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
   #licenseBanner.licenseBanner--grace{
     align-items:center;
     justify-content:space-between;
@@ -168,10 +179,34 @@
     opacity:.85;
     white-space:nowrap;
   }
+  #licenseBanner .demoRemainingChip{
+    display:inline-flex;
+    align-items:center;
+    gap:4px;
+    font-size:11px;
+    font-weight:600;
+    padding:4px 8px;
+    border-radius:999px;
+    border:1px solid rgba(148,163,184,.35);
+    background:rgba(148,163,184,.12);
+    color:rgba(226,232,240,.9);
+    white-space:nowrap;
+  }
+  #licenseBanner .demoRemainingValue{
+    font-weight:600;
+  }
+  #licenseBanner .demoRemainingValue--low{
+    font-weight:700;
+    color:rgba(255,255,255,.98);
+    text-shadow:0 0 6px rgba(255,255,255,.28);
+  }
   #licenseBanner.show{
     display:block;
   }
   #licenseBanner.licenseBanner--grace.show{
+    display:flex;
+  }
+  #licenseBanner.licenseBanner--withChip.show{
     display:flex;
   }
   .brand{
@@ -4456,10 +4491,10 @@ const LicenseCore = (()=> {
     presetDemo: "プリセットはStandard以上で利用できます。",
     backupDemo: "Demoではバックアップ機能は利用できません。",
     demoNotice: "体験版です。1週間・書き出し20回までお試しできます。",
-    demoExpiredBanner: "体験版の利用期限が終了しました。ライセンスを購入ください。",
-    demoExportLimitBanner: "体験版の書き出し回数（20回）に達しました。ライセンスを購入ください。",
-    demoExpiredToast: "体験版の利用期限が終了しました。ライセンスを購入ください。",
-    demoExportLimitToast: "体験版の書き出し回数（20回）に達しました。ライセンスを購入ください。",
+    demoExpiredBanner: "体験版の利用期間が終了しました。ライセンスをご購入ください",
+    demoExportLimitBanner: "体験版の書き出し回数制限に達しました。ライセンスをご購入ください",
+    demoExpiredToast: "体験版の利用期間が終了しました。ライセンスをご購入ください",
+    demoExportLimitToast: "体験版の書き出し回数制限に達しました。ライセンスをご購入ください",
     standardAuthToast: "Standard認証が切れました。書き出しのみ停止します。",
     standardGraceModal: "Standard認証が切れました。1時間後に書き出しのみ停止します。\nネット接続を確認して再認証してください。",
     standardGraceBanner: "認証が切れています（猶予中）。ネット接続を確認して再認証してください。",
@@ -5139,6 +5174,78 @@ const applyProUi = (state)=>{
 
 let _demoStartupNoticeShown = false;
 let _demoExportNoticeShown = false;
+const buildDemoRemainingParts = (remainingDays, remainingExports)=>{
+  const parts = [];
+  if(Number.isFinite(remainingDays)){
+    parts.push({ label: "日", value: remainingDays });
+  }
+  if(Number.isFinite(remainingExports)){
+    parts.push({ label: "回", value: remainingExports });
+  }
+  return parts;
+};
+const renderDemoRemainingNode = (parts)=>{
+  const root = document.createElement("span");
+  root.className = "demoRemainingText";
+  const label = document.createElement("span");
+  label.textContent = "DEMO 残り：";
+  root.appendChild(label);
+  parts.forEach((part, idx)=>{
+    const value = document.createElement("span");
+    value.className = "demoRemainingValue";
+    if(Number(part.value) <= 1) value.classList.add("demoRemainingValue--low");
+    value.textContent = String(part.value);
+    const suffix = document.createElement("span");
+    suffix.textContent = part.label;
+    root.appendChild(value);
+    root.appendChild(suffix);
+    if(idx < parts.length - 1){
+      const sep = document.createElement("span");
+      sep.textContent = " / ";
+      root.appendChild(sep);
+    }
+  });
+  return root;
+};
+const renderDemoRemainingChip = (parts)=>{
+  const chip = document.createElement("span");
+  chip.className = "demoRemainingChip";
+  const inner = renderDemoRemainingNode(parts);
+  chip.appendChild(inner);
+  return chip;
+};
+const updateDemoRemainingBanner = (state)=>{
+  try{
+    const banner = document.getElementById("licenseBanner");
+    const tierRaw = state && state.tier ? state.tier : "demo";
+    const tier = String(tierRaw).toLowerCase();
+    const demoInfo = state?.demo;
+    const isDemo = tier === "demo";
+    const isDemoLocked = isDemo && !!demoInfo?.isLocked;
+    const remainingExports = Number.isFinite(demoInfo?.remainingExports) ? demoInfo.remainingExports : null;
+    const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
+    const parts = buildDemoRemainingParts(remainingDays, remainingExports);
+    const hasRemaining = parts.length > 0;
+    const showDemoRemaining = isDemo && !isDemoLocked && hasRemaining;
+    const bannerMeta = state?.standard?.auth || {};
+    const standardInGrace = tier === "standard" && !!bannerMeta.isInGrace;
+    const standardHardExpired = tier === "standard" && !!bannerMeta.isHardExpired;
+    const hasStandardBanner = standardInGrace || standardHardExpired;
+    const hasDemoLockBanner = isDemoLocked;
+    let mode = "none";
+    if(hasStandardBanner || hasDemoLockBanner){
+      mode = showDemoRemaining ? "chip" : "banner";
+    }else if(showDemoRemaining){
+      mode = "demo";
+    }
+    console.debug("[DemoRemainingBanner] update", { tier, remainingDays, remainingExports, rendered: mode !== "none", mode });
+    if(!banner) return;
+    if(mode === "none") return;
+    // Banner content is assembled in applyLicenseUi after this helper.
+  }catch(e){
+    console.error("[DemoRemainingUI] non-fatal", e);
+  }
+};
 const applyLicenseUi = (state)=>{
   try{
     const tierRaw = state && state.tier ? state.tier : "demo";
@@ -5147,6 +5254,10 @@ const applyLicenseUi = (state)=>{
     const isDemo = tier === "demo";
     const demoBlockedReason = demoInfo?.demoBlockedReason || null;
     const isDemoLocked = isDemo && !!demoInfo?.isLocked;
+    const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
+    const remainingExports = Number.isFinite(demoInfo?.remainingExports) ? demoInfo.remainingExports : null;
+    const demoParts = buildDemoRemainingParts(remainingDays, remainingExports);
+    const showDemoRemaining = isDemo && !isDemoLocked && demoParts.length > 0;
     const standardAuth = state?.standard?.auth || {};
     const standardInGrace = tier === "standard" && !!standardAuth.isInGrace;
     const standardHardExpired = tier === "standard" && !!standardAuth.isHardExpired;
@@ -5157,6 +5268,8 @@ const applyLicenseUi = (state)=>{
       let bannerMeta = "";
       let isStandardBanner = false;
       let isGraceBanner = false;
+      let isDemoBanner = false;
+      let hasChip = false;
       if(isDemoLocked){
         bannerText = (demoBlockedReason === "demo_export_limit")
           ? LICENSE_TEXT.demoExportLimitBanner
@@ -5184,10 +5297,19 @@ const applyLicenseUi = (state)=>{
           metaSpan.textContent = bannerMeta;
           banner.appendChild(metaSpan);
         }
+        if(showDemoRemaining){
+          banner.appendChild(renderDemoRemainingChip(demoParts));
+          hasChip = true;
+        }
+      }else if(showDemoRemaining){
+        banner.appendChild(renderDemoRemainingNode(demoParts));
+        isDemoBanner = true;
       }
       banner.classList.toggle("licenseBanner--standard", isStandardBanner);
       banner.classList.toggle("licenseBanner--grace", isGraceBanner);
-      banner.classList.toggle("show", !!bannerText);
+      banner.classList.toggle("licenseBanner--demo", isDemoBanner);
+      banner.classList.toggle("licenseBanner--withChip", hasChip);
+      banner.classList.toggle("show", !!bannerText || isDemoBanner);
     }
     if(isDemo && !_demoStartupNoticeShown){
       _demoStartupNoticeShown = true;
@@ -5257,6 +5379,7 @@ const applyLicenseUi = (state)=>{
   }catch(e){
     console.error("[License] non-fatal", e);
   }
+  try{ updateDemoRemainingBanner(state); }catch(_){}
 };
 
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
@@ -10916,9 +11039,21 @@ async function _exportOneWithSaveImpl(options){
     }
 
     __exportOK = true;
+    let demoRemainingExportsAfter = null;
     try{ window.WavCueLicense?.recordExportOk?.(); }catch(_){}
-
-    log("OK: 書き出し完了");
+    try{
+      const stAfter = window.WavCueLicense?.getStateSafe?.();
+      const remaining = stAfter?.demo?.remainingExports;
+      if(stAfter?.tier === "demo" && Number.isFinite(remaining)){
+        demoRemainingExportsAfter = remaining;
+      }
+      if(stAfter) applyLicenseUi(stAfter);
+    }catch(_){}
+    if(demoRemainingExportsAfter != null){
+      log(`OK: 書き出しが完了しました（残り：${demoRemainingExportsAfter}回）`);
+    }else{
+      log("OK: 書き出し完了");
+    }
     return { ok:true, save:_saveRes };
   }catch(e){
     log(`ERROR: Export failed: ${e?.name||"Error"} ${e?.message||""}`);
