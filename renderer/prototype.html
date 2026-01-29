@@ -136,6 +136,23 @@
     border-color:rgba(34,197,94,.45);
     color:rgba(187,247,208,.95);
   }
+  .tierBadgeWrap{
+    display:flex;
+    flex-direction:column;
+    align-items:flex-start;
+    gap:4px;
+    flex:0 0 auto;
+  }
+  .demoQuota{
+    display:none;
+    font-size:11px;
+    line-height:1.1;
+    opacity:.85;
+    white-space:nowrap;
+  }
+  .demoQuota .line2{
+    opacity:.9;
+  }
   #licenseBanner{
     display:none;
     margin:8px 16px 0;
@@ -3814,7 +3831,13 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="hdrMid"></div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
-    <span id="tierBadge" class="tierBadge--demo">DEMO</span>
+    <div class="tierBadgeWrap">
+      <span id="tierBadge" class="tierBadge--demo">DEMO</span>
+      <div id="demoQuota" class="demoQuota">
+        <div class="line1">残り: -日</div>
+        <div class="line2">-回</div>
+      </div>
+    </div>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
@@ -5091,6 +5114,7 @@ setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
 const LICENSE_TEXT = LicenseCore.LICENSE_TEXT;
 let _tierBadgeLast = null;
 let _proUiTierLast = null;
+let _demoQuotaLast = null;
 const updateTierBadge = (state)=>{
   try{
     const badge = document.getElementById("tierBadge");
@@ -5108,6 +5132,39 @@ const updateTierBadge = (state)=>{
     }
   }catch(e){
     console.error("[License] non-fatal", e);
+  }
+};
+
+const updateDemoQuotaUI = (state)=>{
+  try{
+    const quota = document.getElementById("demoQuota");
+    if(!quota) return;
+    if(!state){
+      quota.style.display = "none";
+      return;
+    }
+    const tierRaw = state && state.tier ? state.tier : "demo";
+    const tier = String(tierRaw).toLowerCase();
+    if(tier !== "demo"){
+      quota.style.display = "none";
+      return;
+    }
+    const remainingDaysRaw = state?.demo?.remainingDays;
+    const remainingExportsRaw = state?.demo?.remainingExports;
+    const remainingDays = Number.isFinite(remainingDaysRaw) ? remainingDaysRaw : "-";
+    const remainingExports = Number.isFinite(remainingExportsRaw) ? remainingExportsRaw : "-";
+    const line1 = quota.querySelector(".line1");
+    const line2 = quota.querySelector(".line2");
+    if(line1) line1.textContent = `残り: ${remainingDays}日`;
+    if(line2) line2.textContent = `${remainingExports}回`;
+    quota.style.display = "block";
+    const snapshot = `${remainingDays}|${remainingExports}`;
+    if(snapshot !== _demoQuotaLast){
+      console.log(`[DemoQuota] days=${remainingDays} exports=${remainingExports}`);
+      _demoQuotaLast = snapshot;
+    }
+  }catch(e){
+    console.error("[DemoQuota] non-fatal", e);
   }
 };
 
@@ -5262,6 +5319,9 @@ const applyLicenseUi = (state)=>{
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
   console.error("[License] non-fatal", e);
 });
+Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateDemoQuotaUI).catch((e)=>{
+  console.error("[DemoQuota] non-fatal", e);
+});
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyProUi).catch((e)=>{
   console.error("[ProUI] non-fatal", e);
 });
@@ -5270,6 +5330,7 @@ Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyLicenseUi).cat
 });
 if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> updateTierBadge(st));
+  window.WavCueLicense.onChange((st)=> updateDemoQuotaUI(st));
   window.WavCueLicense.onChange((st)=> applyProUi(st));
   window.WavCueLicense.onChange((st)=> applyLicenseUi(st));
 }
@@ -10917,6 +10978,15 @@ async function _exportOneWithSaveImpl(options){
 
     __exportOK = true;
     try{ window.WavCueLicense?.recordExportOk?.(); }catch(_){}
+    try{
+      const latestState = await window.WavCueLicense?.getStateSafe?.();
+      if(latestState?.tier === "demo"){
+        const remaining = latestState?.demo?.remainingExports;
+        const remainingText = Number.isFinite(remaining) ? remaining : "-";
+        if(window.safeToast) window.safeToast(`DEMO：残り${remainingText}回`, "info");
+      }
+      updateDemoQuotaUI(latestState);
+    }catch(_){}
 
     log("OK: 書き出し完了");
     return { ok:true, save:_saveRes };
