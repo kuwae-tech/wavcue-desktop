@@ -143,15 +143,18 @@
     gap:4px;
     flex:0 0 auto;
   }
-  .demoQuota{
+  .headerBtnStack{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    gap:4px;
+  }
+  .demoQuotaLabel{
     display:none;
     font-size:11px;
     line-height:1.1;
     opacity:.85;
     white-space:nowrap;
-  }
-  .demoQuota .line2{
-    opacity:.9;
   }
   #licenseBanner{
     display:none;
@@ -3830,13 +3833,10 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
   <div class="hdrMid"></div>
   <div class="hdrRight">
-    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
+    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><div class="headerBtnStack"><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button><div id="demoExportQuota" class="demoQuotaLabel"></div></div></div>
     <div class="tierBadgeWrap">
       <span id="tierBadge" class="tierBadge--demo">DEMO</span>
-      <div id="demoQuota" class="demoQuota">
-        <div class="line1">残り: -日</div>
-        <div class="line2">-回</div>
-      </div>
+      <div id="demoDaysQuota" class="demoQuotaLabel"></div>
     </div>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
@@ -5137,31 +5137,47 @@ const updateTierBadge = (state)=>{
 
 const updateDemoQuotaUI = (state)=>{
   try{
-    const quota = document.getElementById("demoQuota");
-    if(!quota) return;
+    const daysEl = document.getElementById("demoDaysQuota");
+    const exportsEl = document.getElementById("demoExportQuota");
+    if(!daysEl && !exportsEl) return;
     if(!state){
-      quota.style.display = "none";
+      if(daysEl) daysEl.style.display = "none";
+      if(exportsEl) exportsEl.style.display = "none";
       return;
     }
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
     if(tier !== "demo"){
-      quota.style.display = "none";
+      if(daysEl) daysEl.style.display = "none";
+      if(exportsEl) exportsEl.style.display = "none";
       return;
     }
     const remainingDaysRaw = state?.demo?.remainingDays;
     const remainingExportsRaw = state?.demo?.remainingExports;
-    const remainingDays = Number.isFinite(remainingDaysRaw) ? remainingDaysRaw : "-";
-    const remainingExports = Number.isFinite(remainingExportsRaw) ? remainingExportsRaw : "-";
-    const line1 = quota.querySelector(".line1");
-    const line2 = quota.querySelector(".line2");
-    if(line1) line1.textContent = `残り: ${remainingDays}日`;
-    if(line2) line2.textContent = `${remainingExports}回`;
-    quota.style.display = "block";
-    const snapshot = `${remainingDays}|${remainingExports}`;
-    if(snapshot !== _demoQuotaLast){
-      console.log(`[DemoQuota] days=${remainingDays} exports=${remainingExports}`);
-      _demoQuotaLast = snapshot;
+    const hasDays = Number.isFinite(remainingDaysRaw);
+    const hasExports = Number.isFinite(remainingExportsRaw);
+    if(daysEl){
+      if(hasDays){
+        daysEl.textContent = `残り：${remainingDaysRaw}日`;
+        daysEl.style.display = "block";
+      }else{
+        daysEl.style.display = "none";
+      }
+    }
+    if(exportsEl){
+      if(hasExports){
+        exportsEl.textContent = `残り：${remainingExportsRaw}回`;
+        exportsEl.style.display = "block";
+      }else{
+        exportsEl.style.display = "none";
+      }
+    }
+    if(hasDays || hasExports){
+      const snapshot = `${hasDays ? remainingDaysRaw : "none"}|${hasExports ? remainingExportsRaw : "none"}`;
+      if(snapshot !== _demoQuotaLast){
+        console.log(`[DemoQuota] days=${hasDays ? remainingDaysRaw : "-"} exports=${hasExports ? remainingExportsRaw : "-"}`);
+        _demoQuotaLast = snapshot;
+      }
     }
   }catch(e){
     console.error("[DemoQuota] non-fatal", e);
