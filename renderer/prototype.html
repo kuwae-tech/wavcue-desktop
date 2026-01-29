@@ -3802,6 +3802,162 @@ body, #appRoot, .appRoot, .mainLayout{
     align-items:center !important;
     gap:8px !important;
   }
+  /* ============================================================
+     FINAL OVERRIDES (Bottom layout truth)
+     - Fix meter bottom crop (rounded corners)
+     - Align meter/imager/file list bottoms
+     - Keep file dock controls sane (no scattered buttons)
+     ============================================================ */
+
+  /* ① bottomRow の高さを“1つ”に統一（他の競合は無視） */
+  :root{
+    --wcBottomH: 180px;      /* 現行デザイン前提。必要なら 190/200 へ微調整可 */
+    --wcBottomGap: 12px;
+    --wcBottomPad: 10px;
+    --wcMeterW: 120px;
+    --wcImagerS: 180px;      /* bottomHと合わせると正方形 */
+  }
+
+  /* bottomコンテナは必ずこの高さで、子はstretch */
+  .workBottom,
+  #analyzersRow,
+  .analyzersRow,
+  .analyzers,
+  .bottomRow,
+  .proBottomRow{
+    height: var(--wcBottomH) !important;
+    min-height: var(--wcBottomH) !important;
+    max-height: var(--wcBottomH) !important;
+    display: flex !important;
+    align-items: stretch !important;
+    gap: var(--wcBottomGap) !important;
+    padding: var(--wcBottomPad) !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;  /* はみ出しは許可しない */
+    transform: none !important;   /* 変な持ち上げ禁止 */
+  }
+
+  /* ② メーター：はみ出しの主因を潰す（box-sizing + padding 제거 + 100%） */
+  .meterBox,
+  .proMeterBox,
+  .meterBlock{
+    width: var(--wcMeterW) !important;
+    min-width: var(--wcMeterW) !important;
+    max-width: var(--wcMeterW) !important;
+    flex: 0 0 var(--wcMeterW) !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;          /* ←これが重要（見かけ高さ増加を防ぐ） */
+    box-sizing: border-box !important;
+    overflow: hidden !important;     /* 親で切られないよう、自分でクリップ */
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: stretch !important;
+  }
+
+  /* canvas は枠に追従 */
+  #meterCanvas{
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  /* ③ イメージャ：下端揃え（上に浮く原因を潰す） */
+  .imagerBox,
+  .proImagerBox,
+  .imagerBlock{
+    width: var(--wcImagerS) !important;
+    min-width: var(--wcImagerS) !important;
+    max-width: var(--wcImagerS) !important;
+    flex: 0 0 var(--wcImagerS) !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    align-items: stretch !important;
+    justify-content: stretch !important;
+    transform: none !important;
+    margin: 0 !important;
+  }
+  #imagerCanvas{
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
+  }
+
+  /* ④ ファイルリスト：残り幅を全部、縦は100%で下端揃え */
+  .fileListBox,
+  .proFileListBox,
+  #proFileDock,
+  .proFileDock{
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    height: 100% !important;
+    min-height: 0 !important;
+    box-sizing: border-box !important;
+    overflow: hidden !important;
+    border-radius: 12px !important;
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  /* ⑤ “ボタン群＋フィルター” の位置を上げて、見切れ/右詰め過ぎを防ぐ */
+  .proFileDockTop{
+    flex: 0 0 auto !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: space-between !important;
+    gap: 8px !important;
+    padding: 4px 8px 6px !important;   /* ←上側を詰める（常識的に） */
+    flex-wrap: nowrap !important;
+    min-width: 0 !important;
+  }
+
+  /* 左右ブロックの折り返し/押し潰れ対策 */
+  .proFileDockLeft{
+    display: flex !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  .proFileDockRight{
+    display: flex !important;
+    gap: 6px !important;
+    align-items: center !important;
+    flex-wrap: nowrap !important;
+    justify-content: flex-end !important;
+    min-width: 0 !important;
+  }
+
+  /* フィルター等が “右に寄りすぎて見切れる” のを防ぐ（wrapのmin-width問題を潰す） */
+  .proOnlyWrap{
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+  .proOnlyWrap .btn,
+  .proOnlyWrap select{
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* リスト本体：上の余白を詰め、下端は切れない */
+  #proFileListWrap,
+  .proFileListWrap{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .proFileList{
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    overflow: auto !important;
+    padding: 4px 8px 10px !important;  /* ←上を詰めて左右との隙間感を揃える */
+  }
   /* ===== /UI adjustments ===== */
 </style></head><body>
 <div id="titlebarDrag"></div>
@@ -5426,6 +5582,19 @@ if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> applyProUi(st));
   window.WavCueLicense.onChange((st)=> applyLicenseUi(st));
 }
+(function(){
+  const log = ()=>{
+    const el = document.querySelector('.bottomRow') || document.querySelector('.proBottomRow');
+    if(!el) return;
+    const height = getComputedStyle(el)?.height;
+    console.log("[UI][bottom] FINAL_OVERRIDES applied", height);
+  };
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", ()=> requestAnimationFrame(log), { once: true });
+  }else{
+    requestAnimationFrame(log);
+  }
+})();
 
 const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
 const guardBulkCheck = (ctx)=> LicenseCore.guard("bulkCheck", ctx);
