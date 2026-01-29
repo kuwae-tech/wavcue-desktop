@@ -152,8 +152,27 @@
     background:rgba(251,191,36,.14);
     color:rgba(254,243,199,.98);
   }
+  #licenseBanner.licenseBanner--grace{
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
+  #licenseBanner .licenseBannerText{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+  }
+  #licenseBanner .licenseBannerMeta{
+    font-size:11px;
+    font-weight:600;
+    opacity:.85;
+    white-space:nowrap;
+  }
   #licenseBanner.show{
     display:block;
+  }
+  #licenseBanner.licenseBanner--grace.show{
+    display:flex;
   }
   .brand{
     display:flex;
@@ -676,6 +695,34 @@
     width:min(980px, calc(100% - 24px));
   }
   dialog::backdrop{background:rgba(2,6,23,.60);backdrop-filter: blur(6px)}
+  dialog.standardGraceDialog{
+    width:min(520px, calc(100% - 32px));
+    border-radius:16px;
+    border:1px solid rgba(148,163,184,.35);
+    background:rgba(15,23,42,.98);
+    padding:0;
+  }
+  dialog.standardGraceDialog .stdGraceBody{
+    padding:20px 22px 12px;
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+  }
+  dialog.standardGraceDialog .stdGraceTitle{
+    font-size:14px;
+    font-weight:700;
+  }
+  dialog.standardGraceDialog .stdGraceMsg{
+    font-size:13px;
+    line-height:1.6;
+    color:rgba(226,232,240,.92);
+  }
+  dialog.standardGraceDialog .stdGraceActions{
+    display:flex;
+    justify-content:flex-end;
+    gap:10px;
+    padding:0 22px 20px;
+  }
   .modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);position:relative}
   .dlgHead{position:relative}
   .dialogShell .modalHead,
@@ -3771,6 +3818,15 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
 </header>
 <div id="licenseBanner" role="status" aria-live="polite"></div>
+<dialog id="standardGraceDialog" class="standardGraceDialog" data-lock-close="1" aria-labelledby="standardGraceTitle" aria-describedby="standardGraceMessage">
+  <div class="stdGraceBody">
+    <div class="stdGraceTitle" id="standardGraceTitle">Standard認証のご案内</div>
+    <div class="stdGraceMsg" id="standardGraceMessage">Standard認証が切れました。1時間後に書き出しのみ停止します。ネット接続を確認して再認証してください。</div>
+  </div>
+  <div class="stdGraceActions">
+    <button class="btn primary" id="standardGraceOk" type="button">OK</button>
+  </div>
+</dialog>
 <div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
@@ -4404,6 +4460,8 @@ const LicenseCore = (()=> {
     demoExpiredToast: "体験版の利用期限が終了しました。ライセンスを購入ください。",
     demoExportLimitToast: "体験版の書き出し回数（20回）に達しました。ライセンスを購入ください。",
     standardAuthToast: "Standard認証が切れました。書き出しのみ停止します。",
+    standardGraceModal: "Standard認証が切れました。1時間後に書き出しのみ停止します。ネット接続を確認して再認証してください。",
+    standardGraceBanner: "認証が切れています（猶予中）。ネット接続を確認して再認証してください。",
     standardAuthBanner: "認証が切れています（書き出しのみ停止）。ネット接続を確認して再認証してください。",
   });
   const policy = {
@@ -4420,10 +4478,11 @@ const LicenseCore = (()=> {
     source: "fallback",
     updatedAt: Date.now(),
   };
-  let _lastStdAuthValid = null;
+  let _lastStdHardExpired = null;
   const DEMO_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
   const DEMO_EXPORT_MAX = 20;
   const STANDARD_AUTH_FRESH_MS = 60 * 60 * 1000;
+  const STANDARD_AUTH_GRACE_MS = 60 * 60 * 1000;
   const LS_STATE_KEYS = [
     "wavcue_license_state",
     "wavcue_license",
@@ -4434,6 +4493,9 @@ const LicenseCore = (()=> {
   const LS_DEMO_ACTIVATED_AT = "wavcue_demo_activated_at";
   const LS_DEMO_EXPORT_OK_COUNT = "wavcue_demo_export_ok_count";
   const LS_STANDARD_LAST_ONLINE_OK_AT = "wavcue_standard_last_online_ok_at";
+  const LS_STANDARD_GRACE_STARTED_AT = "wavcue_std_grace_started_at";
+  const LS_STANDARD_GRACE_EXPIRES_AT = "wavcue_std_grace_expires_at";
+  const LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT = "wavcue_std_grace_modal_shown_for_started_at";
 
   const readNumber = (key)=>{
     try{
@@ -4473,6 +4535,21 @@ const LicenseCore = (()=> {
     const stamp = Number.isFinite(now) ? now : Date.now();
     writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
     return stamp;
+  };
+  const readStandardGraceStartedAt = ()=> readNumber(LS_STANDARD_GRACE_STARTED_AT);
+  const readStandardGraceExpiresAt = ()=> readNumber(LS_STANDARD_GRACE_EXPIRES_AT);
+  const readStandardGraceModalShownFor = ()=> readNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT);
+  const writeStandardGraceState = (startedAt, expiresAt)=>{
+    writeNumber(LS_STANDARD_GRACE_STARTED_AT, startedAt);
+    writeNumber(LS_STANDARD_GRACE_EXPIRES_AT, expiresAt);
+  };
+  const clearStandardGraceState = ()=>{
+    writeNumber(LS_STANDARD_GRACE_STARTED_AT, null);
+    writeNumber(LS_STANDARD_GRACE_EXPIRES_AT, null);
+    writeNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT, null);
+  };
+  const markStandardGraceModalShownFor = (startedAt)=>{
+    writeNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT, startedAt);
   };
   const getDemoInfo = (now, ensureActivation)=>{
     const stamp = Number.isFinite(now) ? now : Date.now();
@@ -4515,7 +4592,6 @@ const LicenseCore = (()=> {
         isValidNow,
         remainingMinutes,
       },
-      exportBlockedReason: isValidNow ? null : "standard_auth_expired",
     };
   };
 
@@ -4659,9 +4735,40 @@ const LicenseCore = (()=> {
     }
     const demo = getDemoInfo(now, tier === "demo");
     const standard = getStandardInfo(now);
+    const strictAuth = standard?.auth?.isValidNow !== false;
+    let graceStartedAt = readStandardGraceStartedAt();
+    let graceExpiresAt = readStandardGraceExpiresAt();
     if(tier === "standard"){
-      const stdValid = standard?.auth?.isValidNow !== false;
-      standard.exportBlockedReason = stdValid ? null : "standard_auth_expired";
+      if(strictAuth){
+        if(graceStartedAt != null || graceExpiresAt != null || readStandardGraceModalShownFor() != null){
+          clearStandardGraceState();
+        }
+        graceStartedAt = null;
+        graceExpiresAt = null;
+      }else{
+        const hasGrace = Number.isFinite(graceStartedAt) && Number.isFinite(graceExpiresAt) && graceExpiresAt > graceStartedAt;
+        if(!hasGrace){
+          graceStartedAt = now;
+          graceExpiresAt = now + STANDARD_AUTH_GRACE_MS;
+          writeStandardGraceState(graceStartedAt, graceExpiresAt);
+        }
+      }
+    }
+    const graceEligible = tier === "standard";
+    const isInGrace = graceEligible && !strictAuth && Number.isFinite(graceExpiresAt) && now < graceExpiresAt;
+    const isHardExpired = graceEligible && !strictAuth && (!Number.isFinite(graceExpiresAt) || now >= graceExpiresAt);
+    const graceRemainingMinutes = isInGrace
+      ? Math.max(0, Math.ceil((graceExpiresAt - now) / (60 * 1000)))
+      : 0;
+    if(standard?.auth){
+      standard.auth.isInGrace = !!isInGrace;
+      standard.auth.isHardExpired = !!isHardExpired;
+      standard.auth.graceStartedAt = graceEligible && Number.isFinite(graceStartedAt) ? graceStartedAt : null;
+      standard.auth.graceExpiresAt = graceEligible && Number.isFinite(graceExpiresAt) ? graceExpiresAt : null;
+      standard.auth.graceRemainingMinutes = graceRemainingMinutes;
+    }
+    if(tier === "standard"){
+      standard.exportBlockedReason = isHardExpired ? "standard_auth_expired" : null;
     }else{
       standard.exportBlockedReason = null;
     }
@@ -4691,26 +4798,39 @@ const LicenseCore = (()=> {
     listeners.forEach((fn)=>{ try{ fn(payload); }catch(_){ } });
 
     const demoBlocked = next.demo?.demoBlockedReason || "none";
-    const stdValidNow = next.standard?.auth?.isValidNow !== false;
-    const stdValid = stdValidNow ? "true" : "false";
-    const stdExpires = next.standard?.auth?.expiresAt || "n/a";
+    const stdStrict = next.standard?.auth?.isValidNow !== false;
+    const stdInGrace = !!next.standard?.auth?.isInGrace;
+    const stdHardExpired = !!next.standard?.auth?.isHardExpired;
     const stdBlocked = next.standard?.exportBlockedReason || "none";
-    const summary = `${next.tier}|${demoBlocked}|${stdValid}|${stdExpires}|${stdBlocked}`;
+    const summary = `${next.tier}|${demoBlocked}|${stdStrict}|${stdInGrace}|${stdHardExpired}|${stdBlocked}`;
     const isChange = summary !== _lastRefreshSummary;
     const shouldLog = (reason === "debug" || reason === "key")
       || (reason === "tick" && isChange);
     if(shouldLog){
-      console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} demoBlocked=${demoBlocked} stdAuthValid=${stdValid} isValidNow=${stdValid} stdExpiresAt=${stdExpires} stdExportBlocked=${stdBlocked}`);
+      console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} strict=${stdStrict} grace=${stdInGrace} hard=${stdHardExpired} stdExportBlocked=${stdBlocked}`);
     }
     if(next.tier === "standard"){
-      if(_lastStdAuthValid === true && stdValidNow === false){
+      if(_lastStdHardExpired === false && stdHardExpired === true){
         if(typeof window.safeToast === "function"){
           window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
         }
       }
-      _lastStdAuthValid = stdValidNow;
+      _lastStdHardExpired = stdHardExpired;
+      if(stdInGrace){
+        const startedAt = next.standard?.auth?.graceStartedAt;
+        const shownFor = readStandardGraceModalShownFor();
+        if(Number.isFinite(startedAt) && shownFor !== startedAt){
+          const dlg = document.getElementById("standardGraceDialog");
+          if(dlg){
+            if(!dlg.open){
+              try{ dlg.showModal(); }catch(_){ dlg.open = true; }
+            }
+            markStandardGraceModalShownFor(startedAt);
+          }
+        }
+      }
     }else{
-      _lastStdAuthValid = null;
+      _lastStdHardExpired = null;
     }
     if(isChange) _lastRefreshSummary = summary;
     return payload;
@@ -4734,7 +4854,7 @@ const LicenseCore = (()=> {
       const rule = policy[action] || { minTier: "demo" };
       let ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
       let reason = ok ? undefined : (rule.reason || "restricted");
-      if(action === "exportSingle" && tier === "standard" && !isStandardAuthFresh(st)){
+      if(action === "exportSingle" && tier === "standard" && st?.standard?.auth?.isHardExpired){
         ok = false;
         reason = "standard-auth-expired";
       }
@@ -4901,6 +5021,27 @@ const LicenseCore = (()=> {
       console.log("[LicenseDebug] expireStandardAuthNow");
       return stamp;
     },
+    startStandardGraceNow: ()=>{
+      const now = Date.now();
+      const stamp = now - (STANDARD_AUTH_FRESH_MS + 1000);
+      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
+      writeStandardGraceState(now, now + STANDARD_AUTH_GRACE_MS);
+      writeNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT, null);
+      _refreshState("debug", { touchOnline: false });
+      console.log("[LicenseDebug] startStandardGraceNow", now);
+      return now;
+    },
+    forceStandardHardExpireNow: ()=>{
+      const now = Date.now();
+      const stamp = now - (STANDARD_AUTH_FRESH_MS + 1000);
+      const startedAt = now - (STANDARD_AUTH_GRACE_MS + 60 * 1000);
+      const expiresAt = now - (60 * 1000);
+      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
+      writeStandardGraceState(startedAt, expiresAt);
+      _refreshState("debug", { touchOnline: false });
+      console.log("[LicenseDebug] forceStandardHardExpireNow", { startedAt, expiresAt });
+      return { startedAt, expiresAt };
+    },
     refreshLicense: ()=>{
       return _refreshState("debug", { touchOnline: false });
     },
@@ -4939,6 +5080,8 @@ window.WavCueLicense = {
   __debugResetDemoLimits: LicenseCore.debug.resetDemoLimits,
   __debugSetStandardAuthLastOkAt: LicenseCore.debug.setStandardAuthLastOkAt,
   __debugExpireStandardAuthNow: LicenseCore.debug.expireStandardAuthNow,
+  __debugStartStandardGraceNow: LicenseCore.debug.startStandardGraceNow,
+  __debugForceStandardHardExpireNow: LicenseCore.debug.forceStandardHardExpireNow,
   __debugRefreshLicense: LicenseCore.debug.refreshLicense,
 };
 LicenseCore.init();
@@ -5003,21 +5146,46 @@ const applyLicenseUi = (state)=>{
     const isDemo = tier === "demo";
     const demoBlockedReason = demoInfo?.demoBlockedReason || null;
     const isDemoLocked = isDemo && !!demoInfo?.isLocked;
-    const standardAuthValid = (tier === "standard") ? (state?.standard?.auth?.isValidNow !== false) : true;
+    const standardAuth = state?.standard?.auth || {};
+    const standardInGrace = tier === "standard" && !!standardAuth.isInGrace;
+    const standardHardExpired = tier === "standard" && !!standardAuth.isHardExpired;
+    const standardExportAllowed = tier !== "standard" || !standardHardExpired;
     const banner = document.getElementById("licenseBanner");
     if(banner){
       let bannerText = "";
+      let bannerMeta = "";
       let isStandardBanner = false;
+      let isGraceBanner = false;
       if(isDemoLocked){
         bannerText = (demoBlockedReason === "demo_export_limit")
           ? LICENSE_TEXT.demoExportLimitBanner
           : LICENSE_TEXT.demoExpiredBanner;
-      }else if(tier === "standard" && !standardAuthValid){
+      }else if(tier === "standard" && standardInGrace){
+        bannerText = LICENSE_TEXT.standardGraceBanner;
+        if(Number.isFinite(standardAuth.graceRemainingMinutes) && standardAuth.graceRemainingMinutes > 0){
+          bannerMeta = `あと${standardAuth.graceRemainingMinutes}分`;
+        }
+        isStandardBanner = true;
+        isGraceBanner = true;
+      }else if(tier === "standard" && standardHardExpired){
         bannerText = LICENSE_TEXT.standardAuthBanner;
         isStandardBanner = true;
       }
-      banner.textContent = bannerText;
+      while(banner.firstChild) banner.removeChild(banner.firstChild);
+      if(bannerText){
+        const textSpan = document.createElement("span");
+        textSpan.className = "licenseBannerText";
+        textSpan.textContent = bannerText;
+        banner.appendChild(textSpan);
+        if(bannerMeta){
+          const metaSpan = document.createElement("span");
+          metaSpan.className = "licenseBannerMeta";
+          metaSpan.textContent = bannerMeta;
+          banner.appendChild(metaSpan);
+        }
+      }
       banner.classList.toggle("licenseBanner--standard", isStandardBanner);
+      banner.classList.toggle("licenseBanner--grace", isGraceBanner);
       banner.classList.toggle("show", !!bannerText);
     }
     if(isDemo && !_demoStartupNoticeShown){
@@ -5040,7 +5208,7 @@ const applyLicenseUi = (state)=>{
     ].map(id=> document.getElementById(id));
     lockEditEls.forEach(el=> setDisabled(el, isDemoLocked));
     if(tier === "standard"){
-      setDisabled(document.getElementById("btnExport"), !standardAuthValid);
+      setDisabled(document.getElementById("btnExport"), !standardExportAllowed);
     }
 
     const presetDisabled = isDemo;
@@ -5320,6 +5488,11 @@ function _dialogMarkDirty(e){
 function _wireDialogShell(dlg){
   if(!dlg || dlg.dataset.shellWired === "1") return;
   if(dlg.classList.contains("toastLayer")) return;
+  if(dlg.dataset.lockClose === "1"){
+    dlg.dataset.shellWired = "1";
+    dlg.addEventListener("cancel", (e)=>{ e.preventDefault(); });
+    return;
+  }
   dlg.dataset.shellWired = "1";
   dlg.classList.add("dialogShell");
   const head = dlg.querySelector(".modalHead, .dlgHead");
@@ -5351,10 +5524,26 @@ function _wireDialogShell(dlg){
 function _initDialogShells(){
   document.querySelectorAll("dialog").forEach(_wireDialogShell);
 }
-if(document.readyState === "loading"){
-  document.addEventListener("DOMContentLoaded", _initDialogShells);
-}else{
+function _initStandardGraceDialog(){
+  const dlg = $("standardGraceDialog");
+  const okBtn = $("standardGraceOk");
+  const msg = $("standardGraceMessage");
+  if(!dlg || !okBtn) return;
+  if(msg && typeof LICENSE_TEXT?.standardGraceModal === "string"){
+    msg.textContent = LICENSE_TEXT.standardGraceModal;
+  }
+  okBtn.addEventListener("click", ()=>{
+    try{ dlg.close(); }catch(_){ dlg.open = false; }
+  });
+}
+function _initUiDialogs(){
   _initDialogShells();
+  _initStandardGraceDialog();
+}
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", _initUiDialogs);
+}else{
+  _initUiDialogs();
 }
 
 
@@ -10870,14 +11059,14 @@ if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
   const loaded = !!state.buffer;
   const st = LicenseCore.peekState?.();
   const demoLocked = st?.tier === "demo" && !!st?.demo?.isLocked;
-  const standardAuthValid = st?.tier === "standard" ? (st?.standard?.auth?.isValidNow !== false) : true;
+  const standardExportAllowed = st?.tier === "standard" ? !st?.standard?.auth?.isHardExpired : true;
   $("btnPlay").disabled = !loaded || state.isPlaying;
   $("btnPause").disabled = !loaded || !state.isPlaying;
   $("btnZoomIn").disabled = !loaded;
   $("btnZoomOut").disabled = !loaded;
   $("btnVZoomIn").disabled = !loaded;
   $("btnVZoomOut").disabled = !loaded;
-  $("btnExport").disabled = !loaded || demoLocked || !standardAuthValid;
+  $("btnExport").disabled = !loaded || demoLocked || !standardExportAllowed;
   if($("btnStdCheck")) $("btnStdCheck").disabled = !loaded || demoLocked;
   $("btnAddCustom").disabled = !loaded || demoLocked;
   $("btnAddPair").disabled = !loaded || demoLocked;
