@@ -2696,7 +2696,7 @@ body, #appRoot, .appRoot, .mainLayout{
 .proFileDockTop{
   flex:0 0 auto;
   display:flex; align-items:center; justify-content:space-between; gap:8px;
-  padding:6px 8px 8px;
+  padding:4px 8px 6px;
   border-bottom:1px solid rgba(255,255,255,0.08);
   flex-wrap:nowrap;
 }
@@ -3537,7 +3537,7 @@ body, #appRoot, .appRoot, .mainLayout{
     height: 100% !important;
     border-radius: 12px !important;
     overflow: hidden !important;
-    padding: 8px 8px 14px 8px;   /* 左下見切れ対策 */
+    padding: 4px 8px 14px 8px;   /* 左下見切れ対策 */
     box-sizing: border-box !important;
   }
 
@@ -3778,6 +3778,30 @@ body, #appRoot, .appRoot, .mainLayout{
     height: var(--bottom-line-h);
     overflow: hidden;
   }
+  /* ==== FINAL OVERRIDES: PRO-only visual parity (must win) ==== */
+  #proFilterWrap.proOnlyDisabled #proFilterStatus{ display:none !important; }
+  #proFilterWrap.proOnlyDisabled #proFilterStub{ display:inline-flex !important; }
+  #proFilterWrap:not(.proOnlyDisabled) #proFilterStub{ display:none !important; }
+  #proFilterWrap.proOnlyDisabled::after{ content: none !important; }
+
+  /* 履歴ボタンを他.btnと同じ“PRO無効ボタン”の見た目に揃える（サイズだけ調整） */
+  #proJobMini.btn.proJobMini{
+    height:32px !important;
+    padding: 9px 10px !important;
+    border-radius:12px !important;
+    display:inline-flex !important;
+    align-items:center !important;
+    gap:8px !important;
+  }
+
+  #proFilterStub.btn.proFilterStub{
+    height:32px !important;
+    padding: 9px 10px !important;
+    border-radius:12px !important;
+    display:inline-flex !important;
+    align-items:center !important;
+    gap:8px !important;
+  }
   /* ===== /UI adjustments ===== */
 </style></head><body>
 <div id="titlebarDrag"></div>
@@ -3884,8 +3908,11 @@ body, #appRoot, .appRoot, .mainLayout{
       </div>
     </div>
     <div class="proFileDockRight">
-      <div class="proFilterWrap">
-        <select id="proFilterStatus" class="proSelect">
+      <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
+        <button id="proFilterStub" class="btn proFilterStub" type="button" aria-disabled="true">
+          <span class="btnLabel" id="proFilterStubLabel">全て</span>
+        </button>
+        <select id="proFilterStatus" class="proSelect btn">
           <option value="all">全て</option>
           <option value="unverified">未確認</option>
           <option value="ok">規格OK</option>
@@ -3893,11 +3920,13 @@ body, #appRoot, .appRoot, .mainLayout{
           <option value="unexported">未書き出し</option>
           <option value="exported">書き出し済み</option>
         </select>
+        <span class="proBadge">PRO</span>
+        <span class="proTooltip">Proで利用できます</span>
       </div>
       <div class="proOnlyWrap" id="proJobMiniWrap">
-        <div id="proJobMini" class="proJobMini" title="履歴">
+        <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
           <span id="proJobMiniText">履歴</span>
-        </div>
+        </button>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
@@ -5155,6 +5184,7 @@ const applyProUi = (state)=>{
       { wrapId: "proBtnBulkImportWrap", btnId: "proBtnBulkImport" },
       { wrapId: "proBtnBatchCheckWrap", btnId: "proBtnBatchCheck" },
       { wrapId: "proBtnBatchExportWrap", btnId: "proBtnBatchExport" },
+      { wrapId: "proFilterWrap", btnId: "proFilterStatus" },
       { wrapId: "proJobMiniWrap", btnId: "proJobMini" },
     ];
     configs.forEach(({ wrapId, btnId })=>{
@@ -18087,6 +18117,17 @@ try{
       render();
       console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
     });
+    (function(){
+      const sel = document.getElementById('proFilterStatus');
+      const lab = document.getElementById('proFilterStubLabel');
+      if(!sel || !lab) return;
+      const sync = ()=>{
+        const opt = sel.options[sel.selectedIndex];
+        lab.textContent = opt ? opt.textContent : '全て';
+      };
+      sync();
+      sel.addEventListener('change', sync);
+    })();
 
     $('proBtnBulkImport')?.addEventListener('click', ()=>{
       const gate = guardBulkImport({ source: "button" });
