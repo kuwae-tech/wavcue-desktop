@@ -346,11 +346,21 @@
     align-items:stretch;
     justify-content:stretch;
   }
-  .meterBox,
-  .scopeBox{
-    border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.12);
-  }
-  .meterBox{height:100%}
+.meterBox,
+.scopeBox{
+  border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.12);
+}
+.meterBox{
+  height:100%;
+  box-sizing: border-box;
+  padding: 6px 6px 10px 6px;
+}
+.meterBox canvas,
+#meterCanvas{
+  height: calc(100% - 10px) !important;
+  width: 100% !important;
+  display: block;
+}
   .scopeBox{
     flex:1;
     min-width:0;
@@ -2832,11 +2842,14 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proSelectChevron{ opacity: .8; }
 .proSelectMenu{
-  position: absolute;
+  position: fixed;
   top: calc(100% + 6px);
   left: 0;
   min-width: 160px;
-  z-index: 9999;
+  z-index: 2147483647;
+  max-height: 260px;
+  overflow: auto;
+  text-align: left;
   background: rgba(18,20,24,.98);
   border: 1px solid var(--line);
   border-radius: 12px;
@@ -18201,6 +18214,10 @@ try{
       const wrap = document.getElementById('proFilterSelectWrap') || document.getElementById('proFilterWrap');
       if(!sel || !btn || !label || !menu || !wrap) return;
 
+      if(menu.parentElement !== document.body){
+        document.body.appendChild(menu);
+      }
+
       const close = ()=>{
         menu.hidden = true;
         btn.setAttribute('aria-expanded','false');
@@ -18208,6 +18225,25 @@ try{
       const open = ()=>{
         menu.hidden = false;
         btn.setAttribute('aria-expanded','true');
+        const r = btn.getBoundingClientRect();
+        const margin = 8;
+        menu.style.position = 'fixed';
+        menu.style.top = `${Math.round(r.bottom + 6)}px`;
+        menu.style.minWidth = `${Math.round(r.width)}px`;
+        let left = Math.round(r.left);
+        menu.style.left = `${left}px`;
+        menu.style.right = 'auto';
+        const mw = menu.offsetWidth;
+        const maxLeft = window.innerWidth - margin - mw;
+        if(left > maxLeft) left = Math.max(margin, maxLeft);
+        menu.style.left = `${left}px`;
+        const mh = menu.offsetHeight;
+        const maxTop = window.innerHeight - margin - mh;
+        let top = Math.round(r.bottom + 6);
+        if(top > maxTop){
+          top = Math.max(margin, Math.round(r.top - 6 - mh));
+        }
+        menu.style.top = `${top}px`;
       };
       const sync = ()=>{
         const opt = sel.options[sel.selectedIndex];
@@ -18238,7 +18274,9 @@ try{
 
       document.addEventListener('click', (e)=>{
         if(menu.hidden) return;
-        if(!wrap.contains(e.target)) close();
+        if(btn.contains(e.target)) return;
+        if(menu.contains(e.target)) return;
+        close();
       });
       document.addEventListener('keydown', (e)=>{
         if(e.key === 'Escape') close();
