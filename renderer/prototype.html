@@ -80,7 +80,7 @@
     min-width: 0;
     max-width: 55vw;
     overflow-x: auto;
-    overflow-y: hidden;
+    overflow-y: visible;
     white-space: nowrap;
     -webkit-app-region: no-drag;
   }
@@ -135,6 +135,34 @@
     background:rgba(34,197,94,.18);
     border-color:rgba(34,197,94,.45);
     color:rgba(187,247,208,.95);
+  }
+  .demoRemainingAnchor{
+    position: relative;
+  }
+  .demoRemaining{
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 6px);
+    transform: translateX(-50%);
+    font-size: 11px;
+    line-height: 1;
+    letter-spacing: .2px;
+    opacity: .82;
+    color: rgba(226,232,240,.92);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 4;
+    display: none;
+    align-items: center;
+    gap: 2px;
+  }
+  .demoRemaining.is-visible{
+    display: inline-flex;
+  }
+  .demoRemainingValue--low{
+    font-weight: 600;
+    color: rgba(255,255,255,.98);
+    text-shadow: 0 0 6px rgba(255,255,255,.28);
   }
   #licenseBanner{
     display:none;
@@ -3813,8 +3841,8 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
   <div class="hdrMid"></div>
   <div class="hdrRight">
-    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
-    <span id="tierBadge" class="tierBadge--demo">DEMO</span>
+    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good demoRemainingAnchor" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し<span aria-hidden="true" class="demoRemaining demoRemaining--exports" id="demoRemainingExports"><span class="demoRemainingLabel">残り：</span><span class="demoRemainingValue" id="demoRemainingExportsValue">-</span><span class="demoRemainingSuffix">回</span></span></button></div>
+    <span id="tierBadge" class="tierBadge--demo demoRemainingAnchor">DEMO<span aria-hidden="true" class="demoRemaining demoRemaining--days" id="demoRemainingDays"><span class="demoRemainingLabel">残り：</span><span class="demoRemainingValue" id="demoRemainingDaysValue">-</span><span class="demoRemainingSuffix">日</span></span></span>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
@@ -5139,6 +5167,41 @@ const applyProUi = (state)=>{
 
 let _demoStartupNoticeShown = false;
 let _demoExportNoticeShown = false;
+let _demoRemainingUiShown = false;
+const updateDemoRemainingUi = (state)=>{
+  try{
+    const exportRemaining = document.getElementById("demoRemainingExports");
+    const exportRemainingValue = document.getElementById("demoRemainingExportsValue");
+    const daysRemaining = document.getElementById("demoRemainingDays");
+    const daysRemainingValue = document.getElementById("demoRemainingDaysValue");
+    if(!exportRemaining || !exportRemainingValue || !daysRemaining || !daysRemainingValue) return;
+    const tierRaw = state && state.tier ? state.tier : "demo";
+    const tier = String(tierRaw).toLowerCase();
+    const demoInfo = state?.demo;
+    const isDemo = tier === "demo";
+    const remainingExports = Number.isFinite(demoInfo?.remainingExports) ? demoInfo.remainingExports : null;
+    const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
+    if(!isDemo || remainingExports == null || remainingDays == null){
+      exportRemaining.classList.remove("is-visible");
+      daysRemaining.classList.remove("is-visible");
+      exportRemainingValue.classList.remove("demoRemainingValue--low");
+      daysRemainingValue.classList.remove("demoRemainingValue--low");
+      return;
+    }
+    exportRemaining.classList.add("is-visible");
+    daysRemaining.classList.add("is-visible");
+    exportRemainingValue.textContent = String(remainingExports);
+    daysRemainingValue.textContent = String(remainingDays);
+    exportRemainingValue.classList.toggle("demoRemainingValue--low", remainingExports === 1);
+    daysRemainingValue.classList.toggle("demoRemainingValue--low", remainingDays === 1);
+    if(!_demoRemainingUiShown){
+      console.log(`[DemoRemainingUI] shown exports=${remainingExports} days=${remainingDays}`);
+      _demoRemainingUiShown = true;
+    }
+  }catch(e){
+    console.error("[DemoRemainingUI] non-fatal", e);
+  }
+};
 const applyLicenseUi = (state)=>{
   try{
     const tierRaw = state && state.tier ? state.tier : "demo";
@@ -5257,6 +5320,7 @@ const applyLicenseUi = (state)=>{
   }catch(e){
     console.error("[License] non-fatal", e);
   }
+  try{ updateDemoRemainingUi(state); }catch(_){}
 };
 
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
@@ -10916,9 +10980,22 @@ async function _exportOneWithSaveImpl(options){
     }
 
     __exportOK = true;
+    let demoRemainingExportsAfter = null;
     try{ window.WavCueLicense?.recordExportOk?.(); }catch(_){}
-
-    log("OK: 書き出し完了");
+    try{
+      const stAfter = window.WavCueLicense?.getStateSafe?.();
+      const remaining = stAfter?.demo?.remainingExports;
+      if(stAfter?.tier === "demo" && Number.isFinite(remaining)){
+        demoRemainingExportsAfter = remaining;
+      }
+      if(stAfter) updateDemoRemainingUi(stAfter);
+    }catch(_){}
+    if(demoRemainingExportsAfter != null){
+      console.log(`[DemoExportToast] remainingExportsAfter=${demoRemainingExportsAfter}`);
+      log(`OK: 書き出し完了しました（残り：${demoRemainingExportsAfter}回）`);
+    }else{
+      log("OK: 書き出し完了");
+    }
     return { ok:true, save:_saveRes };
   }catch(e){
     log(`ERROR: Export failed: ${e?.name||"Error"} ${e?.message||""}`);
