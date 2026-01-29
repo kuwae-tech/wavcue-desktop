@@ -4691,7 +4691,8 @@ const LicenseCore = (()=> {
     listeners.forEach((fn)=>{ try{ fn(payload); }catch(_){ } });
 
     const demoBlocked = next.demo?.demoBlockedReason || "none";
-    const stdValid = (next.standard?.auth?.isValidNow === false) ? "false" : "true";
+    const stdValidNow = next.standard?.auth?.isValidNow !== false;
+    const stdValid = stdValidNow ? "true" : "false";
     const stdExpires = next.standard?.auth?.expiresAt || "n/a";
     const stdBlocked = next.standard?.exportBlockedReason || "none";
     const summary = `${next.tier}|${demoBlocked}|${stdValid}|${stdExpires}|${stdBlocked}`;
@@ -4699,16 +4700,15 @@ const LicenseCore = (()=> {
     const shouldLog = (reason === "debug" || reason === "key")
       || (reason === "tick" && isChange);
     if(shouldLog){
-      console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} demoBlocked=${demoBlocked} stdAuthValid=${stdValid} stdExpiresAt=${stdExpires} stdExportBlocked=${stdBlocked}`);
+      console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} demoBlocked=${demoBlocked} stdAuthValid=${stdValid} isValidNow=${stdValid} stdExpiresAt=${stdExpires} stdExportBlocked=${stdBlocked}`);
     }
     if(next.tier === "standard"){
-      const currStdValid = next.standard?.auth?.isValidNow !== false;
-      if(_lastStdAuthValid === true && currStdValid === false){
+      if(_lastStdAuthValid === true && stdValidNow === false){
         if(typeof window.safeToast === "function"){
           window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
         }
       }
-      _lastStdAuthValid = currStdValid;
+      _lastStdAuthValid = stdValidNow;
     }else{
       _lastStdAuthValid = null;
     }
@@ -4716,7 +4716,7 @@ const LicenseCore = (()=> {
     return payload;
   };
 
-  const getStateSafe = ()=> _refreshState("get", { touchOnline: true });
+  const getStateSafe = ()=> _refreshState("get", { touchOnline: false });
 
   const isDemoLocked = (st)=> {
     const info = st?.demo || getDemoInfo(Date.now(), true);
