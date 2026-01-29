@@ -2778,28 +2778,35 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
-.proFilterWrap{ min-width: 0; flex: 1 1 auto; }
+.proFilterWrap{
+  min-width: 0;
+  flex: 0 1 auto;
+  position: relative;
+}
 #proFilterStatus{
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   height: 32px;
-  padding: 0 34px 0 12px;
-  border-radius: 10px;
-  border: 1px solid rgba(255,255,255,.14);
-  background: rgba(255,255,255,.06);
-  color: rgba(240,242,246,.95);
+  padding: 9px 30px 9px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
   outline: none;
+  font-size: 12px;
+  line-height: 1;
   min-width: 0;
   max-width: 100%;
+}
+#proFilterStatus:disabled{
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  color: var(--text);
 }
 #proFilterStatus:focus{
   border-color: rgba(103,167,255,.55);
   box-shadow: 0 0 0 3px rgba(103,167,255,.18);
-}
-.proFilterWrap{
-  position: relative;
-  display: inline-block;
 }
 .proFilterWrap::after{
   content: "▾";
@@ -2810,6 +2817,12 @@ body, #appRoot, .appRoot, .mainLayout{
   pointer-events: none;
   color: rgba(240,242,246,.65);
   font-size: 12px;
+}
+.proOnlyWrap.proOnlyDisabled.proFilterWrap::after{
+  opacity: .45;
+}
+.workBottom.analyzersRow{
+  transform: translateY(-6px);
 }
 .proBottomRow,
 .bottomRow{
@@ -3884,8 +3897,8 @@ body, #appRoot, .appRoot, .mainLayout{
       </div>
     </div>
     <div class="proFileDockRight">
-      <div class="proFilterWrap">
-        <select id="proFilterStatus" class="proSelect">
+      <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
+        <select id="proFilterStatus" class="proSelect btn">
           <option value="all">全て</option>
           <option value="unverified">未確認</option>
           <option value="ok">規格OK</option>
@@ -3893,6 +3906,8 @@ body, #appRoot, .appRoot, .mainLayout{
           <option value="unexported">未書き出し</option>
           <option value="exported">書き出し済み</option>
         </select>
+        <span class="proBadge">PRO</span>
+        <span class="proTooltip">Proで利用できます</span>
       </div>
       <div class="proOnlyWrap" id="proJobMiniWrap">
         <div id="proJobMini" class="proJobMini" title="履歴">
@@ -5155,6 +5170,7 @@ const applyProUi = (state)=>{
       { wrapId: "proBtnBulkImportWrap", btnId: "proBtnBulkImport" },
       { wrapId: "proBtnBatchCheckWrap", btnId: "proBtnBatchCheck" },
       { wrapId: "proBtnBatchExportWrap", btnId: "proBtnBatchExport" },
+      { wrapId: "proFilterWrap", btnId: "proFilterStatus" },
       { wrapId: "proJobMiniWrap", btnId: "proJobMini" },
     ];
     configs.forEach(({ wrapId, btnId })=>{
@@ -5164,7 +5180,10 @@ const applyProUi = (state)=>{
       if(wrap) wrap.classList.toggle("proOnlyDisabled", !isPro);
     });
     if(tier !== _proUiTierLast){
+      const filterReady = !!document.getElementById("proFilterWrap");
+      const historyReady = !!document.getElementById("proJobMiniWrap");
       console.log(`[ProUI] tier=${tier} bulkButtons=${isPro ? "enabled" : "disabled"}`);
+      console.log(`[ProUI] bottomRow pro-only applied: tier=${tier}, targets={filter:${filterReady}, history:${historyReady}}`);
       _proUiTierLast = tier;
     }
   }catch(e){
