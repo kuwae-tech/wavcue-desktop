@@ -121,6 +121,11 @@
     text-transform:uppercase;
     line-height:1;
   }
+  #tierBadge .tierBadgeLabel{
+    display: inline-flex;
+    align-items: center;
+    line-height: 1;
+  }
   #tierBadge.tierBadge--demo{
     background:rgba(148,163,184,.16);
     border-color:rgba(148,163,184,.4);
@@ -142,8 +147,8 @@
   .demoRemaining{
     position: absolute;
     left: 50%;
-    top: calc(100% + 6px);
-    transform: translateX(-50%);
+    bottom: 100%;
+    transform: translate(-50%, -6px);
     font-size: 11px;
     line-height: 1;
     letter-spacing: .2px;
@@ -3842,7 +3847,7 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="hdrMid"></div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good demoRemainingAnchor" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し<span aria-hidden="true" class="demoRemaining demoRemaining--exports" id="demoRemainingExports"><span class="demoRemainingLabel">残り：</span><span class="demoRemainingValue" id="demoRemainingExportsValue">-</span><span class="demoRemainingSuffix">回</span></span></button></div>
-    <span id="tierBadge" class="tierBadge--demo demoRemainingAnchor">DEMO<span aria-hidden="true" class="demoRemaining demoRemaining--days" id="demoRemainingDays"><span class="demoRemainingLabel">残り：</span><span class="demoRemainingValue" id="demoRemainingDaysValue">-</span><span class="demoRemainingSuffix">日</span></span></span>
+    <span id="tierBadge" class="tierBadge--demo demoRemainingAnchor"><span class="tierBadgeLabel">DEMO</span><span aria-hidden="true" class="demoRemaining demoRemaining--days" id="demoRemainingDays"><span class="demoRemainingLabel">残り：</span><span class="demoRemainingValue" id="demoRemainingDaysValue">-</span><span class="demoRemainingSuffix">日</span></span></span>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
@@ -5123,10 +5128,12 @@ const updateTierBadge = (state)=>{
   try{
     const badge = document.getElementById("tierBadge");
     if(!badge) return;
+    const labelEl = badge.querySelector(".tierBadgeLabel");
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
     const label = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
-    badge.textContent = label;
+    if(labelEl) labelEl.textContent = label;
+    else badge.textContent = label;
     badge.classList.remove("tierBadge--demo", "tierBadge--standard", "tierBadge--pro");
     const cls = tier === "pro" ? "tierBadge--pro" : tier === "standard" ? "tierBadge--standard" : "tierBadge--demo";
     badge.classList.add(cls);
@@ -5167,20 +5174,22 @@ const applyProUi = (state)=>{
 
 let _demoStartupNoticeShown = false;
 let _demoExportNoticeShown = false;
-let _demoRemainingUiShown = false;
 const updateDemoRemainingUi = (state)=>{
   try{
     const exportRemaining = document.getElementById("demoRemainingExports");
     const exportRemainingValue = document.getElementById("demoRemainingExportsValue");
     const daysRemaining = document.getElementById("demoRemainingDays");
     const daysRemainingValue = document.getElementById("demoRemainingDaysValue");
-    if(!exportRemaining || !exportRemainingValue || !daysRemaining || !daysRemainingValue) return;
+    const hasExportsEl = !!(exportRemaining && exportRemainingValue);
+    const hasDaysEl = !!(daysRemaining && daysRemainingValue);
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
     const demoInfo = state?.demo;
     const isDemo = tier === "demo";
     const remainingExports = Number.isFinite(demoInfo?.remainingExports) ? demoInfo.remainingExports : null;
     const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
+    console.debug("[DemoRemainingUI] update", { tier, remainingExports, remainingDays, hasExportsEl, hasDaysEl });
+    if(!exportRemaining || !exportRemainingValue || !daysRemaining || !daysRemainingValue) return;
     if(!isDemo || remainingExports == null || remainingDays == null){
       exportRemaining.classList.remove("is-visible");
       daysRemaining.classList.remove("is-visible");
@@ -5194,10 +5203,6 @@ const updateDemoRemainingUi = (state)=>{
     daysRemainingValue.textContent = String(remainingDays);
     exportRemainingValue.classList.toggle("demoRemainingValue--low", remainingExports === 1);
     daysRemainingValue.classList.toggle("demoRemainingValue--low", remainingDays === 1);
-    if(!_demoRemainingUiShown){
-      console.log(`[DemoRemainingUI] shown exports=${remainingExports} days=${remainingDays}`);
-      _demoRemainingUiShown = true;
-    }
   }catch(e){
     console.error("[DemoRemainingUI] non-fatal", e);
   }
@@ -10980,22 +10985,12 @@ async function _exportOneWithSaveImpl(options){
     }
 
     __exportOK = true;
-    let demoRemainingExportsAfter = null;
     try{ window.WavCueLicense?.recordExportOk?.(); }catch(_){}
     try{
       const stAfter = window.WavCueLicense?.getStateSafe?.();
-      const remaining = stAfter?.demo?.remainingExports;
-      if(stAfter?.tier === "demo" && Number.isFinite(remaining)){
-        demoRemainingExportsAfter = remaining;
-      }
       if(stAfter) updateDemoRemainingUi(stAfter);
     }catch(_){}
-    if(demoRemainingExportsAfter != null){
-      console.log(`[DemoExportToast] remainingExportsAfter=${demoRemainingExportsAfter}`);
-      log(`OK: 書き出し完了しました（残り：${demoRemainingExportsAfter}回）`);
-    }else{
-      log("OK: 書き出し完了");
-    }
+    log("OK: 書き出し完了");
     return { ok:true, save:_saveRes };
   }catch(e){
     log(`ERROR: Export failed: ${e?.name||"Error"} ${e?.message||""}`);
