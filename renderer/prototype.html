@@ -2696,7 +2696,7 @@ body, #appRoot, .appRoot, .mainLayout{
 .proFileDockTop{
   flex:0 0 auto;
   display:flex; align-items:center; justify-content:space-between; gap:8px;
-  padding:6px 8px 8px;
+  padding:4px 8px 6px;
   border-bottom:1px solid rgba(255,255,255,0.08);
   flex-wrap:nowrap;
 }
@@ -2820,9 +2820,6 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proOnlyWrap.proOnlyDisabled.proFilterWrap::after{
   opacity: .45;
-}
-.workBottom.analyzersRow{
-  transform: translateY(-6px);
 }
 .proBottomRow,
 .bottomRow{
@@ -2948,15 +2945,20 @@ body, #appRoot, .appRoot, .mainLayout{
   min-width: 0;
 }
 .proJobMini{
-  font-size:12px; padding:2px 10px; border-radius:999px;
-  background:rgba(255,255,255,0.10);
-  user-select:none; cursor:pointer;
-  border:1px solid rgba(255,255,255,0.10);
-  display:inline-flex;
-  align-items:center;
-  line-height:1.2;
-  min-width:44px;
-  flex:0 0 auto;
+  border: 1px solid var(--line);
+  background: rgba(255,255,255,.04);
+  border-radius: 12px;
+  padding: 9px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  display: inline-flex;
+  align-items: center;
+  min-width: 44px;
+  flex: 0 0 auto;
+  user-select: none;
+}
+.proJobMini:hover{
+  background: rgba(255,255,255,.07);
 }
 #proJobMiniText{
   white-space: nowrap;
@@ -3223,9 +3225,9 @@ body, #appRoot, .appRoot, .mainLayout{
 /* 右サイド幅・下段高さをここに統一 */
 :root{
   --cueW: 340px;
-  --bottomH: 190px;     /* 下段(メーター/イメージャ/ファイルリスト)固定高さ */
+  --bottomH: 210px;     /* 下段(メーター/イメージャ/ファイルリスト)固定高さ */
   --meterW: 140px;
-  --imagerS: 190px;
+  --imagerS: 210px;
   --gap: 12px;
 }
 
@@ -3550,7 +3552,7 @@ body, #appRoot, .appRoot, .mainLayout{
     height: 100% !important;
     border-radius: 12px !important;
     overflow: hidden !important;
-    padding: 8px 8px 14px 8px;   /* 左下見切れ対策 */
+    padding: 6px 8px 14px 8px;   /* 左下見切れ対策 */
     box-sizing: border-box !important;
   }
 
@@ -3910,9 +3912,9 @@ body, #appRoot, .appRoot, .mainLayout{
         <span class="proTooltip">Proで利用できます</span>
       </div>
       <div class="proOnlyWrap" id="proJobMiniWrap">
-        <div id="proJobMini" class="proJobMini" title="履歴">
+        <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
           <span id="proJobMiniText">履歴</span>
-        </div>
+        </button>
         <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
