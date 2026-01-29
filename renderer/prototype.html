@@ -3404,6 +3404,7 @@ body, #appRoot, .appRoot, .mainLayout{
     max-height: 190px;
     flex: 0 0 190px;      /* “高さ”として固定。幅固定にはしない */
     box-sizing: border-box;
+    padding: 5px 10px;
     overflow: hidden;     /* 行全体ははみ出しさせない */
   }
 
@@ -3418,6 +3419,9 @@ body, #appRoot, .appRoot, .mainLayout{
     overflow: hidden;
     flex: 0 0 140px;
   }
+  .bottomRow .meterBox{
+    height: 100% !important;
+  }
 
   /* イメージャ：正方形固定（押し出し禁止） */
   .proImagerBox,
@@ -3429,6 +3433,11 @@ body, #appRoot, .appRoot, .mainLayout{
     border-radius: 12px;
     overflow: hidden;
     flex: 0 0 190px;
+  }
+  .bottomRow .imagerBox{
+    height: 100% !important;
+    min-height: 0 !important;
+    max-height: none !important;
   }
 
   /* ファイルリスト：残り幅全部。min-width:0 を必ず入れる（これが無いと width:0 が起きやすい） */
@@ -5178,7 +5187,21 @@ const applyProUi = (state)=>{
     configs.forEach(({ wrapId, btnId })=>{
       const wrap = document.getElementById(wrapId);
       const btn = document.getElementById(btnId);
-      if(btn && "disabled" in btn) btn.disabled = !isPro;
+      if(btn){
+        const isSelect = btn.tagName === "SELECT";
+        if(isSelect){
+          btn.disabled = false;
+          if(!isPro){
+            btn.setAttribute("aria-disabled", "true");
+            btn.tabIndex = -1;
+          }else{
+            btn.removeAttribute("aria-disabled");
+            btn.removeAttribute("tabindex");
+          }
+        }else if("disabled" in btn){
+          btn.disabled = !isPro;
+        }
+      }
       if(wrap) wrap.classList.toggle("proOnlyDisabled", !isPro);
     });
     if(tier !== _proUiTierLast){
