@@ -136,25 +136,24 @@
     border-color:rgba(34,197,94,.45);
     color:rgba(187,247,208,.95);
   }
-  .tierBadgeWrap{
-    display:flex;
-    flex-direction:column;
-    align-items:flex-start;
-    gap:4px;
-    flex:0 0 auto;
-  }
-  .headerBtnStack{
-    display:flex;
-    flex-direction:column;
+  .demoQuotaAnchor{
+    position:relative;
+    display:inline-flex;
     align-items:center;
-    gap:4px;
+    flex:0 0 auto;
+    overflow:visible;
   }
   .demoQuotaLabel{
     display:none;
+    position:absolute;
+    top:calc(100% + 6px);
+    left:50%;
+    transform:translateX(-50%);
     font-size:11px;
     line-height:1.1;
     opacity:.85;
     white-space:nowrap;
+    pointer-events:none;
   }
   #licenseBanner{
     display:none;
@@ -3833,11 +3832,11 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
   <div class="hdrMid"></div>
   <div class="hdrRight">
-    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><div class="headerBtnStack"><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button><div id="demoExportQuota" class="demoQuotaLabel"></div></div></div>
-    <div class="tierBadgeWrap">
+    <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><span class="demoQuotaAnchor"><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button><span id="demoExportQuota" class="demoQuotaLabel"></span></span></div>
+    <span class="demoQuotaAnchor">
       <span id="tierBadge" class="tierBadge--demo">DEMO</span>
-      <div id="demoDaysQuota" class="demoQuotaLabel"></div>
-    </div>
+      <span id="demoDaysQuota" class="demoQuotaLabel"></span>
+    </span>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
@@ -5114,7 +5113,7 @@ setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
 const LICENSE_TEXT = LicenseCore.LICENSE_TEXT;
 let _tierBadgeLast = null;
 let _proUiTierLast = null;
-let _demoQuotaLast = null;
+let _demoRemainingNoticeShown = false;
 const updateTierBadge = (state)=>{
   try{
     const badge = document.getElementById("tierBadge");
@@ -5172,12 +5171,9 @@ const updateDemoQuotaUI = (state)=>{
         exportsEl.style.display = "none";
       }
     }
-    if(hasDays || hasExports){
-      const snapshot = `${hasDays ? remainingDaysRaw : "none"}|${hasExports ? remainingExportsRaw : "none"}`;
-      if(snapshot !== _demoQuotaLast){
-        console.log(`[DemoQuota] days=${hasDays ? remainingDaysRaw : "-"} exports=${hasExports ? remainingExportsRaw : "-"}`);
-        _demoQuotaLast = snapshot;
-      }
+    if((hasDays || hasExports) && !_demoRemainingNoticeShown){
+      _demoRemainingNoticeShown = true;
+      console.log("[DemoRemainingUI] demo quota labels enabled");
     }
   }catch(e){
     console.error("[DemoQuota] non-fatal", e);
