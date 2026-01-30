@@ -945,7 +945,7 @@
   
   .waveBox{flex:1;min-height:0}
   .transport{
-    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+    display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;
     padding:10px 10px;
     border:1px solid var(--line);
     border-radius:14px;
@@ -2813,10 +2813,10 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proBottomRow,
 .bottomRow{
-  flex: 0 0 180px;
-  height: 180px;
-  min-height: 180px;
-  max-height: 180px;
+  flex: 0 0 var(--bottomH);
+  height: var(--bottomH);
+  min-height: var(--bottomH);
+  max-height: var(--bottomH);
   display: flex;
   align-items: stretch;
   gap: 12px;
@@ -2845,9 +2845,9 @@ body, #appRoot, .appRoot, .mainLayout{
   width: 180px;
   min-width: 180px;
   max-width: 180px;
-  height: 180px;
-  min-height: 180px;
-  max-height: 180px;
+  height: var(--bottomH);
+  min-height: var(--bottomH);
+  max-height: var(--bottomH);
   flex: 0 0 180px;
   border-radius: 12px;
   overflow: hidden;
@@ -3210,7 +3210,7 @@ body, #appRoot, .appRoot, .mainLayout{
 /* 右サイド幅・下段高さをここに統一 */
 :root{
   --cueW: 340px;
-  --bottomH: 190px;     /* 下段(メーター/イメージャ/ファイルリスト)固定高さ */
+  --bottomH: var(--bottom-line-h);     /* 下段(メーター/イメージャ/ファイルリスト)固定高さ */
   --meterW: 140px;
   --imagerS: 190px;
   --gap: 12px;
@@ -3612,7 +3612,7 @@ body, #appRoot, .appRoot, .mainLayout{
   .proBottomRow,
   .bottomRow{
     width: 100% !important;
-    flex: 0 0 180px !important;   /* column時は高さとして効く */
+    flex: 0 0 var(--bottomH) !important;   /* column時は高さとして効く */
     box-sizing: border-box !important;
     min-width: 0 !important;
   }
