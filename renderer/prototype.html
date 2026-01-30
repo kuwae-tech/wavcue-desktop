@@ -3993,37 +3993,9 @@ body, #appRoot, .appRoot, .mainLayout{
     border-radius:12px !important;
     padding:8px 10px !important;
   }
-  /* ===== FINAL: PRO badge never wraps / never shifts ===== */
+  /* ===== FINAL: PRO badge is ALWAYS outside (no overlay) ===== */
   .proOnlyWrap,
-  .proBtnGroup{
-    position: relative !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    flex: 0 0 auto !important;
-    white-space: nowrap !important;
-    min-width: 0 !important;
-  }
-  .proOnlyWrap .proBadge,
-  .proBtnGroup .proBadge{
-    position: absolute !important;
-    top: 6px !important;
-    right: 8px !important;
-    transform: none !important;
-    margin: 0 !important;
-    white-space: nowrap !important;
-    pointer-events: none !important;
-    z-index: 2 !important;
-  }
-  .proOnlyWrap .btn,
-  .proBtnGroup .btn{
-    padding-right: 34px !important;
-  }
-  .proFileDockTop,
-  .proFileDockLeft,
-  .proFileDockRight{
-    overflow: visible !important;
-  }
-  /* ===== EXCEPTION: badge must be outside for History/Filter ===== */
+  .proBtnGroup,
   #proJobMiniWrap,
   #proFilterWrap{
     position: relative !important;
@@ -4031,16 +4003,21 @@ body, #appRoot, .appRoot, .mainLayout{
     align-items: center !important;
     gap: 6px !important;
     white-space: nowrap !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
   }
-  #proJobMiniWrap .proBadge,
-  #proFilterWrap .proBadge{
+  .proBadge{
     position: static !important;
     top: auto !important;
     right: auto !important;
     transform: none !important;
     margin: 0 !important;
     z-index: auto !important;
+    pointer-events: none !important;
+    white-space: nowrap !important;
   }
+  .proOnlyWrap .btn,
+  .proBtnGroup .btn,
   #proJobMiniWrap .btn,
   #proFilterWrap .btn,
   #proFilterWrap select{
@@ -4048,27 +4025,38 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .proFileDockRight{
     flex: 0 0 auto !important;
-    min-width: 320px !important;
+    min-width: 360px !important;
+    overflow: visible !important;
   }
   .proFileDockLeft{
     flex: 1 1 auto !important;
     min-width: 0 !important;
+    overflow: hidden !important;
   }
-  .proFileDockLeft .btn .btnLabel,
   .proFileDockLeft .btn{
+    max-width: 100% !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
   #proFilterWrap{
     flex: 0 0 auto !important;
   }
+  /* ===== FINAL: Imager follows UI alignment (no square lock) ===== */
   .imagerBox,
   .proImagerBox,
   .imagerBlock{
-    width: var(--wcImagerS) !important;
-    height: var(--wcImagerS) !important;
-    flex: 0 0 var(--wcImagerS) !important;
-    align-self: stretch !important;
+    width: auto !important;
+    height: 100% !important;
+    flex: 1 1 auto !important;
+    aspect-ratio: auto !important;
+  }
+  .imagerBox canvas,
+  .proImagerBox canvas,
+  .imagerBlock canvas{
+    width: 100% !important;
+    height: 100% !important;
+    display: block !important;
   }
   .bottomRow,
   .proBottomRow{
