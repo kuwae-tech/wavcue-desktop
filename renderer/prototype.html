@@ -3912,7 +3912,7 @@ body, #appRoot, .appRoot, .mainLayout{
     justify-content: space-between !important;
     gap: 8px !important;
     padding: 4px 8px 6px !important;   /* ←上側を詰める（常識的に） */
-    flex-wrap: wrap !important;        /* 縮小時は2段に逃がして重なり防止 */
+    flex-wrap: nowrap !important;       /* 右側が2段に落ちないよう固定 */
     min-width: 0 !important;
   }
 
@@ -3921,7 +3921,7 @@ body, #appRoot, .appRoot, .mainLayout{
     display: flex !important;
     gap: 6px !important;
     flex-wrap: nowrap !important;
-    flex: 1 1 100% !important;
+    flex: 1 1 auto !important;
     min-width: 0 !important;
     overflow: hidden !important;
     justify-content: flex-start !important;
@@ -3932,8 +3932,11 @@ body, #appRoot, .appRoot, .mainLayout{
     align-items: center !important;
     flex-wrap: nowrap !important;
     justify-content: flex-end !important;
-    flex: 0 0 auto !important;
+    flex: 0 1 auto !important;
     min-width: 0 !important; /* 右側の謎スペースを撤廃 */
+    max-width: 100% !important;
+    overflow-x: auto !important; /* 被り回避：必要なら横スクロール */
+    scrollbar-width: thin;
   }
 
   /* フィルター等が “右に寄りすぎて見切れる” のを防ぐ（wrapのmin-width問題を潰す） */
@@ -4027,7 +4030,8 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .proFileDockRight{
     min-width: 0 !important;
-    overflow: visible !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
   }
   .proFileDockLeft{
     flex: 1 1 auto !important;
