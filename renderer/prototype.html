@@ -3811,11 +3811,11 @@ body, #appRoot, .appRoot, .mainLayout{
 
   /* ① bottomRow の高さを“1つ”に統一（他の競合は無視） */
   :root{
-    --wcBottomH: 220px;      /* 現行デザイン前提。必要なら 190/200 へ微調整可 */
+    --wcBottomH: 240px;      /* 現行デザイン前提。必要なら 190/200 へ微調整可 */
     --wcBottomGap: 12px;
     --wcBottomPad: 10px;
     --wcMeterW: 120px;
-    --wcImagerS: 220px;      /* bottomHと合わせると正方形 */
+    --wcImagerS: 240px;      /* bottomHと合わせると正方形 */
   }
 
   /* bottomコンテナは必ずこの高さで、子はstretch */
@@ -3975,6 +3975,53 @@ body, #appRoot, .appRoot, .mainLayout{
     min-height: 0 !important;
     overflow: auto !important;
     padding: 4px 8px 10px !important;  /* ←上を詰めて左右との隙間感を揃える */
+  }
+  .proFileRow{
+    padding: 4px 8px !important;
+  }
+  #proFileDock .proFileList{
+    padding: 4px 8px !important;
+  }
+  .waveWrap{
+    gap: var(--gap) !important;
+  }
+  .waveBox{
+    border-radius:12px !important;
+    overflow:hidden !important;
+  }
+  .transport{
+    border-radius:12px !important;
+    padding:8px 10px !important;
+  }
+  /* ===== FINAL: PRO badge never wraps / never shifts ===== */
+  .proOnlyWrap,
+  .proBtnGroup{
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    flex: 0 0 auto !important;
+    white-space: nowrap !important;
+    min-width: 0 !important;
+  }
+  .proOnlyWrap .proBadge,
+  .proBtnGroup .proBadge{
+    position: absolute !important;
+    top: 6px !important;
+    right: 8px !important;
+    transform: none !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
+    pointer-events: none !important;
+    z-index: 2 !important;
+  }
+  .proOnlyWrap .btn,
+  .proBtnGroup .btn{
+    padding-right: 34px !important;
+  }
+  .proFileDockTop,
+  .proFileDockLeft,
+  .proFileDockRight{
+    overflow: visible !important;
   }
   /* ===== /UI adjustments ===== */
 </style></head><body>
@@ -8941,20 +8988,22 @@ function drawMeter(a){
   const W = c.getBoundingClientRect().width;
   const H = c.getBoundingClientRect().height;
   const pad = 6;
-  const labelW = 34;
-  const labelGap = 6;
-  const barX = pad + labelW + labelGap;
-  const barW = Math.max(10, W - barX - pad);
+  const labelW = 18;
+  const gapX = 6;
+  const footerH = 30;
+  const baseY = H - footerH;
+  const gridX = pad + labelW;
+  const barX = gridX + gapX;
+  const barAreaW = (W - pad) - barX;
   const laneGap = 6;
-  const laneW = Math.max(8, Math.floor((barW - laneGap) / 2));
+  const barW = Math.max(10, Math.floor((barAreaW - laneGap) / 2));
   const xL = barX;
-  const xR = barX + laneW + laneGap;
+  const xR = barX + barW + laneGap;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle="rgba(0,0,0,.10)"; ctx.fillRect(0,0,W,H);
 
   const dbMin=-40, dbMax=0;
-  const baseY = H-22;
-  const toH = (db)=> clamp((db-dbMin)/(dbMax-dbMin),0,1)*(H-40);
+  const toH = (db)=> clamp((db-dbMin)/(dbMax-dbMin),0,1)*(baseY-10);
 
   ctx.strokeStyle="rgba(148,163,184,.18)";
   ctx.lineWidth=1;
@@ -8962,35 +9011,45 @@ function drawMeter(a){
   ctx.fillStyle="rgba(229,231,235,.55)";
   for(let t=0;t>=-40;t-=3){
     const y = baseY - toH(t);
-    ctx.beginPath(); ctx.moveTo(barX,y); ctx.lineTo(W-pad,y); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(gridX,y); ctx.lineTo(W-pad,y); ctx.stroke();
     if(t%6===0 || t===0 || t===-40) ctx.fillText(String(t),pad,y-2);
   }
 
   const rmsLdb=dbfs(a.rmsL), rmsRdb=dbfs(a.rmsR);
   const pkLdb=dbfs(a.pkL), pkRdb=dbfs(a.pkR);
 
+  const fitDbText = (v)=>{
+    const full = `${v.toFixed(1)}dB`;
+    if(ctx.measureText(full).width <= barW) return full;
+    const mid = `${v.toFixed(0)}dB`;
+    if(ctx.measureText(mid).width <= barW) return mid;
+    return `${v.toFixed(0)}`;
+  };
+
   const hL=toH(rmsLdb), hR=toH(rmsRdb);
   ctx.fillStyle="rgba(126,231,162,.55)";
-  ctx.fillRect(xL, baseY-hL, laneW, hL);
-  ctx.fillRect(xR, baseY-hR, laneW, hR);
+  ctx.fillRect(xL, baseY-hL, barW, hL);
+  ctx.fillRect(xR, baseY-hR, barW, hR);
 
   const yPkL=baseY-toH(pkLdb), yPkR=baseY-toH(pkRdb);
   ctx.strokeStyle="rgba(56,189,248,.95)";
   ctx.lineWidth=2;
   ctx.beginPath();
-  ctx.moveTo(xL, yPkL); ctx.lineTo(xL+laneW, yPkL);
-  ctx.moveTo(xR, yPkR); ctx.lineTo(xR+laneW, yPkR);
+  ctx.moveTo(xL, yPkL); ctx.lineTo(xL+barW, yPkL);
+  ctx.moveTo(xR, yPkR); ctx.lineTo(xR+barW, yPkR);
   ctx.stroke();
 
   ctx.fillStyle="rgba(229,231,235,.85)";
   ctx.font="11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
-  ctx.fillText("L", xL, H-10);
-  ctx.fillText("R", xR, H-10);
+  const yLR = H - 16;
+  const yDB = H - 4;
+  ctx.fillText("L", xL, yLR);
+  ctx.fillText("R", xR, yLR);
 
   ctx.fillStyle="rgba(229,231,235,.70)";
   ctx.font="10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
-  ctx.fillText(`${rmsLdb.toFixed(1)}dB`, xL, H-2);
-  ctx.fillText(`${rmsRdb.toFixed(1)}dB`, xR, H-2);
+  ctx.fillText(fitDbText(rmsLdb), xL, yDB);
+  ctx.fillText(fitDbText(rmsRdb), xR, yDB);
 }
 
 function drawImager(a){
