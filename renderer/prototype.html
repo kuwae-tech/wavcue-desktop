@@ -4023,6 +4023,65 @@ body, #appRoot, .appRoot, .mainLayout{
   .proFileDockRight{
     overflow: visible !important;
   }
+  /* ===== EXCEPTION: badge must be outside for History/Filter ===== */
+  #proJobMiniWrap,
+  #proFilterWrap{
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    white-space: nowrap !important;
+  }
+  #proJobMiniWrap .proBadge,
+  #proFilterWrap .proBadge{
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
+    transform: none !important;
+    margin: 0 !important;
+    z-index: auto !important;
+  }
+  #proJobMiniWrap .btn,
+  #proFilterWrap .btn,
+  #proFilterWrap select{
+    padding-right: 12px !important;
+  }
+  .proFileDockRight{
+    flex: 0 0 auto !important;
+    min-width: 320px !important;
+  }
+  .proFileDockLeft{
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+  .proFileDockLeft .btn .btnLabel,
+  .proFileDockLeft .btn{
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
+  #proFilterWrap{
+    flex: 0 0 auto !important;
+  }
+  .imagerBox,
+  .proImagerBox,
+  .imagerBlock{
+    width: var(--wcImagerS) !important;
+    height: var(--wcImagerS) !important;
+    flex: 0 0 var(--wcImagerS) !important;
+    align-self: stretch !important;
+  }
+  .bottomRow,
+  .proBottomRow{
+    padding: 10px !important;
+    align-items: stretch !important;
+  }
+  .meterBox,
+  .imagerBox,
+  .fileListBox{
+    padding: 0 !important;
+    overflow: hidden !important;
+    border-radius: 12px !important;
+  }
   /* ===== /UI adjustments ===== */
 </style></head><body>
 <div id="titlebarDrag"></div>
@@ -8991,28 +9050,30 @@ function drawMeter(a){
   const labelW = 18;
   const gapX = 6;
   const footerH = 30;
+  const topPad = 14;
   const baseY = H - footerH;
   const gridX = pad + labelW;
   const barX = gridX + gapX;
   const barAreaW = (W - pad) - barX;
   const laneGap = 6;
-  const barW = Math.max(10, Math.floor((barAreaW - laneGap) / 2));
+  const barW = Math.max(10, Math.floor((barAreaW - laneGap) / 2) - 2);
   const xL = barX;
   const xR = barX + barW + laneGap;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle="rgba(0,0,0,.10)"; ctx.fillRect(0,0,W,H);
 
   const dbMin=-40, dbMax=0;
-  const toH = (db)=> clamp((db-dbMin)/(dbMax-dbMin),0,1)*(baseY-10);
+  const toH = (db)=> clamp((db-dbMin)/(dbMax-dbMin),0,1)*(baseY - topPad);
 
   ctx.strokeStyle="rgba(148,163,184,.18)";
   ctx.lineWidth=1;
   ctx.font="9px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
   ctx.fillStyle="rgba(229,231,235,.55)";
+  ctx.textBaseline = "middle";
   for(let t=0;t>=-40;t-=3){
     const y = baseY - toH(t);
     ctx.beginPath(); ctx.moveTo(gridX,y); ctx.lineTo(W-pad,y); ctx.stroke();
-    if(t%6===0 || t===0 || t===-40) ctx.fillText(String(t),pad,y-2);
+    if(t%6===0 || t===0 || t===-40) ctx.fillText(String(t),pad,y);
   }
 
   const rmsLdb=dbfs(a.rmsL), rmsRdb=dbfs(a.rmsR);
@@ -9040,14 +9101,15 @@ function drawMeter(a){
   ctx.stroke();
 
   ctx.fillStyle="rgba(229,231,235,.85)";
-  ctx.font="11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+  ctx.font="10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
   const yLR = H - 16;
   const yDB = H - 4;
+  ctx.textBaseline = "alphabetic";
   ctx.fillText("L", xL, yLR);
   ctx.fillText("R", xR, yLR);
 
   ctx.fillStyle="rgba(229,231,235,.70)";
-  ctx.font="10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+  ctx.font="9px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
   ctx.fillText(fitDbText(rmsLdb), xL, yDB);
   ctx.fillText(fitDbText(rmsRdb), xR, yDB);
 }
