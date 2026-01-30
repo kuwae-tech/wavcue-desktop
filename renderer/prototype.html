@@ -3811,7 +3811,7 @@ body, #appRoot, .appRoot, .mainLayout{
 
   /* ① bottomRow の高さを“1つ”に統一（他の競合は無視） */
   :root{
-    --wcBottomH: 240px;      /* 現行デザイン前提。必要なら 190/200 へ微調整可 */
+    --wcBottomH: 240px;      /* 下段高さの真実（他の --bottomH/--bottom-line-h は無視） */
     --wcBottomGap: 12px;
     --wcBottomPad: 10px;
     --wcMeterW: 120px;
@@ -3912,7 +3912,7 @@ body, #appRoot, .appRoot, .mainLayout{
     justify-content: space-between !important;
     gap: 8px !important;
     padding: 4px 8px 6px !important;   /* ←上側を詰める（常識的に） */
-    flex-wrap: nowrap !important;
+    flex-wrap: wrap !important;        /* 縮小時は2段に逃がして重なり防止 */
     min-width: 0 !important;
   }
 
@@ -3921,9 +3921,10 @@ body, #appRoot, .appRoot, .mainLayout{
     display: flex !important;
     gap: 6px !important;
     flex-wrap: nowrap !important;
-    flex: 1 1 auto !important;
+    flex: 1 1 100% !important;
     min-width: 0 !important;
     overflow: hidden !important;
+    justify-content: flex-start !important;
   }
   .proFileDockRight{
     display: flex !important;
@@ -3931,7 +3932,8 @@ body, #appRoot, .appRoot, .mainLayout{
     align-items: center !important;
     flex-wrap: nowrap !important;
     justify-content: flex-end !important;
-    min-width: 0 !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important; /* 右側の謎スペースを撤廃 */
   }
 
   /* フィルター等が “右に寄りすぎて見切れる” のを防ぐ（wrapのmin-width問題を潰す） */
@@ -4024,8 +4026,7 @@ body, #appRoot, .appRoot, .mainLayout{
     padding-right: 12px !important;
   }
   .proFileDockRight{
-    flex: 0 0 auto !important;
-    min-width: 360px !important;
+    min-width: 0 !important;
     overflow: visible !important;
   }
   .proFileDockLeft{
@@ -4051,6 +4052,14 @@ body, #appRoot, .appRoot, .mainLayout{
     flex: 1 1 auto !important;
     aspect-ratio: auto !important;
   }
+  .imagerBlock{
+    height: 100% !important;
+    min-height: 0 !important;
+  }
+  /* FINAL OVERRIDES active selectors:
+     - .proFileDockTop/.proFileDockLeft/.proFileDockRight (wrap + no overlap)
+     - .imagerBlock/.imagerBox/.proImagerBox (height:100% alignment)
+     - :root --wcBottomH (single source of truth) */
   .imagerBox canvas,
   .proImagerBox canvas,
   .imagerBlock canvas{
