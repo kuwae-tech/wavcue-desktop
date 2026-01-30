@@ -3811,11 +3811,11 @@ body, #appRoot, .appRoot, .mainLayout{
 
   /* ① bottomRow の高さを“1つ”に統一（他の競合は無視） */
   :root{
-    --wcBottomH: 180px;      /* 現行デザイン前提。必要なら 190/200 へ微調整可 */
+    --wcBottomH: 220px;      /* 現行デザイン前提。必要なら 190/200 へ微調整可 */
     --wcBottomGap: 12px;
     --wcBottomPad: 10px;
     --wcMeterW: 120px;
-    --wcImagerS: 180px;      /* bottomHと合わせると正方形 */
+    --wcImagerS: 220px;      /* bottomHと合わせると正方形 */
   }
 
   /* bottomコンテナは必ずこの高さで、子はstretch */
@@ -3944,6 +3944,24 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0 !important;
     max-width: 100% !important;
   }
+  .proBtnGroup{
+    display:inline-flex !important;
+    align-items:center !important;
+    gap:6px !important;
+    flex:0 0 auto !important;
+    white-space:nowrap !important; /* バッジ落ち防止 */
+  }
+  .proBtnGroup .proBadge{
+    flex:0 0 auto !important;
+    white-space:nowrap !important;
+  }
+  .proFileDockLeft{
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+  .proFileDockLeft .btn{
+    white-space: nowrap !important;
+  }
 
   /* リスト本体：上の余白を詰め、下端は切れない */
   #proFileListWrap,
@@ -4047,19 +4065,25 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="proFileDockTop">
     <div class="proFileDockLeft">
       <div class="proOnlyWrap" id="proBtnBulkImportWrap">
-        <button id="proBtnBulkImport" class="btn" type="button"><span class="btnLabel">一括読み込み</span></button>
-        <span class="proBadge">PRO</span>
+        <span class="proBtnGroup">
+          <button id="proBtnBulkImport" class="btn" type="button"><span class="btnLabel">一括読み込み</span></button>
+          <span class="proBadge">PRO</span>
+        </span>
         <span class="proTooltip">Proで利用できます</span>
         <input accept=".wav,audio/wav,audio/wave" hidden="" id="proBulkInput" multiple="" type="file"/>
       </div>
       <div class="proOnlyWrap" id="proBtnBatchCheckWrap">
-        <button id="proBtnBatchCheck" class="btn" type="button"><span class="btnLabel">一括チェック</span></button>
-        <span class="proBadge">PRO</span>
+        <span class="proBtnGroup">
+          <button id="proBtnBatchCheck" class="btn" type="button"><span class="btnLabel">一括チェック</span></button>
+          <span class="proBadge">PRO</span>
+        </span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
       <div class="proOnlyWrap" id="proBtnBatchExportWrap">
-        <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
-        <span class="proBadge">PRO</span>
+        <span class="proBtnGroup">
+          <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
+          <span class="proBadge">PRO</span>
+        </span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
     </div>
@@ -8916,6 +8940,15 @@ function drawMeter(a){
   const ctx = c.getContext("2d");
   const W = c.getBoundingClientRect().width;
   const H = c.getBoundingClientRect().height;
+  const pad = 6;
+  const labelW = 34;
+  const labelGap = 6;
+  const barX = pad + labelW + labelGap;
+  const barW = Math.max(10, W - barX - pad);
+  const laneGap = 6;
+  const laneW = Math.max(8, Math.floor((barW - laneGap) / 2));
+  const xL = barX;
+  const xR = barX + laneW + laneGap;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle="rgba(0,0,0,.10)"; ctx.fillRect(0,0,W,H);
 
@@ -8929,28 +8962,24 @@ function drawMeter(a){
   ctx.fillStyle="rgba(229,231,235,.55)";
   for(let t=0;t>=-40;t-=3){
     const y = baseY - toH(t);
-    ctx.beginPath(); ctx.moveTo(8,y); ctx.lineTo(W-6,y); ctx.stroke();
-    if(t%6===0 || t===0 || t===-40) ctx.fillText(String(t),2,y-2);
+    ctx.beginPath(); ctx.moveTo(barX,y); ctx.lineTo(W-pad,y); ctx.stroke();
+    if(t%6===0 || t===0 || t===-40) ctx.fillText(String(t),pad,y-2);
   }
 
   const rmsLdb=dbfs(a.rmsL), rmsRdb=dbfs(a.rmsR);
   const pkLdb=dbfs(a.pkL), pkRdb=dbfs(a.pkR);
 
-  const barW=Math.max(10, Math.floor((W-26)/2));
-  const gap=6;
-  const xL=12, xR=xL+barW+gap;
-
   const hL=toH(rmsLdb), hR=toH(rmsRdb);
   ctx.fillStyle="rgba(126,231,162,.55)";
-  ctx.fillRect(xL, baseY-hL, barW, hL);
-  ctx.fillRect(xR, baseY-hR, barW, hR);
+  ctx.fillRect(xL, baseY-hL, laneW, hL);
+  ctx.fillRect(xR, baseY-hR, laneW, hR);
 
   const yPkL=baseY-toH(pkLdb), yPkR=baseY-toH(pkRdb);
   ctx.strokeStyle="rgba(56,189,248,.95)";
   ctx.lineWidth=2;
   ctx.beginPath();
-  ctx.moveTo(xL, yPkL); ctx.lineTo(xL+barW, yPkL);
-  ctx.moveTo(xR, yPkR); ctx.lineTo(xR+barW, yPkR);
+  ctx.moveTo(xL, yPkL); ctx.lineTo(xL+laneW, yPkL);
+  ctx.moveTo(xR, yPkR); ctx.lineTo(xR+laneW, yPkR);
   ctx.stroke();
 
   ctx.fillStyle="rgba(229,231,235,.85)";
