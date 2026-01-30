@@ -2778,7 +2778,7 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
-.proFilterWrap{ min-width: 0; flex: 1 1 auto; }
+.proFilterWrap{ min-width: 0; flex: 0 0 auto; }
 #proFilterStatus{
   appearance: none;
   -webkit-appearance: none;
@@ -3297,7 +3297,7 @@ body, #appRoot, .appRoot, .mainLayout{
   width: var(--imagerS) !important;
   min-width: var(--imagerS) !important;
   height: 100% !important;
-  aspect-ratio: 1 / 1 !important;
+  aspect-ratio: auto !important;
   overflow: hidden !important;
   border-radius: 12px !important;
 }
@@ -4046,6 +4046,10 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   #proFilterWrap{
     flex: 0 0 auto !important;
+    min-width: 0 !important;
+  }
+  #proFilterStatus{
+    width: 110px !important;
   }
   /* ===== FINAL: Imager follows UI alignment (no square lock) ===== */
   .imagerBox,
