@@ -39,7 +39,7 @@
     --brand-logo-h: 44px;
     --bottom-line-h: 240px;
     --fileList-min-h: var(--bottom-line-h);
-    --wave-min-h: 210px;
+    --wave-min-h: 196px;
     --stereo-box-h: var(--bottom-line-h);
     --titlebar-drag-h: 34px;
   }
@@ -310,10 +310,10 @@
     backdrop-filter: blur(6px);
   }
   .analyzers{
-    flex:0 0 180px;
-    height:180px;
-    min-height:180px;
-    max-height:180px;
+    flex:0 0 var(--bottomH);
+    height:var(--bottomH);
+    min-height:var(--bottomH);
+    max-height:var(--bottomH);
     display:flex;
     gap:10px;
     align-items:stretch;
@@ -337,7 +337,7 @@
   .scopeBlock{
     flex:0 0 180px;
     width:180px;
-    height:180px;
+    height:var(--bottomH);
     min-width:180px;
     max-width:180px;
     border-radius:12px;
@@ -350,7 +350,7 @@
   .scopeBox{
     border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.12);
   }
-  .meterBox{height:180px}
+  .meterBox{height:var(--bottomH)}
   .scopeBox{
     flex:1;
     min-width:0;
@@ -3915,6 +3915,13 @@ body, #appRoot, .appRoot, .mainLayout{
     flex-wrap: nowrap !important;       /* 右側が2段に落ちないよう固定 */
     min-width: 0 !important;
   }
+  .proFileDockRow{
+    display: grid !important;
+    grid-template-columns: 1fr auto !important;
+    align-items: center !important;
+    column-gap: 12px !important;
+    min-width: 0 !important;
+  }
 
   /* 左右ブロックの折り返し/押し潰れ対策 */
   .proFileDockLeft{
@@ -3925,6 +3932,9 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0 !important;
     overflow: hidden !important;
     justify-content: flex-start !important;
+  }
+  .proFileDockLeft > *{
+    min-width: 0 !important;
   }
   .proFileDockRight{
     display: flex !important;
@@ -4050,6 +4060,11 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   #proFilterStatus{
     width: 110px !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
   }
   /* ===== FINAL: Imager follows UI alignment (no square lock) ===== */
   .imagerBox,
@@ -4173,7 +4188,7 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
 </dialog>
 <div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
-  <div class="proFileDockTop">
+  <div class="proFileDockTop proFileDockRow">
     <div class="proFileDockLeft">
       <div class="proOnlyWrap" id="proBtnBulkImportWrap">
         <span class="proBtnGroup">
@@ -5729,6 +5744,21 @@ if(typeof window.WavCueLicense?.onChange === "function"){
   }else{
     requestAnimationFrame(log);
   }
+})();
+(() => {
+  let logged = false;
+  const logDockSizes = () => {
+    if(logged) return;
+    const row = document.querySelector('.proFileDockRow') || document.querySelector('.proFileDockTop');
+    const right = document.querySelector('.proFileDockRight');
+    if(!row || !right) return;
+    logged = true;
+    console.log("[UI][dock] sizes", {
+      rowHeight: row.clientHeight,
+      rightWidth: right.clientWidth,
+    });
+  };
+  window.addEventListener('resize', logDockSizes, { passive: true });
 })();
 
 const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
