@@ -2791,8 +2791,19 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
-.proFilterWrap{ min-width: 0; flex: 0 0 auto; }
+
+/* Filter: must be a flex item that can shrink without clipping/overlap */
+.proFilterWrap{
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex: 1 1 220px;
+  min-width: 140px;
+  max-width: 360px;
+}
+
 #proFilterStatus{
+  width: 100%;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
@@ -2806,14 +2817,12 @@ body, #appRoot, .appRoot, .mainLayout{
   min-width: 0;
   max-width: 100%;
 }
+
 #proFilterStatus:focus{
   border-color: rgba(103,167,255,.55);
   box-shadow: 0 0 0 3px rgba(103,167,255,.18);
 }
-.proFilterWrap{
-  position: relative;
-  display: inline-block;
-}
+
 .proFilterWrap::after{
   content: "▾";
   position: absolute;
@@ -2823,6 +2832,20 @@ body, #appRoot, .appRoot, .mainLayout{
   pointer-events: none;
   color: rgba(240,242,246,.65);
   font-size: 12px;
+}
+
+/* History: never shrink to zero / never get covered */
+#proJobMiniWrap{ flex: 0 0 auto; }
+
+/* Safety net for extremely narrow widths: avoid truncation by allowing wrap */
+@media (max-width: 1100px){
+  .proFileDockTop{ flex-wrap: wrap; }
+  .proFileDockLeft{ flex: 1 1 100%; }
+  .proFileDockRight{
+    flex: 1 1 100%;
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
 .proBottomRow,
 .bottomRow{
