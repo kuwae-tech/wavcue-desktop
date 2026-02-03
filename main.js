@@ -46,7 +46,7 @@ const setSettings = (patch) => {
   const next = {
     ...current,
     ...patch,
-    paths: {
+       paths: {
       ...current.paths,
       ...(patch.paths || {}),
     },
@@ -79,6 +79,7 @@ const ensureFolders = async (root) => {
     root,
     exports: exportsPath,
     backups: backupsPath,
+    reports: path.join(root, 'Reports'),
     reports: reportsPath,
   };
 };
@@ -105,8 +106,7 @@ const ensureDefaultFolders = async () => {
 
   try {
     const result = await dialog.showOpenDialog({
-      title: 'Select a folder for WavCue data',
-      properties: ['openDirectory', 'createDirectory'],
+@@ -108,80 +110,81 @@ const ensureDefaultFolders = async () => {
       buttonLabel: 'Use this folder',
     });
 
@@ -132,6 +132,7 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: initialWidth,
     height: initialHeight,
+    minWidth: 1300,
     minWidth: 1240,
     minHeight: 680,
     autoHideMenuBar: true,
@@ -185,6 +186,9 @@ const getFolderSize = async (targetPath) => {
         const entryPath = path.join(targetPath, entry.name);
         if (entry.isDirectory()) {
           return getFolderSize(entryPath);
+        }
+        if (entry.isFile()) {
+          const stats = await fs.stat(entryPath);
         }
         if (entry.isFile()) {
           const stats = await fs.stat(entryPath);
