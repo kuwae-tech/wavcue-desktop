@@ -37,14 +37,14 @@
     --app-pad: 10px;
     --app-gap: 10px;
     --brand-logo-h: 44px;
-    --bottom-line-h: 252px;
+    --bottom-line-h: 240px;
     --fileList-min-h: var(--bottom-line-h);
-    --wave-min-h: 196px;
+    --wave-min-h: 210px;
     --stereo-box-h: var(--bottom-line-h);
     --titlebar-drag-h: 34px;
   }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none;min-width:1240px}
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none}
   body{padding-top: var(--titlebar-drag-h)}
   .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
   .appHeader{
@@ -310,10 +310,10 @@
     backdrop-filter: blur(6px);
   }
   .analyzers{
-    flex:0 0 var(--bottomH);
-    height:var(--bottomH);
-    min-height:var(--bottomH);
-    max-height:var(--bottomH);
+    flex:0 0 180px;
+    height:180px;
+    min-height:180px;
+    max-height:180px;
     display:flex;
     gap:10px;
     align-items:stretch;
@@ -337,7 +337,7 @@
   .scopeBlock{
     flex:0 0 180px;
     width:180px;
-    height:var(--bottomH);
+    height:180px;
     min-width:180px;
     max-width:180px;
     border-radius:12px;
@@ -350,7 +350,7 @@
   .scopeBox{
     border:1px solid var(--line);border-radius:14px;overflow:hidden;background:rgba(0,0,0,.12);
   }
-  .meterBox{height:var(--bottomH)}
+  .meterBox{height:180px}
   .scopeBox{
     flex:1;
     min-width:0;
@@ -945,7 +945,7 @@
   
   .waveBox{flex:1;min-height:0}
   .transport{
-    display:flex;align-items:center;gap:8px;flex-wrap:nowrap;white-space:nowrap;
+    display:flex;align-items:center;gap:8px;flex-wrap:wrap;
     padding:10px 10px;
     border:1px solid var(--line);
     border-radius:14px;
@@ -2695,42 +2695,23 @@ body, #appRoot, .appRoot, .mainLayout{
 #proFileDock .proFileList{ flex:1 1 auto; min-height:0; overflow:auto; padding:6px 8px; }
 .proFileDockTop{
   flex:0 0 auto;
-  display:grid;
-  grid-template-columns: minmax(0, 1fr) max-content;
-  align-items:center;
-  column-gap:8px;
+  display:flex; align-items:center; justify-content:space-between; gap:8px;
   padding:6px 8px 8px;
   border-bottom:1px solid rgba(255,255,255,0.08);
-}
-.proDockSpacer{ flex:1 1 auto; min-width:12px; }
-.proFileDockLeft{
-  display:flex;
-  gap:6px;
   flex-wrap:nowrap;
-  min-width:0;
-  overflow:hidden;
 }
-.proFileDockRight{
-  display:grid;
-  grid-auto-flow:column;
-  grid-auto-columns:max-content;
-  align-items:center;
-  column-gap:6px;
-  justify-content:end;
-  min-width:0;
-}
+.proFileDockLeft{ display:flex; gap:6px; flex-wrap:nowrap; flex:1 1 auto; min-width:0; overflow:hidden; }
+.proFileDockRight{ display:flex; gap:6px; align-items:center; flex-wrap:nowrap; justify-content:flex-end; min-width:0; }
 .proOnlyWrap{
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  flex: 0 0 auto;
-  flex-shrink: 0;
+  flex: 0 1 auto;
   min-width: 0;
 }
 .proOnlyWrap .btn{
   flex: 0 1 auto;
-  flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
   white-space: nowrap;
@@ -2739,9 +2720,6 @@ body, #appRoot, .appRoot, .mainLayout{
   text-overflow: ellipsis;
   line-height: 1.2;
   padding: 9px 8px;
-}
-.proOnlyWrap select{
-  flex-shrink: 0;
 }
 .proOnlyWrap .btnLabel{
   min-width: 0;
@@ -2800,6 +2778,7 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
+.proFilterWrap{ min-width: 0; flex: 1 1 auto; }
 #proFilterStatus{
   appearance: none;
   -webkit-appearance: none;
@@ -2811,7 +2790,6 @@ body, #appRoot, .appRoot, .mainLayout{
   background: rgba(255,255,255,.06);
   color: rgba(240,242,246,.95);
   outline: none;
-  width: 100%;
   min-width: 0;
   max-width: 100%;
 }
@@ -2822,10 +2800,6 @@ body, #appRoot, .appRoot, .mainLayout{
 .proFilterWrap{
   position: relative;
   display: inline-block;
-  flex: 0 0 auto;
-  width: 160px;
-  min-width: 140px;
-  max-width: 200px;
 }
 .proFilterWrap::after{
   content: "▾";
@@ -2834,15 +2808,15 @@ body, #appRoot, .appRoot, .mainLayout{
   top: 50%;
   transform: translateY(-52%);
   pointer-events: none;
-  color: rgba(229,231,235,.75);
+  color: rgba(240,242,246,.65);
   font-size: 12px;
 }
 .proBottomRow,
 .bottomRow{
-  flex: 0 0 var(--bottomH);
-  height: var(--bottomH);
-  min-height: var(--bottomH);
-  max-height: var(--bottomH);
+  flex: 0 0 180px;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
   display: flex;
   align-items: stretch;
   gap: 12px;
@@ -2871,9 +2845,9 @@ body, #appRoot, .appRoot, .mainLayout{
   width: 180px;
   min-width: 180px;
   max-width: 180px;
-  height: var(--bottomH);
-  min-height: var(--bottomH);
-  max-height: var(--bottomH);
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
   flex: 0 0 180px;
   border-radius: 12px;
   overflow: hidden;
@@ -3236,7 +3210,7 @@ body, #appRoot, .appRoot, .mainLayout{
 /* 右サイド幅・下段高さをここに統一 */
 :root{
   --cueW: 340px;
-  --bottomH: var(--bottom-line-h);     /* 下段(メーター/イメージャ/ファイルリスト)固定高さ */
+  --bottomH: 190px;     /* 下段(メーター/イメージャ/ファイルリスト)固定高さ */
   --meterW: 140px;
   --imagerS: 190px;
   --gap: 12px;
@@ -3323,7 +3297,7 @@ body, #appRoot, .appRoot, .mainLayout{
   width: var(--imagerS) !important;
   min-width: var(--imagerS) !important;
   height: 100% !important;
-  aspect-ratio: auto !important;
+  aspect-ratio: 1 / 1 !important;
   overflow: hidden !important;
   border-radius: 12px !important;
 }
@@ -3563,7 +3537,7 @@ body, #appRoot, .appRoot, .mainLayout{
     height: 100% !important;
     border-radius: 12px !important;
     overflow: hidden !important;
-    padding: 4px 8px 14px 8px;   /* 左下見切れ対策 */
+    padding: 8px 8px 14px 8px;   /* 左下見切れ対策 */
     box-sizing: border-box !important;
   }
 
@@ -3638,7 +3612,7 @@ body, #appRoot, .appRoot, .mainLayout{
   .proBottomRow,
   .bottomRow{
     width: 100% !important;
-    flex: 0 0 var(--bottomH) !important;   /* column時は高さとして効く */
+    flex: 0 0 180px !important;   /* column時は高さとして効く */
     box-sizing: border-box !important;
     min-width: 0 !important;
   }
@@ -3804,311 +3778,6 @@ body, #appRoot, .appRoot, .mainLayout{
     height: var(--bottom-line-h);
     overflow: hidden;
   }
-  /* ==== FINAL OVERRIDES: PRO-only visual parity (must win) ==== */
-  /* 履歴ボタンを他.btnと同じ“PRO無効ボタン”の見た目に揃える（サイズだけ調整） */
-  #proJobMini.btn.proJobMini{
-    height:32px !important;
-    padding: 9px 10px !important;
-    border-radius:12px !important;
-    display:inline-flex !important;
-    align-items:center !important;
-    gap:8px !important;
-  }
-  /* ============================================================
-     FINAL OVERRIDES (Bottom layout truth)
-     - Fix meter bottom crop (rounded corners)
-     - Align meter/imager/file list bottoms
-     - Keep file dock controls sane (no scattered buttons)
-     ============================================================ */
-
-  /* ① bottomRow の高さを“1つ”に統一（他の競合は無視） */
-  :root{
-    --wcBottomH: 240px;      /* 下段高さの真実（他の --bottomH/--bottom-line-h は無視） */
-    --wcBottomGap: 12px;
-    --wcBottomPad: 14px;
-    --wcMeterW: 120px;
-    --wcImagerS: 240px;      /* bottomHと合わせると正方形 */
-  }
-
-  /* bottomコンテナは必ずこの高さで、子はstretch */
-  .workBottom,
-  #analyzersRow,
-  .analyzersRow,
-  .analyzers,
-  .bottomRow,
-  .proBottomRow{
-    height: var(--wcBottomH) !important;
-    min-height: var(--wcBottomH) !important;
-    max-height: var(--wcBottomH) !important;
-    display: flex !important;
-    align-items: stretch !important;
-    gap: var(--wcBottomGap) !important;
-    padding: var(--wcBottomPad) !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;  /* はみ出しは許可しない */
-    transform: none !important;   /* 変な持ち上げ禁止 */
-  }
-
-  /* ② メーター：はみ出しの主因を潰す（box-sizing + padding 제거 + 100%） */
-  .meterBox,
-  .proMeterBox,
-  .meterBlock{
-    width: var(--wcMeterW) !important;
-    min-width: var(--wcMeterW) !important;
-    max-width: var(--wcMeterW) !important;
-    flex: 0 0 var(--wcMeterW) !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    padding: 0 !important;          /* ←これが重要（見かけ高さ増加を防ぐ） */
-    box-sizing: border-box !important;
-    overflow: hidden !important;     /* 親で切られないよう、自分でクリップ */
-    border-radius: 12px !important;
-    display: flex !important;
-    align-items: stretch !important;
-  }
-
-  /* canvas は枠に追従 */
-  #meterCanvas{
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-  }
-
-  /* ③ イメージャ：下端揃え（上に浮く原因を潰す） */
-  .imagerBox,
-  .proImagerBox,
-  .imagerBlock{
-    width: var(--wcImagerS) !important;
-    min-width: var(--wcImagerS) !important;
-    max-width: var(--wcImagerS) !important;
-    flex: 0 0 var(--wcImagerS) !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    padding: 0 !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;
-    border-radius: 12px !important;
-    display: flex !important;
-    align-items: stretch !important;
-    justify-content: stretch !important;
-    transform: none !important;
-    margin: 0 !important;
-  }
-  #imagerCanvas{
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-  }
-
-  /* ④ ファイルリスト：残り幅を全部、縦は100%で下端揃え */
-  .fileListBox,
-  .proFileListBox,
-  #proFileDock,
-  .proFileDock{
-    flex: 1 1 auto !important;
-    min-width: 0 !important;
-    height: 100% !important;
-    min-height: 0 !important;
-    box-sizing: border-box !important;
-    overflow: hidden !important;
-    border-radius: 12px !important;
-    display: flex !important;
-    flex-direction: column !important;
-  }
-
-  /* ⑤ “ボタン群＋フィルター” の位置を上げて、見切れ/右詰め過ぎを防ぐ */
-
-  /* フィルター等が “右に寄りすぎて見切れる” のを防ぐ（wrapのmin-width問題を潰す） */
-  .proOnlyWrap{
-    min-width: 0 !important;
-    max-width: 100% !important;
-  }
-  .proOnlyWrap .btn,
-  .proOnlyWrap select{
-    min-width: 0 !important;
-    max-width: 100% !important;
-  }
-  .proBtnGroup{
-    position: relative !important;
-    display:inline-flex !important;
-    align-items:center !important;
-    gap:6px !important;
-    flex:0 0 auto !important;
-    white-space:nowrap !important; /* バッジ落ち防止 */
-  }
-  .proBtnGroup > .btn,
-  .proBtnGroup > select{
-    flex: 0 0 auto !important;
-  }
-  .proBtnGroup .proBadge{
-    flex:0 0 auto !important;
-    white-space:nowrap !important;
-  }
-  
-
-  /* リスト本体：上の余白を詰め、下端は切れない */
-  #proFileListWrap,
-  .proFileListWrap{
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    overflow: hidden !important;
-  }
-  .proFileList{
-    flex: 1 1 auto !important;
-    min-height: 0 !important;
-    overflow: auto !important;
-    padding: 4px 8px 18px !important;  /* 下側の余白を少し増やす */
-  }
-  .proFileRow{
-    padding: 4px 8px !important;
-  }
-  #proFileDock .proFileList{
-    padding: 4px 8px !important;
-  }
-  .waveWrap{
-    gap: var(--gap) !important;
-  }
-  .waveBox{
-    border-radius:12px !important;
-    overflow:hidden !important;
-  }
-  .transport{
-    border-radius:12px !important;
-    padding:8px 10px !important;
-  }
-  /* ===== FINAL: PRO badge is ALWAYS outside (no overlay) ===== */
-  .proOnlyWrap,
-  .proBtnGroup,
-  #proJobMiniWrap,
-  #proFilterWrap{
-    position: relative !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    white-space: nowrap !important;
-    flex: 0 0 auto !important;
-    flex-shrink: 0 !important;
-    min-width: 0 !important;
-  }
-  .proBadge{
-    position: static !important;
-    top: auto !important;
-    right: auto !important;
-    transform: none !important;
-    margin: 0 !important;
-    z-index: auto !important;
-    pointer-events: none !important;
-    white-space: nowrap !important;
-  }
-  .proOnlyWrap .btn,
-  .proBtnGroup .btn,
-  #proJobMiniWrap .btn,
-  #proFilterWrap .btn,
-  #proFilterWrap select{
-    padding-right: 12px !important;
-  }
-  
-  #proFilterStatus,
-  .proFilterSelect{
-    appearance: none !important;
-    -webkit-appearance: none !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    width: 100% !important;
-    min-width: 96px !important;
-    max-width: 100% !important;
-    height: 32px !important;
-    line-height: 1.2 !important;
-    padding: 9px 28px 9px 10px !important;
-    border-radius: 12px !important;
-    border: 1px solid rgba(255,255,255,0.10) !important;
-    background: rgba(255,255,255,0.04) !important;
-    color: rgba(255,255,255,0.92) !important;
-    overflow: hidden !important;
-    text-overflow: ellipsis !important;
-    white-space: nowrap !important;
-    box-sizing: border-box !important;
-    position: relative !important;
-    z-index: 1 !important;
-  }
-  /* ===== FINAL: Imager follows UI alignment (no square lock) ===== */
-  .imagerBox,
-  .proImagerBox,
-  .imagerBlock{
-    width: auto !important;
-    height: 100% !important;
-    flex: 1 1 auto !important;
-    aspect-ratio: auto !important;
-  }
-  .imagerBlock{
-    height: 100% !important;
-    min-height: 0 !important;
-  }
-  /* FINAL OVERRIDES active selectors:
-     - .proFileDockTop/.proFileDockLeft/.proFileDockRight (wrap + no overlap)
-     - .imagerBlock/.imagerBox/.proImagerBox (height:100% alignment)
-     - :root --wcBottomH (single source of truth) */
-  .imagerBox canvas,
-  .proImagerBox canvas,
-  .imagerBlock canvas{
-    width: 100% !important;
-    height: 100% !important;
-    display: block !important;
-  }
-  .bottomRow,
-  .proBottomRow{
-    padding: 10px !important;
-    align-items: stretch !important;
-  }
-  .meterBox,
-  .imagerBox,
-  .fileListBox{
-    padding: 0 !important;
-    overflow: hidden !important;
-    border-radius: 12px !important;
-  }
-  /* =========================
-     HOTFIX 2026-02-03
-     Bottom dock controls:
-     - no hover clipping
-     - filter looks like buttons
-     - no overlap (push each other)
-     ========================= */
-  
-
-  /* 3つの一括ボタンは横並び維持（ただし全体は押し合いで折返し可） */
-  .proBtnGroup{
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 6px !important;
-    flex-wrap: nowrap !important;
-  }
-
-  /* 下段ドック内：hoverでtranslateしない（overflow:hidden配下で欠けるため） */
-  .proFileDockTop .btn:hover,
-  .proFileDockTop .btn:focus-visible{
-    transform: none !important;
-  }
-  .proFileDockTop .btn:hover{
-    box-shadow: 0 10px 22px rgba(0,0,0,0.35) !important;
-  }
-
-  /* 下段ドック内：見切れて「欠け」に見えるツールチップは出さない */
-  .proFileDockTop .proTooltip{
-    display: none !important;
-  }
-
-  /* フィルターもhoverで欠けない（translate禁止 + shadowのみ） */
-  #proFilterStatus:hover{
-    transform: none !important;
-    box-shadow: 0 10px 22px rgba(0,0,0,0.35) !important;
-  }
-
-  /* 履歴ボタンも同じhover挙動（欠けない） */
-  #proJobMini:hover{
-    transform: none !important;
-    box-shadow: 0 10px 22px rgba(0,0,0,0.35) !important;
-  }
   /* ===== /UI adjustments ===== */
 </style></head><body>
 <div id="titlebarDrag"></div>
@@ -4195,52 +3864,41 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
 </dialog>
 <div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
-  <div class="proFileDockTop proFileDockRow">
-    <div class="proOnlyWrap" id="proBtnBulkImportWrap">
-      <span class="proBtnGroup">
+  <div class="proFileDockTop">
+    <div class="proFileDockLeft">
+      <div class="proOnlyWrap" id="proBtnBulkImportWrap">
         <button id="proBtnBulkImport" class="btn" type="button"><span class="btnLabel">一括読み込み</span></button>
         <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-      <input accept=".wav,audio/wav,audio/wave" hidden="" id="proBulkInput" multiple="" type="file"/>
-    </div>
-    <div class="proOnlyWrap" id="proBtnBatchCheckWrap">
-      <span class="proBtnGroup">
+        <span class="proTooltip">Proで利用できます</span>
+        <input accept=".wav,audio/wav,audio/wave" hidden="" id="proBulkInput" multiple="" type="file"/>
+      </div>
+      <div class="proOnlyWrap" id="proBtnBatchCheckWrap">
         <button id="proBtnBatchCheck" class="btn" type="button"><span class="btnLabel">一括チェック</span></button>
         <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-    </div>
-    <div class="proOnlyWrap" id="proBtnBatchExportWrap">
-      <span class="proBtnGroup">
-        <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-    </div>
-    <span class="proDockSpacer" aria-hidden="true"></span>
-    <div class="proFileDockRight">
-      <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
-        <span class="proBtnGroup">
-          <select id="proFilterStatus" class="btn proSelect proFilterSelect" disabled>
-            <option value="all">全て</option>
-            <option value="unverified">未確認</option>
-            <option value="ok">規格OK</option>
-            <option value="ng">規格NG</option>
-            <option value="unexported">未書き出し</option>
-            <option value="exported">書き出し済み</option>
-          </select>
-          <span class="proBadge">PRO</span>
-        </span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
+      <div class="proOnlyWrap" id="proBtnBatchExportWrap">
+        <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
+        <span class="proBadge">PRO</span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
+    </div>
+    <div class="proFileDockRight">
+      <div class="proFilterWrap">
+        <select id="proFilterStatus" class="proSelect">
+          <option value="all">全て</option>
+          <option value="unverified">未確認</option>
+          <option value="ok">規格OK</option>
+          <option value="ng">規格NG</option>
+          <option value="unexported">未書き出し</option>
+          <option value="exported">書き出し済み</option>
+        </select>
+      </div>
       <div class="proOnlyWrap" id="proJobMiniWrap">
-        <span class="proBtnGroup">
-          <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
-            <span id="proJobMiniText">履歴</span>
-          </button>
-          <span class="proBadge">PRO</span>
-        </span>
+        <div id="proJobMini" class="proJobMini" title="履歴">
+          <span id="proJobMiniText">履歴</span>
+        </div>
+        <span class="proBadge">PRO</span>
         <span class="proTooltip">Proで利用できます</span>
       </div>
     </div>
@@ -5497,7 +5155,6 @@ const applyProUi = (state)=>{
       { wrapId: "proBtnBulkImportWrap", btnId: "proBtnBulkImport" },
       { wrapId: "proBtnBatchCheckWrap", btnId: "proBtnBatchCheck" },
       { wrapId: "proBtnBatchExportWrap", btnId: "proBtnBatchExport" },
-      { wrapId: "proFilterWrap", btnId: "proFilterStatus" },
       { wrapId: "proJobMiniWrap", btnId: "proJobMini" },
     ];
     configs.forEach(({ wrapId, btnId })=>{
@@ -5739,34 +5396,6 @@ if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> applyProUi(st));
   window.WavCueLicense.onChange((st)=> applyLicenseUi(st));
 }
-(function(){
-  const log = ()=>{
-    const el = document.querySelector('.bottomRow') || document.querySelector('.proBottomRow');
-    if(!el) return;
-    const height = getComputedStyle(el)?.height;
-    console.log("[UI][bottom] FINAL_OVERRIDES applied", height);
-  };
-  if(document.readyState === "loading"){
-    document.addEventListener("DOMContentLoaded", ()=> requestAnimationFrame(log), { once: true });
-  }else{
-    requestAnimationFrame(log);
-  }
-})();
-(() => {
-  let logged = false;
-  const logDockSizes = () => {
-    if(logged) return;
-    const row = document.querySelector('.proFileDockRow') || document.querySelector('.proFileDockTop');
-    const right = document.querySelector('.proFileDockRight');
-    if(!row || !right) return;
-    logged = true;
-    console.log("[UI][dock] sizes", {
-      rowHeight: row.clientHeight,
-      rightWidth: right.clientWidth,
-    });
-  };
-  window.addEventListener('resize', logDockSizes, { passive: true });
-})();
 
 const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
 const guardBulkCheck = (ctx)=> LicenseCore.guard("bulkCheck", ctx);
@@ -9088,46 +8717,29 @@ function drawMeter(a){
   const ctx = c.getContext("2d");
   const W = c.getBoundingClientRect().width;
   const H = c.getBoundingClientRect().height;
-  const pad = 6;
-  const labelW = 18;
-  const gapX = 6;
-  const footerH = 30;
-  const topPad = 14;
-  const baseY = H - footerH;
-  const gridX = pad + labelW;
-  const barX = gridX + gapX;
-  const barAreaW = (W - pad) - barX;
-  const laneGap = 6;
-  const barW = Math.max(10, Math.floor((barAreaW - laneGap) / 2) - 2);
-  const xL = barX;
-  const xR = barX + barW + laneGap;
   ctx.clearRect(0,0,W,H);
   ctx.fillStyle="rgba(0,0,0,.10)"; ctx.fillRect(0,0,W,H);
 
   const dbMin=-40, dbMax=0;
-  const toH = (db)=> clamp((db-dbMin)/(dbMax-dbMin),0,1)*(baseY - topPad);
+  const baseY = H-22;
+  const toH = (db)=> clamp((db-dbMin)/(dbMax-dbMin),0,1)*(H-40);
 
   ctx.strokeStyle="rgba(148,163,184,.18)";
   ctx.lineWidth=1;
   ctx.font="9px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
   ctx.fillStyle="rgba(229,231,235,.55)";
-  ctx.textBaseline = "middle";
   for(let t=0;t>=-40;t-=3){
     const y = baseY - toH(t);
-    ctx.beginPath(); ctx.moveTo(gridX,y); ctx.lineTo(W-pad,y); ctx.stroke();
-    if(t%6===0 || t===0 || t===-40) ctx.fillText(String(t),pad,y);
+    ctx.beginPath(); ctx.moveTo(8,y); ctx.lineTo(W-6,y); ctx.stroke();
+    if(t%6===0 || t===0 || t===-40) ctx.fillText(String(t),2,y-2);
   }
 
   const rmsLdb=dbfs(a.rmsL), rmsRdb=dbfs(a.rmsR);
   const pkLdb=dbfs(a.pkL), pkRdb=dbfs(a.pkR);
 
-  const fitDbText = (v)=>{
-    const full = `${v.toFixed(1)}dB`;
-    if(ctx.measureText(full).width <= barW) return full;
-    const mid = `${v.toFixed(0)}dB`;
-    if(ctx.measureText(mid).width <= barW) return mid;
-    return `${v.toFixed(0)}`;
-  };
+  const barW=Math.max(10, Math.floor((W-26)/2));
+  const gap=6;
+  const xL=12, xR=xL+barW+gap;
 
   const hL=toH(rmsLdb), hR=toH(rmsRdb);
   ctx.fillStyle="rgba(126,231,162,.55)";
@@ -9143,17 +8755,14 @@ function drawMeter(a){
   ctx.stroke();
 
   ctx.fillStyle="rgba(229,231,235,.85)";
-  ctx.font="10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
-  const yLR = H - 16;
-  const yDB = H - 4;
-  ctx.textBaseline = "alphabetic";
-  ctx.fillText("L", xL, yLR);
-  ctx.fillText("R", xR, yLR);
+  ctx.font="11px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+  ctx.fillText("L", xL, H-10);
+  ctx.fillText("R", xR, H-10);
 
   ctx.fillStyle="rgba(229,231,235,.70)";
-  ctx.font="9px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
-  ctx.fillText(fitDbText(rmsLdb), xL, yDB);
-  ctx.fillText(fitDbText(rmsRdb), xR, yDB);
+  ctx.font="10px ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace";
+  ctx.fillText(`${rmsLdb.toFixed(1)}dB`, xL, H-2);
+  ctx.fillText(`${rmsRdb.toFixed(1)}dB`, xR, H-2);
 }
 
 function drawImager(a){
@@ -18478,6 +18087,7 @@ try{
       render();
       console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
     });
+
     $('proBtnBulkImport')?.addEventListener('click', ()=>{
       const gate = guardBulkImport({ source: "button" });
       if(!gate.ok){
