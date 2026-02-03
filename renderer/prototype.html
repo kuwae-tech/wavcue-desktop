@@ -2709,6 +2709,18 @@ body, #appRoot, .appRoot, .mainLayout{
   -ms-overflow-style:none;
 }
 .proFileDockTop::-webkit-scrollbar{ display:none; }
+.proFileDockRight{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex-wrap:nowrap;
+  justify-content:flex-end;
+  flex: 0 0 auto;
+  min-width: max-content;
+}
+.proFileDockRight > *{
+  flex-shrink: 0;
+}
 .proDockSpacer{ flex:1 1 auto; min-width:12px; }
 .proOnlyWrap{
   position: relative;
@@ -2784,6 +2796,11 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .proOnlyWrap.proOnlyDisabled .proBadge{
     display: inline-flex;
+    position: absolute;
+    top: -6px;
+    right: -4px;
+    margin-left: 0;
+    pointer-events: none;
   }
 .proOnlyWrap.proOnlyDisabled:hover .proTooltip{
   opacity: 1;
@@ -2792,14 +2809,13 @@ body, #appRoot, .appRoot, .mainLayout{
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
 
-/* Filter: must be a flex item that can shrink without clipping/overlap */
+/* Filter: fixed width to avoid overlap and keep single-row layout */
 .proFilterWrap{
   position: relative;
-  display: flex;
-  align-items: center;
-  flex: 1 1 220px;
-  min-width: 140px;
-  max-width: 360px;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 190px;
+  min-width: 190px;
 }
 
 #proFilterStatus{
@@ -2836,17 +2852,6 @@ body, #appRoot, .appRoot, .mainLayout{
 
 /* History: never shrink to zero / never get covered */
 #proJobMiniWrap{ flex: 0 0 auto; }
-
-/* Safety net for extremely narrow widths: avoid truncation by allowing wrap */
-@media (max-width: 1100px){
-  .proFileDockTop{ flex-wrap: wrap; }
-  .proFileDockLeft{ flex: 1 1 100%; }
-  .proFileDockRight{
-    flex: 1 1 100%;
-    width: 100%;
-    justify-content: flex-start;
-  }
-}
 .proBottomRow,
 .bottomRow{
   flex: 0 0 var(--bottomH);
@@ -3989,8 +3994,7 @@ body, #appRoot, .appRoot, .mainLayout{
   /* ===== FINAL: PRO badge is ALWAYS outside (no overlay) ===== */
   .proOnlyWrap,
   .proBtnGroup,
-  #proJobMiniWrap,
-  #proFilterWrap{
+  #proJobMiniWrap{
     position: relative !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -4001,9 +4005,9 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0 !important;
   }
   .proBadge{
-    position: static !important;
-    top: auto !important;
-    right: auto !important;
+    position: absolute !important;
+    top: -6px !important;
+    right: -4px !important;
     transform: none !important;
     margin: 0 !important;
     z-index: auto !important;
@@ -4019,13 +4023,12 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   
   #proFilterWrap{
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 8px !important;
+    display: inline-block !important;
     padding: 0 !important;
     margin: 0 !important;
     flex: 0 0 auto !important;
-    min-width: 0 !important;
+    width: 190px !important;
+    min-width: 190px !important;
     background: none !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
@@ -4041,8 +4044,8 @@ body, #appRoot, .appRoot, .mainLayout{
     -webkit-appearance: none !important;
     display: inline-flex !important;
     align-items: center !important;
-    width: auto !important;
-    min-width: 96px !important;
+    width: 100% !important;
+    min-width: 0 !important;
     max-width: 100% !important;
     height: 32px !important;
     line-height: 1.2 !important;
