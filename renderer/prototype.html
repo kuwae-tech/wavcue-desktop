@@ -2715,11 +2715,13 @@ body, #appRoot, .appRoot, .mainLayout{
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  flex: 0 1 auto;
+  flex: 0 0 auto;
+  flex-shrink: 0;
   min-width: 0;
 }
 .proOnlyWrap .btn{
   flex: 0 1 auto;
+  flex-shrink: 0;
   min-width: 0;
   max-width: 100%;
   white-space: nowrap;
@@ -2728,6 +2730,9 @@ body, #appRoot, .appRoot, .mainLayout{
   text-overflow: ellipsis;
   line-height: 1.2;
   padding: 9px 8px;
+}
+.proOnlyWrap select{
+  flex-shrink: 0;
 }
 .proOnlyWrap .btnLabel{
   min-width: 0;
@@ -3787,22 +3792,8 @@ body, #appRoot, .appRoot, .mainLayout{
     overflow: hidden;
   }
   /* ==== FINAL OVERRIDES: PRO-only visual parity (must win) ==== */
-  #proFilterWrap.proOnlyDisabled #proFilterStatus{ display:none !important; }
-  #proFilterWrap.proOnlyDisabled #proFilterStub{ display:inline-flex !important; }
-  #proFilterWrap:not(.proOnlyDisabled) #proFilterStub{ display:none !important; }
-  #proFilterWrap.proOnlyDisabled::after{ content: none !important; }
-
   /* 履歴ボタンを他.btnと同じ“PRO無効ボタン”の見た目に揃える（サイズだけ調整） */
   #proJobMini.btn.proJobMini{
-    height:32px !important;
-    padding: 9px 10px !important;
-    border-radius:12px !important;
-    display:inline-flex !important;
-    align-items:center !important;
-    gap:8px !important;
-  }
-
-  #proFilterStub.btn.proFilterStub{
     height:32px !important;
     padding: 9px 10px !important;
     border-radius:12px !important;
@@ -3925,11 +3916,16 @@ body, #appRoot, .appRoot, .mainLayout{
     max-width: 100% !important;
   }
   .proBtnGroup{
+    position: relative !important;
     display:inline-flex !important;
     align-items:center !important;
     gap:6px !important;
     flex:0 0 auto !important;
     white-space:nowrap !important; /* バッジ落ち防止 */
+  }
+  .proBtnGroup > .btn,
+  .proBtnGroup > select{
+    flex: 0 0 auto !important;
   }
   .proBtnGroup .proBadge{
     flex:0 0 auto !important;
@@ -3978,6 +3974,7 @@ body, #appRoot, .appRoot, .mainLayout{
     gap: 6px !important;
     white-space: nowrap !important;
     flex: 0 0 auto !important;
+    flex-shrink: 0 !important;
     min-width: 0 !important;
   }
   .proBadge{
@@ -4015,12 +4012,22 @@ body, #appRoot, .appRoot, .mainLayout{
     display: none !important;
     content: none !important;
   }
-  #proFilterStatus{
+  #proFilterStatus,
+  .proFilterSelect{
+    appearance: none !important;
+    -webkit-appearance: none !important;
     display: inline-flex !important;
     align-items: center !important;
     width: auto !important;
-    min-width: 92px !important;
+    min-width: 96px !important;
     max-width: 100% !important;
+    height: 32px !important;
+    line-height: 1.2 !important;
+    padding: 9px 28px 9px 10px !important;
+    border-radius: 12px !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    background: rgba(255,255,255,0.04) !important;
+    color: rgba(255,255,255,0.92) !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
@@ -4271,25 +4278,26 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <span class="proDockSpacer" aria-hidden="true"></span>
     <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
-      <button id="proFilterStub" class="btn proFilterStub" type="button" aria-disabled="true">
-        <span class="btnLabel" id="proFilterStubLabel">全て</span>
-      </button>
-      <select id="proFilterStatus" class="proSelect btn">
-        <option value="all">全て</option>
-        <option value="unverified">未確認</option>
-        <option value="ok">規格OK</option>
-        <option value="ng">規格NG</option>
-        <option value="unexported">未書き出し</option>
-        <option value="exported">書き出し済み</option>
-      </select>
-      <span class="proBadge">PRO</span>
+      <span class="proBtnGroup">
+        <select id="proFilterStatus" class="btn proSelect proFilterSelect" disabled>
+          <option value="all">全て</option>
+          <option value="unverified">未確認</option>
+          <option value="ok">規格OK</option>
+          <option value="ng">規格NG</option>
+          <option value="unexported">未書き出し</option>
+          <option value="exported">書き出し済み</option>
+        </select>
+        <span class="proBadge">PRO</span>
+      </span>
       <span class="proTooltip">Proで利用できます</span>
     </div>
     <div class="proOnlyWrap" id="proJobMiniWrap">
-      <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
-        <span id="proJobMiniText">履歴</span>
-      </button>
-      <span class="proBadge">PRO</span>
+      <span class="proBtnGroup">
+        <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
+          <span id="proJobMiniText">履歴</span>
+        </button>
+        <span class="proBadge">PRO</span>
+      </span>
       <span class="proTooltip">Proで利用できます</span>
     </div>
   </div>
@@ -18526,18 +18534,6 @@ try{
       render();
       console.log(`[Filter] set key=${project.filter.status} visible=${filtered().length}`);
     });
-    (function(){
-      const sel = document.getElementById('proFilterStatus');
-      const lab = document.getElementById('proFilterStubLabel');
-      if(!sel || !lab) return;
-      const sync = ()=>{
-        const opt = sel.options[sel.selectedIndex];
-        lab.textContent = opt ? opt.textContent : '全て';
-      };
-      sync();
-      sel.addEventListener('change', sync);
-    })();
-
     $('proBtnBulkImport')?.addEventListener('click', ()=>{
       const gate = guardBulkImport({ source: "button" });
       if(!gate.ok){
