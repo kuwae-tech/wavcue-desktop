@@ -71,13 +71,15 @@ const migrateSettingsSchema = () => {
 const ensureFolders = async (root) => {
   const exportsPath = path.join(root, 'Exports');
   const backupsPath = path.join(root, 'Backups');
+  const reportsPath = path.join(root, 'Reports');
   await fs.mkdir(exportsPath, { recursive: true });
   await fs.mkdir(backupsPath, { recursive: true });
+  await fs.mkdir(reportsPath, { recursive: true });
   return {
     root,
     exports: exportsPath,
     backups: backupsPath,
-    reports: path.join(root, 'Reports'),
+    reports: reportsPath,
   };
 };
 
@@ -130,7 +132,7 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: initialWidth,
     height: initialHeight,
-    minWidth: 1300,
+    minWidth: 1240,
     minHeight: 680,
     autoHideMenuBar: true,
     backgroundColor: '#0b0c0f',
@@ -160,6 +162,7 @@ const createWindow = () => {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'prototype.html'));
+  mainWindow.setMinimumSize(1240, 680);
 
   if (!isMac) {
     mainWindow.setMenuBarVisibility(false);
