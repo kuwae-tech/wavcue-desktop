@@ -2710,6 +2710,16 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proFileDockTop::-webkit-scrollbar{ display:none; }
 .proDockSpacer{ flex:1 1 auto; min-width:12px; }
+.proFileDockRight{
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: max-content;
+  align-items: center;
+  column-gap: 6px;
+  justify-content: end;
+  flex: 0 0 auto;
+  min-width: 0;
+}
 .proOnlyWrap{
   position: relative;
   display: inline-flex;
@@ -2791,7 +2801,12 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
-.proFilterWrap{ min-width: 0; flex: 0 0 auto; }
+.proFilterWrap{
+  width: 160px;
+  max-width: 200px;
+  min-width: 120px;
+  justify-self: end;
+}
 #proFilterStatus{
   appearance: none;
   -webkit-appearance: none;
@@ -2803,6 +2818,7 @@ body, #appRoot, .appRoot, .mainLayout{
   background: rgba(255,255,255,.06);
   color: rgba(240,242,246,.95);
   outline: none;
+  width: 100%;
   min-width: 0;
   max-width: 100%;
 }
@@ -4018,7 +4034,7 @@ body, #appRoot, .appRoot, .mainLayout{
     -webkit-appearance: none !important;
     display: inline-flex !important;
     align-items: center !important;
-    width: auto !important;
+    width: 100% !important;
     min-width: 96px !important;
     max-width: 100% !important;
     height: 32px !important;
@@ -4277,28 +4293,30 @@ body, #appRoot, .appRoot, .mainLayout{
       <span class="proTooltip">Proで利用できます</span>
     </div>
     <span class="proDockSpacer" aria-hidden="true"></span>
-    <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
-      <span class="proBtnGroup">
-        <select id="proFilterStatus" class="btn proSelect proFilterSelect" disabled>
-          <option value="all">全て</option>
-          <option value="unverified">未確認</option>
-          <option value="ok">規格OK</option>
-          <option value="ng">規格NG</option>
-          <option value="unexported">未書き出し</option>
-          <option value="exported">書き出し済み</option>
-        </select>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-    </div>
-    <div class="proOnlyWrap" id="proJobMiniWrap">
-      <span class="proBtnGroup">
-        <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
-          <span id="proJobMiniText">履歴</span>
-        </button>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
+    <div class="proFileDockRight">
+      <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
+        <span class="proBtnGroup">
+          <select id="proFilterStatus" class="btn proSelect proFilterSelect" disabled>
+            <option value="all">全て</option>
+            <option value="unverified">未確認</option>
+            <option value="ok">規格OK</option>
+            <option value="ng">規格NG</option>
+            <option value="unexported">未書き出し</option>
+            <option value="exported">書き出し済み</option>
+          </select>
+          <span class="proBadge">PRO</span>
+        </span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
+      <div class="proOnlyWrap" id="proJobMiniWrap">
+        <span class="proBtnGroup">
+          <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
+            <span id="proJobMiniText">履歴</span>
+          </button>
+          <span class="proBadge">PRO</span>
+        </span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
     </div>
   </div>
 
