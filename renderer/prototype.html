@@ -4114,6 +4114,121 @@ body, #appRoot, .appRoot, .mainLayout{
     overflow: hidden !important;
     border-radius: 12px !important;
   }
+  /* =========================
+     HOTFIX 2026-02-03
+     Bottom dock controls:
+     - no hover clipping
+     - filter looks like buttons
+     - no overlap (push each other)
+     ========================= */
+  .proFileDockTop{
+    flex-wrap: wrap !important;
+    row-gap: 8px !important;
+    overflow: visible !important;
+  }
+
+  .proFileDockLeft{
+    flex: 1 1 420px !important;
+    min-width: 220px !important;
+  }
+
+  .proFileDockRight{
+    display: flex !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+    justify-content: flex-end !important;
+    align-items: center !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* 3つの一括ボタンは横並び維持（ただし全体は押し合いで折返し可） */
+  .proBtnGroup{
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    flex-wrap: nowrap !important;
+  }
+
+  /* 下段ドック内：hoverでtranslateしない（overflow:hidden配下で欠けるため） */
+  .proFileDockTop .btn:hover,
+  .proFileDockTop .btn:focus-visible{
+    transform: none !important;
+  }
+  .proFileDockTop .btn:hover{
+    box-shadow: 0 10px 22px rgba(0,0,0,0.35) !important;
+  }
+
+  /* 下段ドック内：見切れて「欠け」に見えるツールチップは出さない */
+  .proFileDockTop .proTooltip{
+    display: none !important;
+  }
+
+  /* フィルター旧矢印（class側）を完全無効化（謎領域の温床） */
+  .proFilterWrap::after{
+    display: none !important;
+    content: none !important;
+  }
+
+  /* フィルターラッパ：余計な背景/スペースを持たない */
+  #proFilterWrap{
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 6px !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    min-width: 0 !important;
+    flex: 0 1 auto !important;
+  }
+
+  /* selectを“ボタン”として統一（高さ/角丸/パディング） */
+  #proFilterStatus{
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    height: 32px !important;
+    line-height: 1.2 !important;
+    padding: 9px 28px 9px 10px !important; /* 右に矢印分 */
+    border-radius: 12px !important;
+    border: 1px solid rgba(255,255,255,0.10) !important;
+    background: rgba(255,255,255,0.04) !important;
+    color: rgba(255,255,255,0.92) !important;
+    min-width: 0 !important;  /* 固定minWidthでの力技は禁止 → 0で押し合い */
+    max-width: 100% !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    z-index: auto !important; /* 変な重なりを防ぐ */
+  }
+
+  /* フィルター矢印はid側で描画（重複矢印/謎スペース防止） */
+  #proFilterWrap::after{
+    content: "▾" !important;
+    position: absolute !important;
+    right: 10px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    pointer-events: none !important;
+    color: rgba(240,242,246,0.65) !important;
+    font-size: 12px !important;
+  }
+
+  /* フィルターもhoverで欠けない（translate禁止 + shadowのみ） */
+  #proFilterStatus:hover{
+    transform: none !important;
+    box-shadow: 0 10px 22px rgba(0,0,0,0.35) !important;
+  }
+
+  /* 履歴ボタンも同じhover挙動（欠けない） */
+  #proJobMini:hover{
+    transform: none !important;
+    box-shadow: 0 10px 22px rgba(0,0,0,0.35) !important;
+  }
   /* ===== /UI adjustments ===== */
 </style></head><body>
 <div id="titlebarDrag"></div>
