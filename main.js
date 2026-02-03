@@ -71,13 +71,15 @@ const migrateSettingsSchema = () => {
 const ensureFolders = async (root) => {
   const exportsPath = path.join(root, 'Exports');
   const backupsPath = path.join(root, 'Backups');
+  const reportsPath = path.join(root, 'Reports');
   await fs.mkdir(exportsPath, { recursive: true });
   await fs.mkdir(backupsPath, { recursive: true });
+  await fs.mkdir(reportsPath, { recursive: true });
   return {
     root,
     exports: exportsPath,
     backups: backupsPath,
-    reports: path.join(root, 'Reports'),
+    reports: reportsPath,
   };
 };
 
