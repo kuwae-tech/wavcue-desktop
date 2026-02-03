@@ -2796,11 +2796,13 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .proOnlyWrap.proOnlyDisabled .proBadge{
     display: inline-flex;
-    position: absolute;
-    top: -6px;
-    right: -4px;
-    margin-left: 0;
+    position: static;
+    top: auto;
+    right: auto;
+    margin-left: 6px;
+    transform: none;
     pointer-events: none;
+    white-space: nowrap;
   }
 .proOnlyWrap.proOnlyDisabled:hover .proTooltip{
   opacity: 1;
@@ -4005,11 +4007,11 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0 !important;
   }
   .proBadge{
-    position: absolute !important;
-    top: -6px !important;
-    right: -4px !important;
+    position: static !important;
+    top: auto !important;
+    right: auto !important;
     transform: none !important;
-    margin: 0 !important;
+    margin: 0 0 0 6px !important;
     z-index: auto !important;
     pointer-events: none !important;
     white-space: nowrap !important;
@@ -4059,7 +4061,7 @@ body, #appRoot, .appRoot, .mainLayout{
     white-space: nowrap !important;
     box-sizing: border-box !important;
     position: relative !important;
-    z-index: 1 !important;
+    z-index: auto !important;
   }
   /* ===== FINAL: Imager follows UI alignment (no square lock) ===== */
   .imagerBox,
