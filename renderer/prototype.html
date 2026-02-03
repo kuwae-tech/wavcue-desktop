@@ -37,14 +37,14 @@
     --app-pad: 10px;
     --app-gap: 10px;
     --brand-logo-h: 44px;
-    --bottom-line-h: 240px;
+    --bottom-line-h: 252px;
     --fileList-min-h: var(--bottom-line-h);
     --wave-min-h: 196px;
     --stereo-box-h: var(--bottom-line-h);
     --titlebar-drag-h: 34px;
   }
   *{box-sizing:border-box}
-  html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none}
+  html,body{height:100%;margin:0;background:radial-gradient(1200px 800px at 20% 10%, #15264a 0%, var(--bg) 55%);color:var(--text);font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,"Hiragino Kaku Gothic ProN","Meiryo",sans-serif;-webkit-user-select:none;user-select:none;min-width:1240px}
   body{padding-top: var(--titlebar-drag-h)}
   .app{height:100%;display:flex;flex-direction:column;gap:var(--app-gap);padding:var(--app-pad)}
   .appHeader{
@@ -3911,7 +3911,7 @@ body, #appRoot, .appRoot, .mainLayout{
     align-items: center !important;
     justify-content: space-between !important;
     gap: 8px !important;
-    padding: 4px 8px 6px !important;   /* ←上側を詰める（常識的に） */
+    padding: 6px 8px 6px !important;   /* hover浮きの逃げを確保 */
     flex-wrap: nowrap !important;       /* 右側が2段に落ちないよう固定 */
     min-width: 0 !important;
   }
@@ -3937,16 +3937,12 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0 !important;
   }
   .proFileDockRight{
-    display: flex !important;
-    gap: 6px !important;
+    display: inline-flex !important;
     align-items: center !important;
-    flex-wrap: nowrap !important;
-    justify-content: flex-end !important;
-    flex: 0 1 auto !important;
-    min-width: 0 !important; /* 右側の謎スペースを撤廃 */
-    max-width: 100% !important;
-    overflow-x: auto !important; /* 被り回避：必要なら横スクロール */
-    scrollbar-width: thin;
+    gap: 10px !important;
+    flex: 0 0 auto !important;
+    min-width: 0 !important;
+    white-space: nowrap !important;
   }
 
   /* フィルター等が “右に寄りすぎて見切れる” のを防ぐ（wrapのmin-width問題を潰す） */
@@ -3989,7 +3985,7 @@ body, #appRoot, .appRoot, .mainLayout{
     flex: 1 1 auto !important;
     min-height: 0 !important;
     overflow: auto !important;
-    padding: 4px 8px 10px !important;  /* ←上を詰めて左右との隙間感を揃える */
+    padding: 4px 8px 18px !important;  /* 下側の余白を少し増やす */
   }
   .proFileRow{
     padding: 4px 8px !important;
@@ -4040,8 +4036,6 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .proFileDockRight{
     min-width: 0 !important;
-    overflow-x: auto !important;
-    overflow-y: hidden !important;
   }
   .proFileDockLeft{
     flex: 1 1 auto !important;
@@ -4055,16 +4049,34 @@ body, #appRoot, .appRoot, .mainLayout{
     white-space: nowrap !important;
   }
   #proFilterWrap{
+    display: inline-flex !important;
+    align-items: center !important;
+    gap: 8px !important;
+    padding: 0 !important;
+    margin: 0 !important;
     flex: 0 0 auto !important;
     min-width: 0 !important;
+    background: none !important;
+    box-shadow: none !important;
+    backdrop-filter: none !important;
+  }
+  #proFilterWrap::before,
+  #proFilterWrap::after{
+    display: none !important;
+    content: none !important;
   }
   #proFilterStatus{
-    width: 110px !important;
-    min-width: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    width: auto !important;
+    min-width: 92px !important;
     max-width: 100% !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
+    box-sizing: border-box !important;
+    position: relative !important;
+    z-index: 1 !important;
   }
   /* ===== FINAL: Imager follows UI alignment (no square lock) ===== */
   .imagerBox,
