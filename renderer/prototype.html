@@ -2699,29 +2699,36 @@ body, #appRoot, .appRoot, .mainLayout{
   align-items:center;
   justify-content:flex-start;
   gap:6px;
-  padding:14px 8px 6px;
+  padding:14px 16px 6px 12px;
   border-bottom:1px solid rgba(255,255,255,0.08);
   flex-wrap:nowrap;
-  overflow-x:auto;
-  overflow-y:visible;
+  overflow: visible;
   min-width:0;
   scrollbar-width:none;
   -ms-overflow-style:none;
 }
 .proFileDockTop::-webkit-scrollbar{ display:none; }
 .proFileDockLeft{
-  flex: 1 1 auto;
-  min-width: 0;
+  flex: 0 0 auto;
+  min-width: max-content;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
 }
 .proFileDockRight{
   display:flex;
-  gap:6px;
+  gap:8px;
   align-items:center;
   flex-wrap:nowrap;
   justify-content:flex-end;
   flex: 0 0 auto;
+  margin-left: auto;
   min-width: max-content;
   white-space: nowrap;
+  padding-right: 12px;
+  overflow: visible;
+  flex-shrink: 0;
 }
 .proFileDockRight > *{
   flex-shrink: 0;
@@ -2823,6 +2830,7 @@ body, #appRoot, .appRoot, .mainLayout{
   flex: 0 0 auto;
   width: 190px;
   min-width: 190px;
+  flex-shrink: 0;
 }
 
 #proFilterStatus{
@@ -2855,6 +2863,7 @@ body, #appRoot, .appRoot, .mainLayout{
   pointer-events: none;
   color: rgba(240,242,246,.65);
   font-size: 12px;
+  z-index: 2;
 }
 
 /* History: never shrink to zero / never get covered */
@@ -4294,51 +4303,54 @@ body, #appRoot, .appRoot, .mainLayout{
 </dialog>
 <div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop proFileDockRow">
-    <div class="proOnlyWrap" id="proBtnBulkImportWrap">
-      <span class="proBtnGroup">
-        <button id="proBtnBulkImport" class="btn" type="button"><span class="btnLabel">一括読み込み</span></button>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-      <input accept=".wav,audio/wav,audio/wave" hidden="" id="proBulkInput" multiple="" type="file"/>
+    <div class="proFileDockLeft">
+      <div class="proOnlyWrap" id="proBtnBulkImportWrap">
+        <span class="proBtnGroup">
+          <button id="proBtnBulkImport" class="btn" type="button"><span class="btnLabel">一括読み込み</span></button>
+          <span class="proBadge">PRO</span>
+        </span>
+        <span class="proTooltip">Proで利用できます</span>
+        <input accept=".wav,audio/wav,audio/wave" hidden="" id="proBulkInput" multiple="" type="file"/>
+      </div>
+      <div class="proOnlyWrap" id="proBtnBatchCheckWrap">
+        <span class="proBtnGroup">
+          <button id="proBtnBatchCheck" class="btn" type="button"><span class="btnLabel">一括チェック</span></button>
+          <span class="proBadge">PRO</span>
+        </span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
+      <div class="proOnlyWrap" id="proBtnBatchExportWrap">
+        <span class="proBtnGroup">
+          <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
+          <span class="proBadge">PRO</span>
+        </span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
     </div>
-    <div class="proOnlyWrap" id="proBtnBatchCheckWrap">
-      <span class="proBtnGroup">
-        <button id="proBtnBatchCheck" class="btn" type="button"><span class="btnLabel">一括チェック</span></button>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-    </div>
-    <div class="proOnlyWrap" id="proBtnBatchExportWrap">
-      <span class="proBtnGroup">
-        <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-    </div>
-    <span class="proDockSpacer" aria-hidden="true"></span>
-    <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
-      <span class="proBtnGroup">
-        <select id="proFilterStatus" class="btn proSelect proFilterSelect" disabled>
-          <option value="all">全て</option>
-          <option value="unverified">未確認</option>
-          <option value="ok">規格OK</option>
-          <option value="ng">規格NG</option>
-          <option value="unexported">未書き出し</option>
-          <option value="exported">書き出し済み</option>
-        </select>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-    </div>
-    <div class="proOnlyWrap" id="proJobMiniWrap">
-      <span class="proBtnGroup">
-        <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
-          <span id="proJobMiniText">履歴</span>
-        </button>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
+    <div class="proFileDockRight">
+      <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
+        <span class="proBtnGroup">
+          <select id="proFilterStatus" class="btn proSelect proFilterSelect" disabled>
+            <option value="all">全て</option>
+            <option value="unverified">未確認</option>
+            <option value="ok">規格OK</option>
+            <option value="ng">規格NG</option>
+            <option value="unexported">未書き出し</option>
+            <option value="exported">書き出し済み</option>
+          </select>
+          <span class="proBadge">PRO</span>
+        </span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
+      <div class="proOnlyWrap" id="proJobMiniWrap">
+        <span class="proBtnGroup">
+          <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
+            <span id="proJobMiniText">履歴</span>
+          </button>
+          <span class="proBadge">PRO</span>
+        </span>
+        <span class="proTooltip">Proで利用できます</span>
+      </div>
     </div>
   </div>
 
@@ -5855,10 +5867,15 @@ if(typeof window.WavCueLicense?.onChange === "function"){
     const row = document.querySelector('.proFileDockRow') || document.querySelector('.proFileDockTop');
     const right = document.querySelector('.proFileDockRight');
     if(!row || !right) return;
+    const rect = right.getBoundingClientRect();
     logged = true;
-    console.log("[UI][dock] sizes", {
+    console.debug("[UI][dock] sizes", {
       rowHeight: row.clientHeight,
-      rightWidth: right.clientWidth,
+      rightRect: {
+        left: rect.left,
+        right: rect.right,
+        width: rect.width,
+      },
     });
   };
   window.addEventListener('resize', logDockSizes, { passive: true });
