@@ -6647,7 +6647,7 @@ function maybeToastFromLog(msg){
       toast(s.replace(/^ERROR:\s*/,"").trim() || s, "err", 3600);
       return;
     }
-    if(s.includes("書き出し完了") || s.includes("ファイルを添付しました") || s.includes("添付ファイルを認識しました")){
+    if(s.includes("ファイルを添付しました") || s.includes("添付ファイルを認識しました")){
       toast(s.replace(/^OK:\s*/,"").trim() || s, "ok", 2600);
       return;
     }
@@ -11618,12 +11618,15 @@ async function exportWav(){
     return;
   }
   const suggested = (state.fileName && String(state.fileName).trim()) ? String(state.fileName).trim() : "output.wav";
-  await exportOneWithSave({
+  const exportResult = await exportOneWithSave({
     saveHandler: _saveBlobWithFallback,
     suggestedName: suggested,
     progressEnabled: true,
     notifyOnError: true,
   });
+  if(exportResult?.ok && window.safeToast){
+    window.safeToast("書き出し完了", "ok", 2600);
+  }
 }
 
 function normalizeExportFileName(name){
