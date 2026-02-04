@@ -18437,7 +18437,6 @@ try{
         render();
         if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("qc:bulk");
       }
-      if(type === "export") isBulkExporting = false;
       job.running = false;
       updateJobUI();
       render();
@@ -18483,6 +18482,7 @@ try{
           "ok",
           4000
         );
+        if(type === "export") isBulkExporting = false;
       }else{
         bulkResultPanel.show({
           title: type === "qc" ? "一括チェック結果" : "一括書き出し結果",
@@ -18491,6 +18491,7 @@ try{
           sub,
           messages: historyEntry.failureMessages,
         });
+        if(type === "export") isBulkExporting = false;
       }
     }
   }
