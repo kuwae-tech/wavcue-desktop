@@ -515,17 +515,26 @@
   #bulkOverlay .proJobNow{ color:rgba(226,232,240,0.9); }
 
   /* Batch result panel */
+  .batchResultBackdrop{
+    position:fixed;
+    inset:0;
+    background:rgba(2,6,23,0.55);
+    backdrop-filter: blur(4px);
+    z-index:10045;
+  }
+  .batchResultBackdrop.hidden{ display:none; }
   .batchResultPanel{
     position:fixed;
-    right:16px;
-    bottom:18px;
+    left:50%;
+    top:50%;
+    transform:translate(-50%, -50%);
     width:min(420px, calc(100vw - 32px));
     border-radius:14px;
     border:1px solid rgba(255,255,255,0.12);
     background:rgba(15,23,42,0.94);
     box-shadow:0 18px 60px rgba(0,0,0,0.4);
     padding:12px 14px;
-    z-index:10020;
+    z-index:10050;
     backdrop-filter: blur(10px);
   }
   .batchResultPanel.hidden{ display:none; }
@@ -4284,6 +4293,7 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="sub proJobNow" id="bulkNow"> </div>
   </div>
 </div>
+<div id="bulkResultBackdrop" class="batchResultBackdrop hidden" aria-hidden="true"></div>
 <div id="bulkResultPanel" class="batchResultPanel hidden" role="status" aria-live="polite" aria-atomic="true">
   <div class="batchResultHeader">
     <div class="batchResultTitle" id="bulkResultTitle">一括処理結果</div>
@@ -4341,7 +4351,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div class="proOnlyWrap" id="proBtnBatchExportWrap">
       <span class="proBtnGroup">
-        <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">まとめて書き出し</span></button>
+        <button id="proBtnBatchExport" class="btn" type="button"><span class="btnLabel">一括書き出し</span></button>
         <span class="proBadge">PRO</span>
       </span>
       <span class="proTooltip">Proで利用できます</span>
@@ -16849,10 +16859,11 @@ try{
     return { start, update, end };
   })();
   const bulkResultPanel = (()=> {
-    let panel=null, titleEl=null, statusEl=null, countEl=null, subEl=null, msgEl=null, closeBtn=null;
+    let panel=null, backdrop=null, titleEl=null, statusEl=null, countEl=null, subEl=null, msgEl=null, closeBtn=null;
     let bound = false;
     const ensure = ()=>{
       if(panel) return;
+      backdrop = $("bulkResultBackdrop");
       panel = $("bulkResultPanel");
       titleEl = $("bulkResultTitle");
       statusEl = $("bulkResultStatus");
@@ -16863,14 +16874,18 @@ try{
       if(closeBtn && !bound){
         bound = true;
         closeBtn.addEventListener("click", ()=> hide());
+        backdrop?.addEventListener("click", ()=> hide());
+        panel?.addEventListener("click", (e)=> e.stopPropagation());
       }
     };
     const hide = ()=>{
       ensure();
+      if(backdrop) backdrop.classList.add("hidden");
       if(panel) panel.classList.add("hidden");
     };
     const show = ({ title, ok, counts, sub, messages })=>{
       ensure();
+      if(backdrop) backdrop.classList.remove("hidden");
       if(!panel) return;
       if(titleEl) titleEl.textContent = title || "一括処理結果";
       if(statusEl){
@@ -18419,7 +18434,7 @@ try{
         sub = `書き出し成功 ${historyEntry.okCount}件`;
       }
       bulkResultPanel.show({
-        title: type === "qc" ? "一括チェック結果" : "まとめて書き出し結果",
+        title: type === "qc" ? "一括チェック結果" : "一括書き出し結果",
         ok: !job.cancel && historyEntry.failCount === 0,
         counts,
         sub,
