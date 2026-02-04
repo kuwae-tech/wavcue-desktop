@@ -2699,7 +2699,7 @@ body, #appRoot, .appRoot, .mainLayout{
   align-items:center;
   justify-content:flex-start;
   gap:6px;
-  padding:4px 8px 6px;
+  padding:14px 8px 6px;
   border-bottom:1px solid rgba(255,255,255,0.08);
   flex-wrap:nowrap;
   overflow-x:auto;
@@ -2796,13 +2796,11 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .proOnlyWrap.proOnlyDisabled .proBadge{
     display: inline-flex;
-    position: static;
-    top: auto;
-    right: auto;
-    margin-left: 6px;
-    transform: none;
+    position: absolute;
+    top: -6px;
+    right: -4px;
+    margin-left: 0;
     pointer-events: none;
-    white-space: nowrap;
   }
 .proOnlyWrap.proOnlyDisabled:hover .proTooltip{
   opacity: 1;
@@ -4007,11 +4005,11 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0 !important;
   }
   .proBadge{
-    position: static !important;
-    top: auto !important;
-    right: auto !important;
+    position: absolute !important;
+    top: -6px !important;
+    right: -4px !important;
     transform: none !important;
-    margin: 0 0 0 6px !important;
+    margin: 0 !important;
     z-index: auto !important;
     pointer-events: none !important;
     white-space: nowrap !important;

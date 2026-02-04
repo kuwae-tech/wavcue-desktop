@@ -132,7 +132,7 @@ const createWindow = () => {
   const mainWindow = new BrowserWindow({
     width: initialWidth,
     height: initialHeight,
-    minWidth: 1320,
+    minWidth: 1590,
     minHeight: 680,
     autoHideMenuBar: true,
     backgroundColor: '#0b0c0f',
@@ -162,7 +162,7 @@ const createWindow = () => {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'prototype.html'));
-  mainWindow.setMinimumSize(1320, 680);
+  mainWindow.setMinimumSize(1590, 680);
 
   if (!isMac) {
     mainWindow.setMenuBarVisibility(false);
