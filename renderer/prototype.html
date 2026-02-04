@@ -16909,6 +16909,38 @@ try{
     };
     return { show, hide };
   })();
+  const showBatchToast = (message, type="ok", timeout=4000)=>{
+    try{
+      const host = (typeof getToastHostTarget === "function")
+        ? getToastHostTarget()
+        : (document.getElementById("toastRoot") || document.body);
+      if(!host) return;
+      const t = document.createElement("div");
+      t.className = `toast ${type}`;
+      const ic = document.createElement("div");
+      ic.className = "ic";
+      ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : "OK");
+      const m = document.createElement("div");
+      m.className = "msg";
+      m.textContent = String(message ?? "");
+      t.appendChild(ic);
+      t.appendChild(m);
+      host.appendChild(t);
+      requestAnimationFrame(()=>{ try{ t.classList.add("in"); }catch(_){ } });
+      let removed = false;
+      const removeNow = ()=>{
+        if(removed) return;
+        removed = true;
+        t.classList.add("out");
+        window.setTimeout(()=>{ try{ t.remove(); }catch(_){ } }, 200);
+      };
+      const timerId = window.setTimeout(removeNow, timeout);
+      t.addEventListener("click", ()=>{
+        window.clearTimeout(timerId);
+        removeNow();
+      });
+    }catch(_){}
+  };
   const W = window.WavCue || {};
   const api = W.api || {};
   const loadSingleWav =
@@ -18433,13 +18465,25 @@ try{
       }else{
         sub = `書き出し成功 ${historyEntry.okCount}件`;
       }
-      bulkResultPanel.show({
-        title: type === "qc" ? "一括チェック結果" : "一括書き出し結果",
-        ok: !job.cancel && historyEntry.failCount === 0,
-        counts,
-        sub,
-        messages: historyEntry.failureMessages,
-      });
+      const isSuccess = !job.cancel && historyEntry.failCount === 0;
+      if(isSuccess){
+        bulkResultPanel.hide();
+        showBatchToast(
+          type === "qc"
+            ? `一括チェック完了（${historyEntry.total}件）`
+            : `一括書き出し完了（${historyEntry.total}件）`,
+          "ok",
+          4000
+        );
+      }else{
+        bulkResultPanel.show({
+          title: type === "qc" ? "一括チェック結果" : "一括書き出し結果",
+          ok: false,
+          counts,
+          sub,
+          messages: historyEntry.failureMessages,
+        });
+      }
     }
   }
   function idsSelectedOrActive(){
