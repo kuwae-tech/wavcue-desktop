@@ -508,9 +508,73 @@
   #bulkOverlay .meta{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:8px}
   #bulkOverlay .msg{font-size:13px}
   #bulkOverlay .pct{font-size:11px;color:var(--muted);white-space:nowrap}
-  #bulkOverlay .bar{width:100%;height:8px;border-radius:999px;background:rgba(255,255,255,0.08);overflow:hidden}
-  #bulkOverlay .bar>div{height:100%;width:0%;border-radius:999px;background:linear-gradient(90deg,rgba(96,165,250,0.95),rgba(34,197,94,0.95))}
+  #bulkOverlay .proJobProgressWrap{
+    margin:6px 0 10px;
+  }
   #bulkOverlay .sub{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.4}
+  #bulkOverlay .proJobNow{ color:rgba(226,232,240,0.9); }
+
+  /* Batch result panel */
+  .batchResultPanel{
+    position:fixed;
+    right:16px;
+    bottom:18px;
+    width:min(420px, calc(100vw - 32px));
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,0.12);
+    background:rgba(15,23,42,0.94);
+    box-shadow:0 18px 60px rgba(0,0,0,0.4);
+    padding:12px 14px;
+    z-index:10020;
+    backdrop-filter: blur(10px);
+  }
+  .batchResultPanel.hidden{ display:none; }
+  .batchResultHeader{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    margin-bottom:6px;
+  }
+  .batchResultTitle{ font-weight:700; font-size:13px; }
+  .batchResultStatus{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    font-size:12px;
+    padding:2px 8px;
+    border-radius:999px;
+    border:1px solid rgba(255,255,255,0.16);
+    background:rgba(255,255,255,0.06);
+  }
+  .batchResultStatus.isFail{
+    border-color: rgba(255,120,120,0.45);
+    background: rgba(255,120,120,0.12);
+    color: rgba(255,200,200,0.95);
+  }
+  .batchResultMeta{
+    display:flex;
+    flex-wrap:wrap;
+    gap:8px 12px;
+    align-items:center;
+    font-size:12px;
+    color:rgba(229,231,235,.9);
+    margin-bottom:6px;
+  }
+  .batchResultSub{ font-size:11px; color:var(--muted); }
+  .batchResultMessages{
+    margin:8px 0 0;
+    display:grid;
+    gap:6px;
+    font-size:11px;
+    color:rgba(229,231,235,.85);
+  }
+  .batchResultMessages .msgItem{
+    border-radius:10px;
+    padding:6px 8px;
+    border:1px solid rgba(255,255,255,0.12);
+    background:rgba(255,255,255,0.03);
+  }
 
   
   /* ===== QC preset export selector overlay ===== */
@@ -2796,11 +2860,6 @@ body, #appRoot, .appRoot, .mainLayout{
     cursor: not-allowed;
     pointer-events: none;
   }
-  .proOnlyWrap.proOnlyDisabled .proJobMini{
-    opacity: .45;
-    cursor: not-allowed;
-    pointer-events: none;
-  }
   .proOnlyWrap.proOnlyDisabled .proBadge{
     display: inline-flex;
     position: absolute;
@@ -2857,8 +2916,6 @@ body, #appRoot, .appRoot, .mainLayout{
   font-size: 12px;
 }
 
-/* History: never shrink to zero / never get covered */
-#proJobMiniWrap{ flex: 0 0 auto; }
 .proBottomRow,
 .bottomRow{
   flex: 0 0 var(--bottomH);
@@ -2974,36 +3031,13 @@ body, #appRoot, .appRoot, .mainLayout{
 .proCueBtn{ border-color:rgba(56,189,248,.45); color:#bae6fd; }
 .proClipBtn{ border-color:rgba(255,255,255,0.2); }
 .miniIcon{ width:12px; height:12px; display:inline-block; }
-.proFileDockTop .btn,
-.proFileDockTop .proJobMini{
+.proFileDockTop .btn{
   white-space: nowrap;
   word-break: keep-all;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
   flex-shrink: 0;
-}
-.proFileDockTop .proJobMini{
-  min-width: fit-content;
-  overflow: visible;
-}
-.proJobMini{
-  font-size:12px; padding:2px 10px; border-radius:999px;
-  background:rgba(255,255,255,0.10);
-  user-select:none; cursor:pointer;
-  border:1px solid rgba(255,255,255,0.10);
-  display:inline-flex;
-  align-items:center;
-  line-height:1.2;
-  min-width:44px;
-  flex:0 0 auto;
-}
-#proJobMiniText{
-  white-space: nowrap;
-  word-break: keep-all;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
 }
 .proGlobalPopover{
   position:fixed;
@@ -3832,15 +3866,6 @@ body, #appRoot, .appRoot, .mainLayout{
     overflow: hidden;
   }
   /* ==== FINAL OVERRIDES: PRO-only visual parity (must win) ==== */
-  /* 履歴ボタンを他.btnと同じ“PRO無効ボタン”の見た目に揃える（サイズだけ調整） */
-  #proJobMini.btn.proJobMini{
-    height:32px !important;
-    padding: 9px 10px !important;
-    border-radius:12px !important;
-    display:inline-flex !important;
-    align-items:center !important;
-    gap:8px !important;
-  }
   /* ============================================================
      FINAL OVERRIDES (Bottom layout truth)
      - Fix meter bottom crop (rounded corners)
@@ -4005,8 +4030,7 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   /* ===== FINAL: PRO badge is ALWAYS outside (no overlay) ===== */
   .proOnlyWrap,
-  .proBtnGroup,
-  #proJobMiniWrap{
+  .proBtnGroup{
     position: relative !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -4029,7 +4053,6 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .proOnlyWrap .btn,
   .proBtnGroup .btn,
-  #proJobMiniWrap .btn,
   #proFilterWrap .btn,
   #proFilterWrap select{
     padding-right: 12px !important;
@@ -4202,11 +4225,6 @@ body, #appRoot, .appRoot, .mainLayout{
     box-shadow: 0 10px 22px rgba(0,0,0,0.35) !important;
   }
 
-  /* 履歴ボタンも同じhover挙動（欠けない） */
-  #proJobMini:hover{
-    transform: none !important;
-    box-shadow: 0 10px 22px rgba(0,0,0,0.35) !important;
-  }
   /* ===== /UI adjustments ===== */
 </style></head><body>
 <div id="titlebarDrag"></div>
@@ -4261,10 +4279,22 @@ body, #appRoot, .appRoot, .mainLayout{
       <div class="msg" id="bulkMsg">一括処理中…</div>
       <div class="pct" id="bulkPct">0%</div>
     </div>
-    <div class="bar"><div id="bulkBar"></div></div>
+    <div class="proJobProgressWrap"><div id="bulkBar" class="proJobProgressBar"></div></div>
     <div class="sub" id="bulkSub"> </div>
-    <div class="sub" id="bulkNow"> </div>
+    <div class="sub proJobNow" id="bulkNow"> </div>
   </div>
+</div>
+<div id="bulkResultPanel" class="batchResultPanel hidden" role="status" aria-live="polite" aria-atomic="true">
+  <div class="batchResultHeader">
+    <div class="batchResultTitle" id="bulkResultTitle">一括処理結果</div>
+    <button class="btnMini" id="bulkResultClose" type="button">閉じる</button>
+  </div>
+  <div class="batchResultMeta">
+    <span class="batchResultStatus" id="bulkResultStatus">完了</span>
+    <span id="bulkResultCounts">対象 0件 / 成功 0件 / 失敗 0件</span>
+  </div>
+  <div class="batchResultSub" id="bulkResultSub"></div>
+  <div class="batchResultMessages" id="bulkResultMessages"></div>
 </div>
 <header class="appHeader">
   <div class="hdrLeft">
@@ -4316,7 +4346,6 @@ body, #appRoot, .appRoot, .mainLayout{
       </span>
       <span class="proTooltip">Proで利用できます</span>
     </div>
-    <span class="proDockSpacer" aria-hidden="true"></span>
     <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
       <span class="proBtnGroup">
         <select id="proFilterStatus" class="btn proSelect proFilterSelect" disabled>
@@ -4327,15 +4356,6 @@ body, #appRoot, .appRoot, .mainLayout{
           <option value="unexported">未書き出し</option>
           <option value="exported">書き出し済み</option>
         </select>
-        <span class="proBadge">PRO</span>
-      </span>
-      <span class="proTooltip">Proで利用できます</span>
-    </div>
-    <div class="proOnlyWrap" id="proJobMiniWrap">
-      <span class="proBtnGroup">
-        <button id="proJobMini" class="btn proJobMini" type="button" title="履歴">
-          <span id="proJobMiniText">履歴</span>
-        </button>
         <span class="proBadge">PRO</span>
       </span>
       <span class="proTooltip">Proで利用できます</span>
@@ -5594,7 +5614,6 @@ const applyProUi = (state)=>{
       { wrapId: "proBtnBatchCheckWrap", btnId: "proBtnBatchCheck" },
       { wrapId: "proBtnBatchExportWrap", btnId: "proBtnBatchExport" },
       { wrapId: "proFilterWrap", btnId: "proFilterStatus" },
-      { wrapId: "proJobMiniWrap", btnId: "proJobMini" },
     ];
     configs.forEach(({ wrapId, btnId })=>{
       const wrap = document.getElementById(wrapId);
@@ -16829,6 +16848,52 @@ try{
     };
     return { start, update, end };
   })();
+  const bulkResultPanel = (()=> {
+    let panel=null, titleEl=null, statusEl=null, countEl=null, subEl=null, msgEl=null, closeBtn=null;
+    let bound = false;
+    const ensure = ()=>{
+      if(panel) return;
+      panel = $("bulkResultPanel");
+      titleEl = $("bulkResultTitle");
+      statusEl = $("bulkResultStatus");
+      countEl = $("bulkResultCounts");
+      subEl = $("bulkResultSub");
+      msgEl = $("bulkResultMessages");
+      closeBtn = $("bulkResultClose");
+      if(closeBtn && !bound){
+        bound = true;
+        closeBtn.addEventListener("click", ()=> hide());
+      }
+    };
+    const hide = ()=>{
+      ensure();
+      if(panel) panel.classList.add("hidden");
+    };
+    const show = ({ title, ok, counts, sub, messages })=>{
+      ensure();
+      if(!panel) return;
+      if(titleEl) titleEl.textContent = title || "一括処理結果";
+      if(statusEl){
+        statusEl.textContent = ok ? "成功" : "失敗あり";
+        statusEl.classList.toggle("isFail", !ok);
+      }
+      if(countEl) countEl.textContent = counts || "";
+      if(subEl){
+        subEl.textContent = sub || "";
+        subEl.style.display = sub ? "block" : "none";
+      }
+      if(msgEl){
+        const list = Array.isArray(messages) ? messages : [];
+        if(!list.length){
+          msgEl.innerHTML = `<div class="msgItem">エラーなし</div>`;
+        }else{
+          msgEl.innerHTML = list.map(item=>`<div class="msgItem">${esc(item)}</div>`).join("");
+        }
+      }
+      panel.classList.remove("hidden");
+    };
+    return { show, hide };
+  })();
   const W = window.WavCue || {};
   const api = W.api || {};
   const loadSingleWav =
@@ -18015,8 +18080,6 @@ try{
     renderHistoryDetail();
   }
   function updateJobUI(now){
-    const mini = $('proJobMiniText');
-    if(mini) mini.textContent = job.running ? `${job.done}/${job.total}` : '履歴';
     if(history.active){
       history.active.done = job.done;
       if(history.active.type === "export"){
@@ -18148,9 +18211,9 @@ try{
       }catch(_){}
       return;
     }
-    const prog = getProg();
     let exportTarget = null;
     let bulkStartedAt = 0;
+    bulkResultPanel.hide();
     if(type === "export"){
       console.log(`[BULK][PREFLIGHT] start total=${targets.length}`);
       const ngItems = [];
@@ -18172,15 +18235,13 @@ try{
         if(!proceed) return;
       }
       console.log("[BULK][PREFLIGHT] pass -> continue");
-      bulkStartedAt = Date.now();
-      console.log(`[BULK] start total=${targets.length}`);
-      prog.show("一括書き出し中…", `0/${targets.length}`);
       exportTarget = await resolveBulkExportTarget();
       if(!exportTarget){
         logJob("一括書き出しをキャンセルしました。");
-        prog.hide();
         return;
       }
+      bulkStartedAt = Date.now();
+      console.log(`[BULK] start total=${targets.length}`);
       const exportFolderLabel = exportTarget.folderPath || "";
       console.log(`[BULK] pickFolder ok path=${exportFolderLabel}`);
     }
@@ -18191,6 +18252,7 @@ try{
     job.total=targets.length;
     job.ok=0;
 
+    const failureMessages = [];
     const historyEntry = {
       id: uid(),
       type,
@@ -18202,6 +18264,7 @@ try{
       failedIds: [],
       exportedNames: [],
       logLines: [],
+      failureMessages,
       startedAt: Date.now(),
       running: true,
       nowText: "",
@@ -18214,9 +18277,7 @@ try{
     logJob(`対象件数: ${targets.length}`);
     logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
     updateJobUI();
-    if(type !== "export"){
-      bulkOverlay.start(type, targets.length);
-    }
+    bulkOverlay.start(type, targets.length);
 
     let qcUpdatedRows = 0;
     try{
@@ -18230,12 +18291,7 @@ try{
           logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
           await setActiveFile(id, {force:true});
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
-          if(type === "export"){
-            const pct = job.total ? (job.done / job.total) : 0;
-            prog.set(pct, "一括書き出し中…", `${index}/${job.total} ${f.name || ""}`);
-          }else{
-            bulkOverlay.update(job.done, job.total, f.name);
-          }
+          bulkOverlay.update(job.done, job.total, f.name);
           if(type==='qc'){
             const st = window.WavCue?.state;
             if(!st || !st.buffer){
@@ -18304,20 +18360,19 @@ try{
         }catch(e){
           job.failed.push(id);
           historyEntry.failCount += 1;
-          logJob(`失敗: ${f.name} / ${e?.message || e}`);
+          const errMsg = e?.message || e;
+          logJob(`失敗: ${f.name} / ${errMsg}`);
+          if(failureMessages.length < 3){
+            failureMessages.push(`${f.name}: ${errMsg}`);
+          }
           if(type === "export"){
             const stack = e?.stack ? String(e.stack) : "";
-            console.log(`[BULK] file ${index}/${targets.length} ng reason=${e?.message || e} stack=${stack}`);
+            console.log(`[BULK] file ${index}/${targets.length} ng reason=${errMsg} stack=${stack}`);
           }
         }finally{
           job.done++;
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
-          if(type === "export"){
-            const pct = job.total ? (job.done / job.total) : 0;
-            prog.set(pct, "一括書き出し中…", `${Math.min(index, job.total)}/${job.total} ${f.name || ""}`);
-          }else{
-            bulkOverlay.update(job.done, job.total, f.name);
-          }
+          bulkOverlay.update(job.done, job.total, f.name);
           render();
         }
       }
@@ -18334,7 +18389,6 @@ try{
 
       const status = job.cancel ? "cancel" : (job.failed.length ? "fail" : "success");
       if(type === "export"){
-        prog.hide();
         console.log(`[BULK] end ok=${job.ok} ng=${job.failed.length} ms=${Date.now() - bulkStartedAt}`);
       }
       bulkOverlay.end(type, status);
@@ -18354,6 +18408,23 @@ try{
       console.log(`[History] push type=${type==="qc" ? "QC" : "EXPORT"} total=${historyEntry.total} ok=${historyEntry.okCount} ng=${historyEntry.ngCount} fail=${historyEntry.failCount}`);
       renderHistoryList();
       renderHistoryDetail();
+      const successCount = Math.max(0, historyEntry.total - historyEntry.failCount);
+      const counts = `対象 ${historyEntry.total}件 / 成功 ${successCount}件 / 失敗 ${historyEntry.failCount}件`;
+      let sub = "";
+      if(job.cancel){
+        sub = "キャンセル";
+      }else if(type === "qc"){
+        sub = `OK ${historyEntry.okCount} / NG ${historyEntry.ngCount}`;
+      }else{
+        sub = `書き出し成功 ${historyEntry.okCount}件`;
+      }
+      bulkResultPanel.show({
+        title: type === "qc" ? "一括チェック結果" : "まとめて書き出し結果",
+        ok: !job.cancel && historyEntry.failCount === 0,
+        counts,
+        sub,
+        messages: historyEntry.failureMessages,
+      });
     }
   }
   function idsSelectedOrActive(){
@@ -18600,20 +18671,7 @@ try{
     $('proBtnBatchExport')?.addEventListener('click', ()=> {
       runJob('export').catch((e)=> console.error("[BulkExport] runJob error", e));
     });
-
-    $('proJobMini')?.addEventListener('click', ()=>{
-      const gate = guardHistory({ source: "history" });
-      if(!gate.ok){
-        if(window.safeToast) window.safeToast(LICENSE_TEXT.historyPro, "warn");
-        return;
-      }
-      showJob(true);
-    });
     $('proJobClose')?.addEventListener('click', ()=> showJob(false));
-    if(!project.historyTriggerLogged){
-      project.historyTriggerLogged = true;
-      console.log("[UI] historyTrigger=rightOnly");
-    }
     $('proJobCopy')?.addEventListener('click', async ()=>{
       try{
         const txt = $('proJobLog')?.innerText || "";
