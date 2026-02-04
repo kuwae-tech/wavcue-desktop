@@ -6647,6 +6647,10 @@ function maybeToastFromLog(msg){
       toast(s.replace(/^ERROR:\s*/,"").trim() || s, "err", 3600);
       return;
     }
+    const bulkExportRunning = history && history.active && history.active.running && history.active.type === "export";
+    if(bulkExportRunning){
+      if(s.includes("書き出し完了") && !s.includes("一括")) return;
+    }
     if(s.includes("書き出し完了") || s.includes("ファイルを添付しました") || s.includes("添付ファイルを認識しました")){
       toast(s.replace(/^OK:\s*/,"").trim() || s, "ok", 2600);
       return;
