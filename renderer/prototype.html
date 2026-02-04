@@ -2699,7 +2699,7 @@ body, #appRoot, .appRoot, .mainLayout{
   align-items:center;
   justify-content:flex-start;
   gap:6px;
-  padding:4px 8px 6px;
+  padding:14px 8px 6px;
   border-bottom:1px solid rgba(255,255,255,0.08);
   flex-wrap:nowrap;
   overflow-x:auto;
@@ -2709,6 +2709,23 @@ body, #appRoot, .appRoot, .mainLayout{
   -ms-overflow-style:none;
 }
 .proFileDockTop::-webkit-scrollbar{ display:none; }
+.proFileDockLeft{
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.proFileDockRight{
+  display:flex;
+  gap:6px;
+  align-items:center;
+  flex-wrap:nowrap;
+  justify-content:flex-end;
+  flex: 0 0 auto;
+  min-width: max-content;
+  white-space: nowrap;
+}
+.proFileDockRight > *{
+  flex-shrink: 0;
+}
 .proDockSpacer{ flex:1 1 auto; min-width:12px; }
 .proOnlyWrap{
   position: relative;
@@ -2752,7 +2769,9 @@ body, #appRoot, .appRoot, .mainLayout{
   color: rgba(251,191,36,.95);
   background: rgba(15,23,42,.6);
   flex: 0 0 auto;
+  flex-shrink: 0;
   white-space: nowrap;
+  pointer-events: none;
 }
 .proOnlyWrap .proTooltip{
   position: absolute;
@@ -2784,6 +2803,11 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .proOnlyWrap.proOnlyDisabled .proBadge{
     display: inline-flex;
+    position: absolute;
+    top: -6px;
+    right: -4px;
+    margin-left: 0;
+    pointer-events: none;
   }
 .proOnlyWrap.proOnlyDisabled:hover .proTooltip{
   opacity: 1;
@@ -2791,13 +2815,23 @@ body, #appRoot, .appRoot, .mainLayout{
 }
 .proInput{ height:28px; padding:0 8px; width:180px; }
 .proSelect{ height:28px; }
-.proFilterWrap{ min-width: 0; flex: 0 0 auto; }
+
+/* Filter: fixed width to avoid overlap and keep single-row layout */
+.proFilterWrap{
+  position: relative;
+  display: inline-block;
+  flex: 0 0 auto;
+  width: 190px;
+  min-width: 190px;
+}
+
 #proFilterStatus{
+  width: 100%;
   appearance: none;
   -webkit-appearance: none;
   -moz-appearance: none;
   height: 32px;
-  padding: 0 34px 0 12px;
+  padding: 0 40px 0 12px;
   border-radius: 10px;
   border: 1px solid rgba(255,255,255,.14);
   background: rgba(255,255,255,.06);
@@ -2806,14 +2840,12 @@ body, #appRoot, .appRoot, .mainLayout{
   min-width: 0;
   max-width: 100%;
 }
+
 #proFilterStatus:focus{
   border-color: rgba(103,167,255,.55);
   box-shadow: 0 0 0 3px rgba(103,167,255,.18);
 }
-.proFilterWrap{
-  position: relative;
-  display: inline-block;
-}
+
 .proFilterWrap::after{
   content: "▾";
   position: absolute;
@@ -2824,6 +2856,9 @@ body, #appRoot, .appRoot, .mainLayout{
   color: rgba(240,242,246,.65);
   font-size: 12px;
 }
+
+/* History: never shrink to zero / never get covered */
+#proJobMiniWrap{ flex: 0 0 auto; }
 .proBottomRow,
 .bottomRow{
   flex: 0 0 var(--bottomH);
@@ -2946,6 +2981,11 @@ body, #appRoot, .appRoot, .mainLayout{
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+  flex-shrink: 0;
+}
+.proFileDockTop .proJobMini{
+  min-width: fit-content;
+  overflow: visible;
 }
 .proJobMini{
   font-size:12px; padding:2px 10px; border-radius:999px;
@@ -3966,8 +4006,7 @@ body, #appRoot, .appRoot, .mainLayout{
   /* ===== FINAL: PRO badge is ALWAYS outside (no overlay) ===== */
   .proOnlyWrap,
   .proBtnGroup,
-  #proJobMiniWrap,
-  #proFilterWrap{
+  #proJobMiniWrap{
     position: relative !important;
     display: inline-flex !important;
     align-items: center !important;
@@ -3978,14 +4017,15 @@ body, #appRoot, .appRoot, .mainLayout{
     min-width: 0 !important;
   }
   .proBadge{
-    position: static !important;
-    top: auto !important;
-    right: auto !important;
+    position: absolute !important;
+    top: -6px !important;
+    right: -4px !important;
     transform: none !important;
     margin: 0 !important;
     z-index: auto !important;
     pointer-events: none !important;
     white-space: nowrap !important;
+    flex-shrink: 0 !important;
   }
   .proOnlyWrap .btn,
   .proBtnGroup .btn,
@@ -3993,16 +4033,16 @@ body, #appRoot, .appRoot, .mainLayout{
   #proFilterWrap .btn,
   #proFilterWrap select{
     padding-right: 12px !important;
+    flex-shrink: 0 !important;
   }
   
   #proFilterWrap{
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 8px !important;
+    display: inline-block !important;
     padding: 0 !important;
     margin: 0 !important;
     flex: 0 0 auto !important;
-    min-width: 0 !important;
+    width: 190px !important;
+    min-width: 190px !important;
     background: none !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
@@ -4018,12 +4058,12 @@ body, #appRoot, .appRoot, .mainLayout{
     -webkit-appearance: none !important;
     display: inline-flex !important;
     align-items: center !important;
-    width: auto !important;
-    min-width: 96px !important;
+    width: 100% !important;
+    min-width: 0 !important;
     max-width: 100% !important;
     height: 32px !important;
     line-height: 1.2 !important;
-    padding: 9px 28px 9px 10px !important;
+    padding: 9px 34px 9px 10px !important;
     border-radius: 12px !important;
     border: 1px solid rgba(255,255,255,0.10) !important;
     background: rgba(255,255,255,0.04) !important;
@@ -4033,7 +4073,7 @@ body, #appRoot, .appRoot, .mainLayout{
     white-space: nowrap !important;
     box-sizing: border-box !important;
     position: relative !important;
-    z-index: 1 !important;
+    z-index: auto !important;
   }
   /* ===== FINAL: Imager follows UI alignment (no square lock) ===== */
   .imagerBox,
