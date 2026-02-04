@@ -6636,6 +6636,7 @@ window.safeToast = function(message, type="ok", timeout=2600){
 };
 
 // Only toast for major ops & errors (avoid spam)
+let isBulkExporting = false;
 function maybeToastFromLog(msg){
   try{
     const s = String(msg || "");
@@ -6647,7 +6648,12 @@ function maybeToastFromLog(msg){
       toast(s.replace(/^ERROR:\s*/,"").trim() || s, "err", 3600);
       return;
     }
-    if(s.includes("書き出し完了") || s.includes("ファイルを添付しました") || s.includes("添付ファイルを認識しました")){
+    if(s.includes("書き出し完了")){
+      if(isBulkExporting) return;
+      toast(s.replace(/^OK:\s*/,"").trim() || s, "ok", 2600);
+      return;
+    }
+    if(s.includes("ファイルを添付しました") || s.includes("添付ファイルを認識しました")){
       toast(s.replace(/^OK:\s*/,"").trim() || s, "ok", 2600);
       return;
     }
@@ -18292,6 +18298,7 @@ try{
       const exportFolderLabel = exportTarget.folderPath || "";
       console.log(`[BULK] pickFolder ok path=${exportFolderLabel}`);
     }
+    if(type === "export") isBulkExporting = true;
     job.running = true;
     job.cancel=false;
     job.failed=[];
@@ -18430,6 +18437,7 @@ try{
         render();
         if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("qc:bulk");
       }
+      if(type === "export") isBulkExporting = false;
       job.running = false;
       updateJobUI();
       render();
