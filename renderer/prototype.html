@@ -4035,6 +4035,20 @@ body, #appRoot, .appRoot, .mainLayout{
     padding-right: 12px !important;
     flex-shrink: 0 !important;
   }
+
+  :root{
+    --filterPadR: 40px;
+  }
+  @media (max-width: 1400px){
+    :root{
+      --filterPadR: 32px;
+    }
+  }
+  @media (max-width: 1320px){
+    :root{
+      --filterPadR: 26px;
+    }
+  }
   
   #proFilterWrap{
     display: inline-block !important;
@@ -4063,7 +4077,7 @@ body, #appRoot, .appRoot, .mainLayout{
     max-width: 100% !important;
     height: 32px !important;
     line-height: 1.2 !important;
-    padding: 9px 34px 9px 10px !important;
+    padding: 9px var(--filterPadR) 9px 10px !important;
     border-radius: 12px !important;
     border: 1px solid rgba(255,255,255,0.10) !important;
     background: rgba(255,255,255,0.04) !important;
@@ -4159,8 +4173,9 @@ body, #appRoot, .appRoot, .mainLayout{
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    min-width: 0 !important;
-    flex: 0 1 auto !important;
+    min-width: 190px !important;
+    width: 190px !important;
+    flex: 0 0 auto !important;
   }
 
   /* selectを“ボタン”として統一（高さ/角丸/パディング） */
@@ -4169,7 +4184,7 @@ body, #appRoot, .appRoot, .mainLayout{
     appearance: none !important;
     height: 32px !important;
     line-height: 1.2 !important;
-    padding: 9px 28px 9px 10px !important; /* 右に矢印分 */
+    padding: 9px var(--filterPadR) 9px 10px !important; /* 右に矢印分 */
     border-radius: 12px !important;
     border: 1px solid rgba(255,255,255,0.10) !important;
     background: rgba(255,255,255,0.04) !important;
@@ -4188,12 +4203,17 @@ body, #appRoot, .appRoot, .mainLayout{
   #proFilterWrap::after{
     content: "▾" !important;
     position: absolute !important;
-    right: 10px !important;
+    right: 12px !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
     pointer-events: none !important;
-    color: rgba(240,242,246,0.65) !important;
-    font-size: 12px !important;
+    color: rgba(240,242,246,0.92) !important;
+    font-size: 13px !important;
+    text-shadow: 0 1px 2px rgba(0,0,0,0.35) !important;
+  }
+
+  #proJobMiniWrap{
+    margin-left: -6px !important;
   }
 
   /* フィルターもhoverで欠けない（translate禁止 + shadowのみ） */
