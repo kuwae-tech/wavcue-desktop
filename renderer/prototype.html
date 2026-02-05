@@ -3992,12 +3992,12 @@ body, #appRoot, .appRoot, .mainLayout{
   /* フィルター等が “右に寄りすぎて見切れる” のを防ぐ（wrapのmin-width問題を潰す） */
   .proOnlyWrap{
     min-width: 0 !important;
-    max-width: 100% !important;
+    max-width: 220px !important;
   }
   .proOnlyWrap .btn,
   .proOnlyWrap select{
     min-width: 0 !important;
-    max-width: 100% !important;
+    max-width: 220px !important;
   }
   .proBtnGroup{
     position: relative !important;
@@ -4084,8 +4084,9 @@ body, #appRoot, .appRoot, .mainLayout{
     padding: 0 !important;
     margin: 0 !important;
     flex: 0 0 auto !important;
-    width: 220px !important;
-    min-width: 220px !important;
+    width: clamp(160px, 18vw, 220px) !important;
+    min-width: 160px !important;
+    max-width: 220px !important;
     background: none !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
@@ -4102,7 +4103,7 @@ body, #appRoot, .appRoot, .mainLayout{
     align-items: center !important;
     width: 100% !important;
     min-width: 0 !important;
-    max-width: 100% !important;
+    max-width: 220px !important;
     height: 32px !important;
     line-height: 1.2 !important;
     padding: 9px 34px 9px 10px !important;
@@ -4197,8 +4198,9 @@ body, #appRoot, .appRoot, .mainLayout{
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    width: 220px !important;
-    min-width: 220px !important;
+    width: clamp(160px, 18vw, 220px) !important;
+    min-width: 160px !important;
+    max-width: 220px !important;
   }
 
   /* selectを“ボタン”として統一（高さ/角丸/パディング） */
@@ -4206,8 +4208,9 @@ body, #appRoot, .appRoot, .mainLayout{
   .proFilterSelect{
     -webkit-appearance: none !important;
     appearance: none !important;
-    width: 220px !important;
-    min-width: 220px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     height: 32px !important;
     line-height: 1.2 !important;
     padding: 9px 40px 9px 10px !important; /* 右に矢印分 */
@@ -4219,7 +4222,7 @@ body, #appRoot, .appRoot, .mainLayout{
     background-position: right 12px center !important;
     background-size: 10px !important;
     color: rgba(255,255,255,0.92) !important;
-    max-width: 220px !important;
+    max-width: 100% !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
@@ -7885,7 +7888,9 @@ function setupDragAndDrop(){
         }
       }
       if(!files.length){ return; }
-      if(files.length > 1){
+      const st = LicenseCore.peekState?.();
+      const isPro = st?.tier === "pro";
+      if(isPro && files.length > 1){
         const gate = guardBulkImport({ count: files.length, source: "dnd" });
         if(!gate.ok){
           if(window.safeToast) window.safeToast(LICENSE_TEXT.bulkImportPro, "warn");
@@ -17620,12 +17625,34 @@ try{
     try{
       const files = Array.from(fileList || []).filter(isWavFile);
       if(!files.length) return;
-      const dndGuard = (files.length > 1) ? { expected: files.length, seen: 0, startedAt: Date.now() } : null;
-      if (typeof window.diagLog === "function") window.diagLog("[DND]", "start", window.diagState({ count: files.length, startedAt: dndGuard?.startedAt || null }));
-      console.log(`[DND] start ${files.length}`);
+      const st = LicenseCore.peekState?.();
+      const isPro = st?.tier === "pro";
+      let addTargets = files;
+      const hasExisting = project.files.length > 0;
+      if(!isPro){
+        if(hasExisting){
+          const ok = window.confirm("別のファイルを開きます。\n現在のファイルは閉じられます。\n続行しますか？");
+          if(!ok) return [];
+        }
+        addTargets = [files[files.length - 1]];
+        if(hasExisting){
+          project.files = [];
+          project.activeId = null;
+          project.lastLoadedId = null;
+          project.selectedIds.clear();
+          project.lastClickIndex = null;
+          project.popover.openType = null;
+          project.popover.openFileId = null;
+          project.popover.anchorEl = null;
+          state.activeFileId = null;
+        }
+      }
+      const dndGuard = (addTargets.length > 1) ? { expected: addTargets.length, seen: 0, startedAt: Date.now() } : null;
+      if (typeof window.diagLog === "function") window.diagLog("[DND]", "start", window.diagState({ count: addTargets.length, startedAt: dndGuard?.startedAt || null }));
+      console.log(`[DND] start ${addTargets.length}`);
       const addedIds = [];
       const addedRecs = [];
-      for(const file of files){
+      for(const file of addTargets){
         const id = uid();
         const rec = {
           id,
@@ -17752,7 +17779,7 @@ try{
         console.warn("[GUARD] DND fullLoad mismatch", warnPayload);
         if (typeof window.diagLog === "function") window.diagLog("[GUARD]", "dnd:seen-mismatch", warnPayload);
       }
-      if (typeof window.diagLog === "function") window.diagLog("[DND]", "all done", window.diagState({ expected: dndGuard?.expected || files.length, seen: dndGuard?.seen || files.length }));
+      if (typeof window.diagLog === "function") window.diagLog("[DND]", "all done", window.diagState({ expected: dndGuard?.expected || addTargets.length, seen: dndGuard?.seen || addTargets.length }));
       console.log(`[DND] all done ${addedRecs.length}`);
       if(targetActiveId){
         await setActiveFile(targetActiveId, {force:true, skipSave:true});
