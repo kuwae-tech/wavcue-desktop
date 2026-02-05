@@ -4090,14 +4090,13 @@ body, #appRoot, .appRoot, .mainLayout{
     padding: 0 !important;
     margin: 0 !important;
     flex: 0 0 auto !important;
-    width: 190px !important;
-    min-width: 190px !important;
+    width: 220px !important;
+    min-width: 220px !important;
     background: none !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
   }
-  #proFilterWrap::before,
-  #proFilterWrap::after{
+  #proFilterWrap::before{
     display: none !important;
     content: none !important;
   }
@@ -4120,6 +4119,7 @@ body, #appRoot, .appRoot, .mainLayout{
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
+    text-align: left !important;
     box-sizing: border-box !important;
     position: relative !important;
     z-index: auto !important;
@@ -4203,25 +4203,24 @@ body, #appRoot, .appRoot, .mainLayout{
   /* フィルターラッパ：余計な背景/スペースを持たない */
   #proFilterWrap{
     position: relative !important;
-    display: inline-flex !important;
-    align-items: center !important;
-    gap: 6px !important;
+    display: inline-block !important;
     padding: 0 !important;
     margin: 0 !important;
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    min-width: 0 !important;
-    flex: 0 1 auto !important;
+    width: 220px !important;
+    min-width: 220px !important;
   }
 
   /* selectを“ボタン”として統一（高さ/角丸/パディング） */
   #proFilterStatus{
     -webkit-appearance: none !important;
     appearance: none !important;
+    width: 100% !important;
     height: 32px !important;
     line-height: 1.2 !important;
-    padding: 9px 28px 9px 10px !important; /* 右に矢印分 */
+    padding: 9px 34px 9px 10px !important; /* 右に矢印分 */
     border-radius: 12px !important;
     border: 1px solid rgba(255,255,255,0.10) !important;
     background: rgba(255,255,255,0.04) !important;
@@ -4231,6 +4230,7 @@ body, #appRoot, .appRoot, .mainLayout{
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
+    text-align: left !important;
     box-sizing: border-box !important;
     position: relative !important;
     z-index: auto !important; /* 変な重なりを防ぐ */
@@ -4240,12 +4240,14 @@ body, #appRoot, .appRoot, .mainLayout{
   #proFilterWrap::after{
     content: "▾" !important;
     position: absolute !important;
-    right: 10px !important;
+    right: 14px !important;
     top: 50% !important;
     transform: translateY(-50%) !important;
     pointer-events: none !important;
     color: rgba(240,242,246,0.65) !important;
     font-size: 12px !important;
+    display: block !important;
+    z-index: 2 !important;
   }
 
   /* フィルターもhoverで欠けない（translate禁止 + shadowのみ） */
