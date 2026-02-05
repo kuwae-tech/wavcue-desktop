@@ -909,11 +909,15 @@
   }
   .settingsDialog .settingsTabPanels{
     display:block;
+    height:auto;
+    overflow:hidden;
   }
   .settingsDialog .settingsTabPanel{
     display:none;
     flex-direction:column;
     gap:10px;
+    height:100%;
+    overflow:auto;
   }
   .settingsDialog .settingsTabPanel.active{
     display:flex;
@@ -5927,6 +5931,10 @@ const LICENSE_STATE_KEYS = [
 ];
 const SETTINGS_TAB_KEY = "wavcue_settings_tab";
 const DEMO_PROMPT_KEY = "wavcue_demo_prompt_done";
+const LICENSE_EXTRA_KEYS = [
+  "wavcue_license_key_locked",
+  "wavcue_license_key_lock",
+];
 
 function getStoredLicenseKey(){
   try{ return localStorage?.getItem?.(LICENSE_STORAGE_KEY) || ""; }catch(_){ return ""; }
@@ -6000,9 +6008,21 @@ function clearLicenseKeySafe(){
   try{
     LICENSE_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
     localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
+    LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
   }catch(_){}
   try{ window.WavCueLicense?.resetDemoTrial?.(); }catch(_){}
   try{ window.WavCueLicense?.__debugRefreshLicense?.(); }catch(_){}
+}
+function applyAllLicenseUi(state){
+  try{ updateTierBadge(state); }catch(_){}
+  try{ applyProUi(state); }catch(_){}
+  try{ applyLicenseUi(state); }catch(_){}
+}
+if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "function"){
+  window.WavCueLicense.clearKeySafe = async ()=>{
+    clearLicenseKeySafe();
+    return { ok: true };
+  };
 }
 function updateActivationUi(state){
   const tierRaw = state && state.tier ? state.tier : "demo";
@@ -12158,6 +12178,7 @@ const activationOverlayActivate = $("activationOverlayActivate");
 const activationOverlayContinue = $("activationOverlayContinue");
 const activationOverlayOpenSettings = $("activationOverlayOpenSettings");
 const activationOverlayError = $("activationOverlayError");
+let _settingsTabHeightLocked = false;
 let cachedAutoBackupEnabled = true;
 
 const RECOMMENDED_SETTINGS = {
@@ -12246,11 +12267,29 @@ const refreshSettingsData = async ()=>{
   }
 };
 
+const lockSettingsTabHeight = ()=>{
+  if(_settingsTabHeightLocked) return;
+  const wrap = document.querySelector(".settingsTabPanels");
+  const backupPanel = document.querySelector('[data-settings-tabpanel="backup"]');
+  if(!wrap || !backupPanel) return;
+  const height = backupPanel.getBoundingClientRect().height;
+  if(height > 0){
+    wrap.style.height = `${Math.ceil(height)}px`;
+    _settingsTabHeightLocked = true;
+  }
+};
+
 const openSettingsDialog = async ()=>{
   if(!settingsDialog) return;
   await refreshSettingsData();
+  const storedTab = getStoredSettingsTab();
+  setSettingsTab("backup");
   try{ settingsDialog.showModal(); }catch(_){ settingsDialog.open = true; }
-  setSettingsTab(getStoredSettingsTab());
+  requestAnimationFrame(()=>{
+    lockSettingsTabHeight();
+    setSettingsTab(storedTab);
+    if(storedTab === "license") focusSettingsLicenseInput();
+  });
 };
 
 const openCleanupConfirm = ()=>{
@@ -12284,11 +12323,16 @@ if(settingsCleanupConfirmCancel){
 settingsCleanupConfirm?.addEventListener("click", (e)=>{ if(e.target === settingsCleanupConfirm){ closeCleanupConfirm(); } });
 licenseClearCancel?.addEventListener("click", closeLicenseClearConfirm);
 licenseClearConfirm?.addEventListener("click", (e)=>{ if(e.target === licenseClearConfirm){ closeLicenseClearConfirm(); } });
-licenseClearConfirmOk?.addEventListener("click", ()=>{
-  closeLicenseClearConfirm();
-  clearLicenseKeySafe();
-  const st = window.WavCueLicense?.getStateSafe?.();
-  if(st) applyLicenseUi(st);
+licenseClearConfirmOk?.addEventListener("click", async ()=>{
+  try{
+    await window.WavCueLicense?.clearKeySafe?.();
+    const st = await window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    console.log("[License] clear ok");
+    closeLicenseClearConfirm();
+  }catch(e){
+    console.log("[License] clear failed", e?.message || "exception");
+  }
 });
 
 settingsTabButtons.forEach((btn)=>{
