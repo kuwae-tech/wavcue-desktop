@@ -17631,7 +17631,7 @@ try{
       const hasExisting = project.files.length > 0;
       if(!isPro){
         if(hasExisting){
-          const ok = window.confirm("別のファイルを開きます。\n現在のファイルは閉じられます。続行しますか？");
+          const ok = window.confirm("別のファイルを開きます。\n現在のファイルは閉じられます。\n続行しますか？");
           if(!ok) return [];
         }
         addTargets = [files[files.length - 1]];
