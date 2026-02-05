@@ -209,6 +209,48 @@
   #licenseBanner.licenseBanner--withChip.show{
     display:flex;
   }
+  .activateBtn{
+    font-size:12px;
+    padding:8px 12px;
+  }
+  .activationDialog{
+    width:min(420px, calc(100% - 32px));
+    padding:0;
+  }
+  .activationDialog .activationBody{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+    padding:16px;
+  }
+  .activationDialog .activationTitle{
+    font-size:14px;
+    font-weight:700;
+  }
+  .activationDialog .activationHint{
+    font-size:11px;
+    color:var(--muted);
+    line-height:1.45;
+  }
+  .activationDialog .activationPlan{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    font-size:12px;
+    color:rgba(226,232,240,.9);
+    padding:8px 10px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:rgba(0,0,0,.2);
+  }
+  .activationDialog .activationActions{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+    gap:8px;
+    padding:0 16px 16px;
+  }
   .brand{
     display:flex;
     align-items:center;
@@ -4332,10 +4374,33 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
     <span id="tierBadge" class="tierBadge--demo">DEMO</span>
-        <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
+        <div class="headerActions">
+          <button class="btn activateBtn" id="btnActivate" type="button">アクティベート…</button>
+          <button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button>
+        </div>
   </div>
 </header>
 <div id="licenseBanner" role="status" aria-live="polite"></div>
+<dialog id="activationDialog" class="activationDialog" aria-labelledby="activationTitle" aria-describedby="activationHint">
+  <div class="modalHead">
+    <div class="activationTitle" id="activationTitle">ライセンスをアクティベート</div>
+    <button class="modalCloseBtn" id="activationClose" type="button" aria-label="閉じる">×</button>
+  </div>
+  <div class="activationBody">
+    <div class="activationPlan">
+      <span>現在のプラン</span>
+      <strong id="activationCurrentPlan">DEMO</strong>
+    </div>
+    <label for="activationKeyInput">ライセンスキー</label>
+    <input id="activationKeyInput" type="text" placeholder="WAVCUE-STANDARD-XXXX / WAVCUE-PRO-XXXX" autocomplete="off" spellcheck="false"/>
+    <div class="activationHint" id="activationHint">キーを入力して「適用」してください。無効なキーは反映されません。</div>
+  </div>
+  <div class="activationActions">
+    <button class="btn danger" id="activationClear" type="button">ライセンス解除</button>
+    <button class="btn" id="activationCancel" type="button">キャンセル</button>
+    <button class="btn primary" id="activationApply" type="button">適用</button>
+  </div>
+</dialog>
 <dialog id="standardGraceDialog" class="standardGraceDialog" data-lock-close="1" aria-labelledby="standardGraceTitle" aria-describedby="standardGraceMessage">
   <div class="stdGraceBody">
     <div class="stdGraceTitle" id="standardGraceTitle">Standard認証のご案内</div>
@@ -5124,6 +5189,8 @@ const LicenseCore = (()=> {
   const normalizeKeyTier = (rawKey)=>{
     const t = String(rawKey || "").trim().toLowerCase();
     if(!t) return null;
+    if(t.startsWith("wavcue-standard-")) return "standard";
+    if(t.startsWith("wavcue-pro-")) return "pro";
     if(t === "wavcue_standard_test" || t === "wavcue_standard") return "standard";
     if(t.includes("standard") || t.includes("wavcue_standard")) return "standard";
     if(t.includes("pro")) return "pro";
@@ -5190,6 +5257,16 @@ const LicenseCore = (()=> {
           if(norm) return norm;
         }
       }
+    }catch(_){}
+    return null;
+  };
+
+  const readStoredKeyTier = ()=>{
+    try{
+      if(!window.localStorage) return null;
+      const raw = localStorage.getItem(LS_KEY_LAST);
+      const keyTier = normalizeKeyTier(raw);
+      return keyTier ? { tier: keyTier } : null;
     }catch(_){}
     return null;
   };
@@ -5294,10 +5371,12 @@ const LicenseCore = (()=> {
 
   const getStateSafeInternal = (options = {})=>{
     try{
+      const keyTier = readStoredKeyTier();
       const local = readLocalState();
-      if(local) return buildState({ ...stateCache, ...local }, options);
+      if(local) return buildState({ ...stateCache, ...local, ...(keyTier ? { tier: decideTier(keyTier.tier, local.tier) } : {}) }, options);
       const sync = readWindowSync();
-      if(sync) return buildState({ ...stateCache, ...sync }, options);
+      if(sync) return buildState({ ...stateCache, ...sync, ...(keyTier ? { tier: decideTier(keyTier.tier, sync.tier) } : {}) }, options);
+      if(keyTier) return buildState({ ...stateCache, ...keyTier }, options);
       return buildState({ ...stateCache }, options);
     }catch(e){
       console.error("[License] non-fatal", e);
@@ -5406,6 +5485,7 @@ const LicenseCore = (()=> {
       const value = String(key || "").trim();
       if(!value) return { ok: false, reason: "empty" };
       const keyTier = normalizeKeyTier(value);
+      if(!keyTier) return { ok: false, reason: "invalid" };
       try{ localStorage?.setItem?.(LS_KEY_LAST, value); }catch(_){}
       const fns = [
         window.wavcue?.setLicenseKey,
@@ -5448,6 +5528,18 @@ const LicenseCore = (()=> {
   const resetDemoTrial = ()=>{
     writeNumber(LS_DEMO_ACTIVATED_AT, null);
     writeNumber(LS_DEMO_EXPORT_OK_COUNT, null);
+  };
+
+  const clearKeySafe = ()=>{
+    try{
+      localStorage?.removeItem?.(LS_KEY_LAST);
+      setCache({ tier: "demo" }, "activationClear");
+      _refreshState("key", { touchOnline: false });
+      return { ok: true };
+    }catch(e){
+      console.error("[License] non-fatal", e);
+      return { ok: false, reason: "exception" };
+    }
   };
 
   const recordExportOk = ()=>{
@@ -5569,6 +5661,7 @@ const LicenseCore = (()=> {
     getStateSafe,
     guard,
     setKeySafe,
+    clearKeySafe,
     onChange,
     isDemoLocked,
     isStandardAuthFresh,
@@ -5585,6 +5678,7 @@ window.WavCueLicense = {
   getStateSafe: LicenseCore.getStateSafe,
   guard: LicenseCore.guard,
   setKeySafe: LicenseCore.setKeySafe,
+  clearKeySafe: LicenseCore.clearKeySafe,
   onChange: LicenseCore.onChange,
   resetDemoTrial: LicenseCore.resetDemoTrial,
   recordExportOk: LicenseCore.recordExportOk,
@@ -5877,6 +5971,78 @@ if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> applyProUi(st));
   window.WavCueLicense.onChange((st)=> applyLicenseUi(st));
 }
+(() => {
+  const dialog = document.getElementById("activationDialog");
+  const btnOpen = document.getElementById("btnActivate");
+  const btnClose = document.getElementById("activationClose");
+  const btnCancel = document.getElementById("activationCancel");
+  const btnApply = document.getElementById("activationApply");
+  const btnClear = document.getElementById("activationClear");
+  const input = document.getElementById("activationKeyInput");
+  const planEl = document.getElementById("activationCurrentPlan");
+  if(!dialog || !btnOpen || !input || !planEl) return;
+
+  const updatePlan = (st)=>{
+    const tierRaw = st?.tier || "demo";
+    const tier = String(tierRaw).toLowerCase();
+    planEl.textContent = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
+  };
+
+  const openDialog = ()=>{
+    const storedKey = localStorage?.getItem?.("wavcue_license_key") || "";
+    input.value = storedKey;
+    Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updatePlan).catch(()=> updatePlan({ tier: "demo" }));
+    if(!dialog.open){
+      try{ dialog.showModal(); }catch(_){ dialog.open = true; }
+    }
+    setTimeout(()=>{ try{ input.focus(); input.select(); }catch(_){ } }, 0);
+  };
+
+  const closeDialog = ()=>{
+    if(dialog.open){
+      try{ dialog.close(); }catch(_){ dialog.open = false; }
+    }
+  };
+
+  btnOpen.addEventListener("click", openDialog);
+  btnClose?.addEventListener("click", closeDialog);
+  btnCancel?.addEventListener("click", closeDialog);
+
+  btnApply?.addEventListener("click", async ()=>{
+    const value = String(input.value || "").trim();
+    const res = await window.WavCueLicense?.setKeySafe?.(value);
+    if(res && res.ok){
+      const st = await Promise.resolve(window.WavCueLicense?.getStateSafe?.());
+      updatePlan(st);
+      const tier = String(st?.tier || "").toLowerCase();
+      if(tier === "pro"){
+        window.safeToast?.("Proを有効化しました", "ok");
+      }else if(tier === "standard"){
+        window.safeToast?.("Standardを有効化しました", "ok");
+      }else{
+        window.safeToast?.("DEMOを有効化しました", "info");
+      }
+      closeDialog();
+    }else{
+      window.safeToast?.("キーが無効です", "err");
+    }
+  });
+
+  btnClear?.addEventListener("click", async ()=>{
+    const res = await window.WavCueLicense?.clearKeySafe?.();
+    if(res && res.ok){
+      const st = await Promise.resolve(window.WavCueLicense?.getStateSafe?.());
+      updatePlan(st);
+      window.safeToast?.("ライセンスを解除しました", "info");
+    }else{
+      window.safeToast?.("ライセンス解除に失敗しました", "err");
+    }
+  });
+
+  if(typeof window.WavCueLicense?.onChange === "function"){
+    window.WavCueLicense.onChange((st)=> updatePlan(st));
+  }
+})();
 (function(){
   const log = ()=>{
     const el = document.querySelector('.bottomRow') || document.querySelector('.proBottomRow');
