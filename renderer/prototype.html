@@ -3900,6 +3900,7 @@ body, #appRoot, .appRoot, .mainLayout{
     --wcBottomH: 240px;      /* 下段高さの真実（他の --bottomH/--bottom-line-h は無視） */
     --wcBottomGap: 12px;
     --wcBottomPad: 14px;
+    --wcWaveBottomGap: 2px;
     --wcMeterW: 120px;
     --wcImagerS: 240px;      /* bottomHと合わせると正方形 */
   }
@@ -4041,6 +4042,7 @@ body, #appRoot, .appRoot, .mainLayout{
   }
   .waveWrap{
     gap: var(--gap) !important;
+    padding-bottom: var(--wcWaveBottomGap) !important;
   }
   .waveBox{
     border-radius:12px !important;
