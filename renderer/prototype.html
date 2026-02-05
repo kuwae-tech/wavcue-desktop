@@ -514,6 +514,44 @@
   #bulkOverlay .sub{font-size:11px;color:var(--muted);margin-top:8px;line-height:1.4}
   #bulkOverlay .proJobNow{ color:rgba(226,232,240,0.9); }
 
+  /* Activation overlay */
+  #activationOverlay{
+    position:fixed;
+    inset:0;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    background:rgba(2,6,23,.72);
+    backdrop-filter: blur(8px);
+    z-index:10050;
+  }
+  #activationOverlay.show{display:flex}
+  #activationOverlay .box{
+    width:min(520px, calc(100% - 24px));
+    border-radius:18px;
+    border:1px solid rgba(148,163,184,.3);
+    background:rgba(15,23,42,.96);
+    padding:18px 18px;
+    box-shadow:var(--shadow);
+    display:grid;
+    gap:10px;
+  }
+  #activationOverlay .title{
+    font-size:16px;
+    font-weight:700;
+  }
+  #activationOverlay .desc{
+    font-size:12px;
+    line-height:1.6;
+    color:rgba(226,232,240,.88);
+  }
+  #activationOverlay .actions{
+    display:flex;
+    gap:8px;
+    justify-content:flex-end;
+    flex-wrap:wrap;
+  }
+
   /* Batch result panel */
   .batchResultBackdrop{
     position:fixed;
@@ -932,6 +970,20 @@
     gap:4px;
     font-size:12px;
   }
+  .settingsDialog input[type="text"]{
+    color-scheme: dark;
+    width:100%;
+    padding:8px 10px;
+    border-radius:12px;
+    border:1px solid var(--line);
+    background:rgba(13,16,22,.92);
+    color:var(--text);
+    font-size:12px;
+  }
+  .settingsDialog input[type="text"]:disabled{
+    background:rgba(9,12,17,.7);
+    color:rgba(226,232,240,.7);
+  }
   .settingsDialog select,
   .settingsDialog input[type="number"]{
     color-scheme: dark;
@@ -977,6 +1029,25 @@
     font-size:10px;
     color:rgba(229,231,235,.6);
     min-height:1em;
+  }
+  .settingsDialog .licensePlanBadge{
+    border-color:rgba(148,163,184,.35);
+    background:rgba(148,163,184,.12);
+    color:rgba(226,232,240,.92);
+  }
+  .settingsDialog .licensePlanBadge.is-standard{
+    border-color:rgba(59,130,246,.45);
+    background:rgba(59,130,246,.16);
+    color:rgba(191,219,254,.95);
+  }
+  .settingsDialog .licensePlanBadge.is-pro{
+    border-color:rgba(34,197,94,.45);
+    background:rgba(34,197,94,.16);
+    color:rgba(187,247,208,.95);
+  }
+  .settingsDialog .licenseKeyMeta{
+    font-size:11px;
+    color:rgba(229,231,235,.72);
   }
   .settingsDialog .fieldNote.is-empty{
     visibility:hidden;
@@ -4306,6 +4377,19 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="sub proJobNow" id="bulkNow"> </div>
   </div>
 </div>
+<div id="activationOverlay" aria-modal="true" role="dialog" aria-labelledby="activationOverlayTitle" aria-describedby="activationOverlayDesc">
+  <div class="box">
+    <div class="title" id="activationOverlayTitle">アクティベートのご案内</div>
+    <div class="desc" id="activationOverlayDesc">
+      ライセンスキーをお持ちの場合は「キーを入力して有効化」から設定画面を開いてください。<br/>
+      まだお持ちでない場合は「DEMOで続ける」から体験版として利用できます。
+    </div>
+    <div class="actions">
+      <button class="btn good" id="activationOverlayActivate" type="button">キーを入力して有効化</button>
+      <button class="btn" id="activationOverlayDemo" type="button">DEMOで続ける</button>
+    </div>
+  </div>
+</div>
 <div id="bulkResultBackdrop" class="batchResultBackdrop hidden" aria-hidden="true"></div>
 <div id="bulkResultPanel" class="batchResultPanel hidden" role="status" aria-live="polite" aria-atomic="true">
   <div class="batchResultHeader">
@@ -4855,6 +4939,25 @@ body, #appRoot, .appRoot, .mainLayout{
         <button class="btn" id="settingsSave" type="button">設定を保存</button>
         <div class="settingsHint" id="settingsToastDebug">debug line: —</div>
       </section>
+      <section class="settingsCard" id="settingsLicenseSection" style="grid-column:1/-1">
+        <h3>ライセンス/アクティベート</h3>
+        <div class="settingsBlock">
+          <div class="settingsBlockTitleRow">
+            <div class="settingsBlockTitle">現在のプラン</div>
+            <span class="settingsBadge licensePlanBadge" id="settingsLicensePlan">DEMO</span>
+          </div>
+          <label class="settingsField">
+            <span class="muted">ライセンスキー</span>
+            <input id="licenseKeyInput" type="text" placeholder="XXXX-XXXX-XXXX-XXXX" autocomplete="off" autocapitalize="off" spellcheck="false"/>
+            <span class="licenseKeyMeta" id="licenseKeyMask">保存済みキー: —</span>
+          </label>
+          <div class="row" style="gap:8px;flex-wrap:wrap">
+            <button class="btn" id="licenseActivateBtn" type="button">有効化</button>
+            <button class="btn danger" id="licenseDeactivateBtn" type="button">解除</button>
+          </div>
+          <div class="settingsHint">解除するとDEMOに戻ります。アクティベーションはいつでも再実行できます。</div>
+        </div>
+      </section>
       <section class="settingsCard" style="grid-column:1/-1">
         <h3>ログ</h3>
         <div class="settingsLog" id="settingsLog">準備完了</div>
@@ -4878,6 +4981,25 @@ body, #appRoot, .appRoot, .mainLayout{
       <div class="confirmActions">
         <button class="btn" id="settingsCleanupConfirmCancel" type="button">キャンセル</button>
         <button class="btn danger" id="settingsCleanupConfirmRun" type="button">完全クリーンアップを実行</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+<dialog class="confirmDialog" id="licenseDeactivateConfirm">
+  <div class="modalHead">
+    <div class="title">
+      <b>ライセンスを解除しますか？</b>
+    </div>
+  </div>
+  <div class="modalBody">
+    <div class="confirmBody">
+      <ul class="confirmList">
+        <li>解除するとプランがDEMOに戻ります</li>
+        <li>解除後はライセンスキーの再入力が必要です</li>
+      </ul>
+      <div class="confirmActions">
+        <button class="btn" id="licenseDeactivateCancel" type="button">キャンセル</button>
+        <button class="btn danger" id="licenseDeactivateRun" type="button">解除する</button>
       </div>
     </div>
   </div>
@@ -5439,6 +5561,22 @@ const LicenseCore = (()=> {
     }
   };
 
+  const clearKeySafe = ()=>{
+    try{
+      try{ localStorage?.removeItem?.(LS_KEY_LAST); }catch(_){}
+      LS_STATE_KEYS.forEach((key)=>{
+        try{ localStorage?.removeItem?.(key); }catch(_){}
+      });
+      clearStandardGraceState();
+      setCache({ tier: "demo" }, "deactivate");
+      _refreshState("key", { touchOnline: false });
+      return { ok: true };
+    }catch(e){
+      console.error("[License] non-fatal", e);
+      return { ok: false, reason: "exception" };
+    }
+  };
+
   const onChange = (fn)=>{
     if(typeof fn !== "function") return ()=>{};
     listeners.add(fn);
@@ -5569,6 +5707,7 @@ const LicenseCore = (()=> {
     getStateSafe,
     guard,
     setKeySafe,
+    clearKeySafe,
     onChange,
     isDemoLocked,
     isStandardAuthFresh,
@@ -5585,6 +5724,7 @@ window.WavCueLicense = {
   getStateSafe: LicenseCore.getStateSafe,
   guard: LicenseCore.guard,
   setKeySafe: LicenseCore.setKeySafe,
+  clearKeySafe: LicenseCore.clearKeySafe,
   onChange: LicenseCore.onChange,
   resetDemoTrial: LicenseCore.resetDemoTrial,
   recordExportOk: LicenseCore.recordExportOk,
@@ -5872,10 +6012,14 @@ Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyProUi).catch((
 Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyLicenseUi).catch((e)=>{
   console.error("[License] non-fatal", e);
 });
+Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateLicenseSettingsUi).catch((e)=>{
+  console.error("[License] non-fatal", e);
+});
 if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> updateTierBadge(st));
   window.WavCueLicense.onChange((st)=> applyProUi(st));
   window.WavCueLicense.onChange((st)=> applyLicenseUi(st));
+  window.WavCueLicense.onChange((st)=> updateLicenseSettingsUi(st));
 }
 (function(){
   const log = ()=>{
@@ -11805,6 +11949,20 @@ const settingsDeleteMethod = $("settingsDeleteMethod");
 const settingsAutoCleanup = $("settingsAutoCleanup");
 const settingsResetRecommended = $("settingsResetRecommended");
 const settingsRulesBadge = $("settingsRulesBadge");
+const settingsLicensePlan = $("settingsLicensePlan");
+const licenseKeyInput = $("licenseKeyInput");
+const licenseKeyMask = $("licenseKeyMask");
+const licenseActivateBtn = $("licenseActivateBtn");
+const licenseDeactivateBtn = $("licenseDeactivateBtn");
+const licenseDeactivateConfirm = $("licenseDeactivateConfirm");
+const licenseDeactivateCancel = $("licenseDeactivateCancel");
+const licenseDeactivateRun = $("licenseDeactivateRun");
+const activationOverlay = $("activationOverlay");
+const activationOverlayActivate = $("activationOverlayActivate");
+const activationOverlayDemo = $("activationOverlayDemo");
+const LS_LICENSE_KEY = "wavcue_license_key";
+const LS_LICENSE_LOCKED = "wavcue_license_key_locked";
+const LS_ACTIVATION_PROMPT_DONE = "wavcue_activation_prompt_done";
 let cachedAutoBackupEnabled = true;
 
 const RECOMMENDED_SETTINGS = {
@@ -11827,6 +11985,91 @@ const updateRulesBadge = ()=>{
     && minKeepValue === 20
     && deleteValue === "trash";
   settingsRulesBadge.classList.toggle("is-hidden", !isRecommended);
+};
+
+const readStoredLicenseKey = ()=>{
+  try{ return localStorage?.getItem?.(LS_LICENSE_KEY) || ""; }catch(_){ return ""; }
+};
+
+const maskLicenseKey = (raw)=>{
+  const value = String(raw || "").trim();
+  if(!value) return "—";
+  const tail = value.slice(-4);
+  const masked = value.slice(0, -4).replace(/[A-Za-z0-9]/g, "•");
+  return `${masked}${tail}`;
+};
+
+const isLicenseLocked = ()=>{
+  try{ return localStorage?.getItem?.(LS_LICENSE_LOCKED) === "1"; }catch(_){ return false; }
+};
+
+const setLicenseLocked = (locked)=>{
+  try{
+    if(!localStorage?.setItem) return;
+    if(locked) localStorage.setItem(LS_LICENSE_LOCKED, "1");
+    else localStorage.removeItem(LS_LICENSE_LOCKED);
+  }catch(_){}
+};
+
+const setActivationPromptDone = ()=>{
+  try{ localStorage?.setItem?.(LS_ACTIVATION_PROMPT_DONE, "1"); }catch(_){}
+};
+
+const isActivationPromptDone = ()=>{
+  try{ return localStorage?.getItem?.(LS_ACTIVATION_PROMPT_DONE) === "1"; }catch(_){ return false; }
+};
+
+const updateLicenseSettingsUi = (state)=>{
+  const tierRaw = state && state.tier ? state.tier : "demo";
+  const tier = String(tierRaw).toLowerCase();
+  const key = readStoredLicenseKey();
+  let locked = isLicenseLocked() && !!key;
+  if(!key && locked){
+    setLicenseLocked(false);
+    locked = false;
+  }
+  if(key && !locked && tier !== "demo"){
+    setLicenseLocked(true);
+    locked = true;
+  }
+  if(settingsLicensePlan){
+    const label = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
+    settingsLicensePlan.textContent = label;
+    settingsLicensePlan.classList.toggle("is-pro", tier === "pro");
+    settingsLicensePlan.classList.toggle("is-standard", tier === "standard");
+  }
+  if(licenseKeyInput){
+    licenseKeyInput.disabled = locked;
+    if(locked){
+      licenseKeyInput.value = maskLicenseKey(key);
+    }else if(!licenseKeyInput.value){
+      licenseKeyInput.value = key || "";
+    }
+  }
+  if(licenseKeyMask){
+    const masked = key ? maskLicenseKey(key) : "—";
+    licenseKeyMask.textContent = `保存済みキー: ${masked}`;
+  }
+  if(licenseActivateBtn) licenseActivateBtn.disabled = locked;
+  if(licenseDeactivateBtn) licenseDeactivateBtn.disabled = !locked;
+};
+
+const openLicenseDeactivateConfirm = ()=>{
+  if(!licenseDeactivateConfirm) return;
+  try{ licenseDeactivateConfirm.showModal(); }catch(_){ licenseDeactivateConfirm.open = true; }
+};
+
+const closeLicenseDeactivateConfirm = ()=>{
+  if(!licenseDeactivateConfirm) return;
+  _dialogCloseWithGuard(licenseDeactivateConfirm);
+};
+
+const showActivationOverlayIfNeeded = ()=>{
+  if(!activationOverlay) return;
+  const hasKey = !!readStoredLicenseKey();
+  if(hasKey || isActivationPromptDone()) return;
+  activationOverlay.classList.add("show");
+  console.log("[License] overlay shown");
 };
 
 const settingsLogAdd = (message)=>{
@@ -11893,10 +12136,24 @@ const refreshSettingsData = async ()=>{
   }
 };
 
-const openSettingsDialog = async ()=>{
+const focusLicenseSection = ()=>{
+  const section = document.getElementById("settingsLicenseSection");
+  if(section){
+    section.scrollIntoView({ behavior: "smooth", block: "start" });
+  }
+  if(licenseKeyInput && !licenseKeyInput.disabled){
+    licenseKeyInput.focus();
+    licenseKeyInput.select();
+  }
+};
+
+const openSettingsDialog = async (options = {})=>{
   if(!settingsDialog) return;
   await refreshSettingsData();
   try{ settingsDialog.showModal(); }catch(_){ settingsDialog.open = true; }
+  if(options.focusLicense){
+    requestAnimationFrame(()=> focusLicenseSection());
+  }
 };
 
 const openCleanupConfirm = ()=>{
@@ -11920,11 +12177,68 @@ if(settingsCleanupConfirmCancel){
   settingsCleanupConfirmCancel.addEventListener("click", closeCleanupConfirm);
 }
 settingsCleanupConfirm?.addEventListener("click", (e)=>{ if(e.target === settingsCleanupConfirm){ closeCleanupConfirm(); } });
+licenseDeactivateCancel?.addEventListener("click", closeLicenseDeactivateConfirm);
+licenseDeactivateConfirm?.addEventListener("click", (e)=>{ if(e.target === licenseDeactivateConfirm){ closeLicenseDeactivateConfirm(); } });
 
 [settingsRetentionDays, settingsBackupQuotaGB, settingsMinKeepCount, settingsDeleteMethod].forEach((select)=>{
   if(!select) return;
   select.addEventListener("change", updateRulesBadge);
 });
+
+if(licenseActivateBtn){
+  licenseActivateBtn.addEventListener("click", async ()=>{
+    const raw = (licenseKeyInput?.value || "").trim();
+    if(!raw){
+      if(window.safeToast) window.safeToast("キーが無効です", "warn");
+      return;
+    }
+    const res = await window.WavCueLicense?.setKeySafe?.(raw);
+    if(res?.ok){
+      setLicenseLocked(true);
+      setActivationPromptDone();
+      activationOverlay?.classList.remove("show");
+      console.log("[License] activation success");
+      updateLicenseSettingsUi(window.WavCueLicense?.getStateSafe?.());
+    }else{
+      if(window.safeToast) window.safeToast("キーが無効です", "warn");
+    }
+  });
+}
+
+licenseDeactivateBtn?.addEventListener("click", openLicenseDeactivateConfirm);
+licenseDeactivateRun?.addEventListener("click", async ()=>{
+  closeLicenseDeactivateConfirm();
+  const res = await window.WavCueLicense?.clearKeySafe?.();
+  setLicenseLocked(false);
+  updateLicenseSettingsUi(window.WavCueLicense?.getStateSafe?.());
+  console.log("[License] deactivated");
+  if(!res?.ok && window.safeToast){
+    window.safeToast("解除に失敗しました", "warn");
+  }
+});
+
+if(activationOverlayActivate){
+  activationOverlayActivate.addEventListener("click", ()=>{
+    setActivationPromptDone();
+    activationOverlay?.classList.remove("show");
+    openSettingsDialog({ focusLicense: true });
+  });
+}
+
+if(activationOverlayDemo){
+  activationOverlayDemo.addEventListener("click", ()=>{
+    setActivationPromptDone();
+    activationOverlay?.classList.remove("show");
+    if(window.safeToast) window.safeToast("アクティベーションは設定（⚙）からいつでも行えます", "info", 3200);
+    console.log("[License] demo continue");
+  });
+}
+
+if(document.readyState === "loading"){
+  document.addEventListener("DOMContentLoaded", ()=> showActivationOverlayIfNeeded(), { once: true });
+}else{
+  showActivationOverlayIfNeeded();
+}
 
 document.querySelectorAll("[data-settings-folder]").forEach((button)=>{
   button.addEventListener("click", async ()=>{
