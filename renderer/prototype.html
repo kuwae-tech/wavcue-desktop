@@ -3019,6 +3019,19 @@ body, #appRoot, .appRoot, .mainLayout{
   min-width: 0;
 }
 .proFileFlags{ display:flex; gap:6px; }
+.proFlagBadge{
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  line-height: 1;
+  padding: 2px 6px;
+  border-radius: 999px;
+  border: 1px solid rgba(148,163,184,.35);
+  background: rgba(255,255,255,0.08);
+  color: rgba(226,232,240,.92);
+  white-space: nowrap;
+}
 .proBadge{ font-size:11px; padding:2px 6px; border-radius:999px; background:rgba(255,255,255,0.10); }
 .proFileActions{ display:flex; align-items:center; gap:6px; }
 .proFileActionBtn{
@@ -4049,7 +4062,7 @@ body, #appRoot, .appRoot, .mainLayout{
     flex-shrink: 0 !important;
     min-width: 0 !important;
   }
-  .proBadge{
+  .proOnlyWrap .proBadge{
     position: absolute !important;
     top: -6px !important;
     right: -4px !important;
@@ -4111,9 +4124,12 @@ body, #appRoot, .appRoot, .mainLayout{
   .imagerBox,
   .proImagerBox,
   .imagerBlock{
-    width: auto !important;
+    width: var(--imagerS) !important;
+    min-width: var(--imagerS) !important;
+    max-width: var(--imagerS) !important;
     height: 100% !important;
-    flex: 1 1 auto !important;
+    flex: 0 0 var(--imagerS) !important;
+    flex-shrink: 0 !important;
     aspect-ratio: auto !important;
   }
   .imagerBlock{
@@ -18622,8 +18638,8 @@ try{
         ? f.attachCount
         : (Array.isArray(f.attachments) ? f.attachments.length : 0);
       const flags = [];
-      if(f.status.edited) flags.push('<span class="proBadge">編</span>');
-      if(f.status.exported) flags.push('<span class="proBadge">出</span>');
+      if(f.status.edited) flags.push('<span class="proFlagBadge">編</span>');
+      if(f.status.exported) flags.push('<span class="proFlagBadge">出</span>');
       return `<div class="${cls.join(' ')}" data-id="${esc(f.id)}" data-idx="${i}">
         <div class="proFileRowMain">
           <div class="proName">${esc(f.name)}</div>
