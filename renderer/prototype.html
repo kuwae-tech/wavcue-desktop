@@ -3900,7 +3900,8 @@ body, #appRoot, .appRoot, .mainLayout{
     --wcBottomH: 240px;      /* 下段高さの真実（他の --bottomH/--bottom-line-h は無視） */
     --wcBottomGap: 12px;
     --wcBottomPad: 14px;
-    --wcWaveBottomGap: 2px;
+    --wcWaveBottomGap: 0px;
+    --wcBottomLift: -8px;
     --wcMeterW: 120px;
     --wcImagerS: 240px;      /* bottomHと合わせると正方形 */
   }
@@ -3922,6 +3923,7 @@ body, #appRoot, .appRoot, .mainLayout{
     box-sizing: border-box !important;
     overflow: hidden !important;  /* はみ出しは許可しない */
     transform: none !important;   /* 変な持ち上げ禁止 */
+    margin-top: var(--wcBottomLift) !important;
   }
 
   /* ② メーター：はみ出しの主因を潰す（box-sizing + padding 제거 + 100%） */
