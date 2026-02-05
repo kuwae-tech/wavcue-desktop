@@ -3992,12 +3992,12 @@ body, #appRoot, .appRoot, .mainLayout{
   /* フィルター等が “右に寄りすぎて見切れる” のを防ぐ（wrapのmin-width問題を潰す） */
   .proOnlyWrap{
     min-width: 0 !important;
-    max-width: 100% !important;
+    max-width: 220px !important;
   }
   .proOnlyWrap .btn,
   .proOnlyWrap select{
     min-width: 0 !important;
-    max-width: 100% !important;
+    max-width: 220px !important;
   }
   .proBtnGroup{
     position: relative !important;
@@ -4084,8 +4084,9 @@ body, #appRoot, .appRoot, .mainLayout{
     padding: 0 !important;
     margin: 0 !important;
     flex: 0 0 auto !important;
-    width: 220px !important;
-    min-width: 220px !important;
+    width: clamp(160px, 18vw, 220px) !important;
+    min-width: 160px !important;
+    max-width: 220px !important;
     background: none !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
@@ -4102,7 +4103,7 @@ body, #appRoot, .appRoot, .mainLayout{
     align-items: center !important;
     width: 100% !important;
     min-width: 0 !important;
-    max-width: 100% !important;
+    max-width: 220px !important;
     height: 32px !important;
     line-height: 1.2 !important;
     padding: 9px 34px 9px 10px !important;
@@ -4197,8 +4198,9 @@ body, #appRoot, .appRoot, .mainLayout{
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    width: 220px !important;
-    min-width: 220px !important;
+    width: clamp(160px, 18vw, 220px) !important;
+    min-width: 160px !important;
+    max-width: 220px !important;
   }
 
   /* selectを“ボタン”として統一（高さ/角丸/パディング） */
@@ -4206,8 +4208,9 @@ body, #appRoot, .appRoot, .mainLayout{
   .proFilterSelect{
     -webkit-appearance: none !important;
     appearance: none !important;
-    width: 220px !important;
-    min-width: 220px !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
     height: 32px !important;
     line-height: 1.2 !important;
     padding: 9px 40px 9px 10px !important; /* 右に矢印分 */
@@ -4219,7 +4222,7 @@ body, #appRoot, .appRoot, .mainLayout{
     background-position: right 12px center !important;
     background-size: 10px !important;
     color: rgba(255,255,255,0.92) !important;
-    max-width: 220px !important;
+    max-width: 100% !important;
     overflow: hidden !important;
     text-overflow: ellipsis !important;
     white-space: nowrap !important;
@@ -17628,7 +17631,7 @@ try{
       const hasExisting = project.files.length > 0;
       if(!isPro){
         if(hasExisting){
-          const ok = window.confirm("既にファイルを開いています。新しいファイルを開くと現在のファイルは閉じられます。続行しますか？");
+          const ok = window.confirm("別のファイルを開きます。\n現在のファイルは閉じられます。続行しますか？");
           if(!ok) return [];
         }
         addTargets = [files[files.length - 1]];
