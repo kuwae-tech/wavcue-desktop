@@ -3436,6 +3436,17 @@ body, #appRoot, .appRoot, .mainLayout{
   font-size:11px;
   color:rgba(226,232,240,.7);
 }
+.tierNoteRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.tierNoteInline{
+  margin-left:auto;
+  font-size:11px;
+  color:rgba(226,232,240,.7);
+}
 .proHistoryDialog .proJobPanel{
   position:static;
   width:100%;
@@ -4696,13 +4707,13 @@ body, #appRoot, .appRoot, .mainLayout{
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:10px;margin:10px 0 8px">
+    <div class="tierNoteRow" style="margin:10px 0 8px">
       <div class="tabBar" role="tablist" aria-label="cmcd タブ">
         <button class="tabBtn active" type="button" role="tab" aria-selected="true" data-tab="cmcdIn">入力</button>
         <button class="tabBtn" type="button" role="tab" aria-selected="false" data-tab="cmcdPreset">プリセット</button>
       </div>
+      <div class="tierNoteInline" id="cmcdPresetTierNote" style="display:none">DEMO版ではプリセット機能は使用できません</div>
     </div>
-    <div class="tierNote" id="cmcdPresetTierNote" style="display:none">DEMO版ではプリセット機能は使用できません</div>
 
     <div class="tabPanels" style="min-height:0">
       <div class="tabPanel active" role="tabpanel" data-tabpanel="cmcdIn">
@@ -4845,13 +4856,13 @@ body, #appRoot, .appRoot, .mainLayout{
 </div>
 </div>
 <div class="modalBody">
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<div class="tierNoteRow" style="margin-bottom:10px">
 <div aria-label="規格チェック タブ" class="tabBar" role="tablist">
 <button aria-controls="sc_resultsPane" aria-selected="true" class="tabBtn active" id="sc_tab_results" role="tab" type="button">チェック</button>
 <button aria-controls="sc_presetMgr" aria-selected="false" class="tabBtn" id="sc_tab_preset" role="tab" type="button">プリセット編集</button>
 </div>
+<div class="tierNoteInline" id="scPresetTierNote" style="display:none">DEMO版ではプリセット機能は使用できません</div>
 </div>
-<div class="tierNote" id="scPresetTierNote" style="display:none">DEMO版ではプリセット機能は使用できません</div>
 <div class="scPresetMgr" id="sc_presetMgr" style="display:none;padding:12px;border:1px solid var(--line);border-radius:16px;background:transparent">
 <div class="scPmHeadRow" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
 <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
@@ -6021,6 +6032,7 @@ const LICENSE_EXTRA_KEYS = [
   "wavcue_std_grace_modal_shown_for_started_at",
 ];
 const DEBUG_TIER_OVERRIDE_KEY = "wavcue_debug_tier_override";
+let _licenseRestoreDone = false;
 
 function getStoredLicenseKey(){
   try{ return localStorage?.getItem?.(LICENSE_STORAGE_KEY) || ""; }catch(_){ return ""; }
@@ -6116,6 +6128,23 @@ function openSettingsModalSafe(preferTab){
       }
     }
   }
+}
+async function restoreSavedLicenseKey(){
+  if(_licenseRestoreDone) return;
+  _licenseRestoreDone = true;
+  try{
+    const saved = localStorage?.getItem?.(LICENSE_STORAGE_KEY);
+    if(saved){
+      await window.WavCueLicense?.setKeySafe?.(saved);
+    }
+    const st = await window.WavCueLicense?.getStateSafe?.();
+    if(st){
+      if(String(st.tier || "demo").toLowerCase() === "demo"){
+        localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
+      }
+      applyAllLicenseUi(st);
+    }
+  }catch(_){}
 }
 function clearLicenseKeySafe(){
   try{
@@ -6441,7 +6470,7 @@ const applyLicenseUi = (state)=>{
   try{ updateDemoRemainingBanner(state); }catch(_){}
 };
 
-Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyAllLicenseUi).catch((e)=>{
+Promise.resolve().then(restoreSavedLicenseKey).catch((e)=>{
   console.error("[License] non-fatal", e);
 });
 if(typeof window.WavCueLicense?.onChange === "function"){
@@ -12592,10 +12621,12 @@ const runActivationFlow = async (source)=>{
     if(st) applyAllLicenseUi(st);
     const tier = String(st?.tier || "demo").toLowerCase();
     if(!res?.ok || tier === "demo"){
+      localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
       if(errorEl) errorEl.textContent = "ライセンスキーが無効です。入力内容をご確認ください。";
       console.log("[License] activation failed", res?.reason || "invalid");
       return;
     }
+    try{ localStorage?.setItem?.(LICENSE_STORAGE_KEY, rawKey); }catch(_){}
     if(errorEl) errorEl.textContent = "";
     console.log("[License] activation ok");
     try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
