@@ -246,17 +246,20 @@
     align-items:center;
     gap:8px;
     flex-wrap:wrap;
+    background:transparent;
   }
   #licenseBanner .licenseBannerBtn{
     border-radius:999px;
     padding:6px 10px;
     font-size:11px;
-    background:rgba(15,23,42,.45);
-    border:1px solid rgba(248,113,113,.45);
-    color:rgba(254,202,202,.95);
+    background:rgba(255,255,255,.04);
+    border:1px solid var(--line);
+    color:var(--text);
+    position:relative;
+    z-index:2;
   }
   #licenseBanner .licenseBannerBtn:hover{
-    background:rgba(248,113,113,.18);
+    background:rgba(255,255,255,.07);
   }
   #licenseBanner.show{
     display:block;
@@ -974,6 +977,12 @@
   }
   .settingsDialog .settingsInfoValue{
     text-align:right;
+  }
+  .settingsDialog .settingsLimitList{
+    margin:0;
+    padding-left:18px;
+    font-size:12px;
+    line-height:1.6;
   }
   .settingsDialog .settingsError{
     color:rgba(252,165,165,.95);
@@ -3417,6 +3426,16 @@ body, #appRoot, .appRoot, .mainLayout{
   margin-top:10px;
 }
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
+.tierDisabled{
+  opacity:0.5;
+  pointer-events:none;
+  cursor:not-allowed;
+}
+.tierNote{
+  margin-top:6px;
+  font-size:11px;
+  color:rgba(226,232,240,.7);
+}
 .proHistoryDialog .proJobPanel{
   position:static;
   width:100%;
@@ -4683,6 +4702,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <button class="tabBtn" type="button" role="tab" aria-selected="false" data-tab="cmcdPreset">プリセット</button>
       </div>
     </div>
+    <div class="tierNote" id="cmcdPresetTierNote" style="display:none">DEMO版ではプリセット機能は使用できません</div>
 
     <div class="tabPanels" style="min-height:0">
       <div class="tabPanel active" role="tabpanel" data-tabpanel="cmcdIn">
@@ -4831,6 +4851,7 @@ body, #appRoot, .appRoot, .mainLayout{
 <button aria-controls="sc_presetMgr" aria-selected="false" class="tabBtn" id="sc_tab_preset" role="tab" type="button">プリセット編集</button>
 </div>
 </div>
+<div class="tierNote" id="scPresetTierNote" style="display:none">DEMO版ではプリセット機能は使用できません</div>
 <div class="scPresetMgr" id="sc_presetMgr" style="display:none;padding:12px;border:1px solid var(--line);border-radius:16px;background:transparent">
 <div class="scPmHeadRow" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
 <div style="display:flex;align-items:baseline;gap:10px;flex-wrap:wrap">
@@ -5083,24 +5104,16 @@ body, #appRoot, .appRoot, .mainLayout{
                   <span class="muted">DEMO残り</span>
                   <span class="settingsInfoValue" id="settingsLicenseDemoRemaining">—</span>
                 </div>
-                <div class="settingsInfoRow">
-                  <span class="muted">ロック理由</span>
-                  <span class="settingsInfoValue" id="settingsLicenseLockReason">—</span>
-                </div>
-              </div>
-              <div class="muted" id="settingsLicenseDebugOverride" style="font-size:11px;margin-top:6px"></div>
             </div>
-            <div class="settingsBlock">
-              <div class="settingsBlockTitle">有効化でできること</div>
-              <ul class="muted" style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">
-                <li>書き出し・バックアップ機能の制限解除</li>
-                <li>規格チェックや履歴機能を全開放</li>
-                <li>PRO機能の利用</li>
-              </ul>
-            </div>
-          </section>
-        </div>
+            <div class="muted" id="settingsLicenseDebugOverride" style="font-size:11px;margin-top:6px"></div>
+          </div>
+          <div class="settingsBlock">
+            <div class="settingsBlockTitle">機能制限</div>
+            <ul class="muted settingsLimitList" id="settingsLicenseLimits"></ul>
+          </div>
+        </section>
       </div>
+    </div>
     </div>
   </div>
 </dialog>
@@ -6231,18 +6244,33 @@ function updateLicenseInfo(state){
     : "—";
   if(settingsLicenseDemoRemaining) settingsLicenseDemoRemaining.textContent = remainText;
   const storedKey = getStoredLicenseKey();
-  let lockReason = "—";
-  if(tier === "demo" && demoInfo?.isLocked){
-    lockReason = demoInfo.demoBlockedReason === "demo_export_limit"
-      ? "書き出し回数制限に達しました"
-      : "利用期間が終了しました";
-  }else if(tier !== "demo" && storedKey){
-    lockReason = "解除まで編集できません";
-  }
-  if(settingsLicenseLockReason) settingsLicenseLockReason.textContent = lockReason;
   const override = getDebugTierOverride();
   if(settingsLicenseDebugOverride){
     settingsLicenseDebugOverride.textContent = override ? `開発者用: debug override = ${override}` : "";
+  }
+  if(settingsLicenseLimits){
+    const lines = [];
+    if(tier === "demo"){
+      const daysTxt = Number.isFinite(remainingDays) ? `${remainingDays}日` : "—";
+      const exportTxt = Number.isFinite(remainingExports) ? `${remainingExports}回` : "—";
+      lines.push(`有効期限: 残り${daysTxt}`);
+      lines.push(`書き出し回数制限: 残り${exportTxt}`);
+      lines.push("プリセット編集 不可");
+      lines.push("一括読み込み / 一括チェック / 一括書き出し 不可");
+    }else if(tier === "standard"){
+      lines.push("一括読み込み / 一括チェック / 一括書き出し 不可");
+    }else{
+      lines.push("制限なし");
+    }
+    settingsLicenseLimits.innerHTML = "";
+    lines.forEach((line)=>{
+      const li = document.createElement("li");
+      li.textContent = line;
+      settingsLicenseLimits.appendChild(li);
+    });
+  }
+  if(tier !== "demo" && storedKey){
+    // keep lock state in status area only
   }
 }
 const applyLicenseUi = (state)=>{
@@ -6313,7 +6341,7 @@ const applyLicenseUi = (state)=>{
           const actions = document.createElement("span");
           actions.className = "licenseBannerActions";
           const openBtn = document.createElement("button");
-          openBtn.className = "btnGhost licenseBannerBtn";
+          openBtn.className = "btn licenseBannerBtn";
           openBtn.type = "button";
           openBtn.textContent = "ライセンスキーを入力";
           openBtn.addEventListener("click", openLicenseEntryFlow);
@@ -6381,6 +6409,13 @@ const applyLicenseUi = (state)=>{
       "sc_pm_silmax",
     ].map(id=> document.getElementById(id));
     presetEls.forEach(el=> setDisabled(el, presetDisabled));
+    const cmcdPresetBtn = document.querySelector('[data-tab="cmcdPreset"]');
+    const scPresetBtn = document.getElementById("sc_tab_preset");
+    [cmcdPresetBtn, scPresetBtn].filter(Boolean).forEach((el)=> el.classList.toggle("tierDisabled", presetDisabled));
+    const cmcdNote = document.getElementById("cmcdPresetTierNote");
+    if(cmcdNote) cmcdNote.style.display = presetDisabled ? "block" : "none";
+    const scNote = document.getElementById("scPresetTierNote");
+    if(scNote) scNote.style.display = presetDisabled ? "block" : "none";
 
     const backupDisabled = isDemo;
     const backupEls = [
@@ -12347,8 +12382,8 @@ const settingsLicenseStatus = $("settingsLicenseStatus");
 const settingsLicenseError = $("settingsLicenseError");
 const settingsLicensePlan = $("settingsLicensePlan");
 const settingsLicenseDemoRemaining = $("settingsLicenseDemoRemaining");
-const settingsLicenseLockReason = $("settingsLicenseLockReason");
 const settingsLicenseDebugOverride = $("settingsLicenseDebugOverride");
+const settingsLicenseLimits = $("settingsLicenseLimits");
 const licenseClearConfirm = $("licenseClearConfirm");
 const licenseClearCancel = $("licenseClearCancel");
 const licenseClearConfirmOk = $("licenseClearConfirmOk");
@@ -12548,25 +12583,25 @@ const runActivationFlow = async (source)=>{
   const rawKey = String(keyInput?.value || "").trim();
   if(errorEl) errorEl.textContent = "";
   if(!rawKey){
-    if(errorEl) errorEl.textContent = resolveActivationErrorMessage("empty");
+    if(errorEl) errorEl.textContent = "キーを入力してください";
     return;
   }
   try{
     const res = await window.WavCueLicense?.setKeySafe?.(rawKey);
-    if(!res?.ok){
-      if(errorEl) errorEl.textContent = resolveActivationErrorMessage(res?.reason);
-      console.log("[License] activation failed", res?.reason || "unknown");
+    const st = await window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    const tier = String(st?.tier || "demo").toLowerCase();
+    if(!res?.ok || tier === "demo"){
+      if(errorEl) errorEl.textContent = "ライセンスキーが無効です。入力内容をご確認ください。";
+      console.log("[License] activation failed", res?.reason || "invalid");
       return;
     }
-    const st = window.WavCueLicense?.getStateSafe?.();
-    if(st) applyLicenseUi(st);
+    if(errorEl) errorEl.textContent = "";
     console.log("[License] activation ok");
-    if(st?.tier && String(st.tier).toLowerCase() !== "demo"){
-      try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
-      activationOverlay?.classList.remove("show");
-    }
+    try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
+    activationOverlay?.classList.remove("show");
   }catch(e){
-    if(errorEl) errorEl.textContent = resolveActivationErrorMessage("exception");
+    if(errorEl) errorEl.textContent = "ライセンスキーが無効です。入力内容をご確認ください。";
     console.log("[License] activation failed", e?.message || "exception");
   }
 };
