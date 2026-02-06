@@ -5265,6 +5265,7 @@ const LicenseCore = (()=> {
     standardGraceModal: "Standard認証が切れました。1時間後に書き出しのみ停止します。\nネット接続を確認して再認証してください。",
     standardGraceBanner: "認証が切れています（猶予中）。ネット接続を確認して再認証してください。",
     standardAuthBanner: "認証が切れています（書き出しのみ停止）。ネット接続を確認して再認証してください。",
+    standardOfflineBanner: "オフラインのためDEMO制限中です。オンライン復帰でSTANDARDに戻ります。",
   });
   const policy = {
     bulkImport: { minTier: "pro", reason: "pro-only" },
@@ -5281,10 +5282,23 @@ const LicenseCore = (()=> {
     updatedAt: Date.now(),
   };
   let _lastStdHardExpired = null;
+  let _lastStdOfflineDegraded = null;
   const DEMO_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
   const DEMO_EXPORT_MAX = 20;
   const STANDARD_AUTH_FRESH_MS = 60 * 60 * 1000;
   const STANDARD_AUTH_GRACE_MS = 60 * 60 * 1000;
+  const LICENSE_SERVER_BASE_KEY = "wavcue_license_server_base";
+  const LICENSE_DEVICE_ID_KEY = "wavcue_device_id_v1";
+  const LICENSE_EXTRA_KEYS = [
+    "wavcue_license_key_locked",
+    "wavcue_license_key_lock",
+    "wavcue_demo_activated_at",
+    "wavcue_demo_export_ok_count",
+    "wavcue_standard_last_online_ok_at",
+    "wavcue_std_grace_started_at",
+    "wavcue_std_grace_expires_at",
+    "wavcue_std_grace_modal_shown_for_started_at",
+  ];
   const LS_STATE_KEYS = [
     "wavcue_license_state",
     "wavcue_license",
@@ -5446,7 +5460,7 @@ const LicenseCore = (()=> {
         (raw.isPro ? "pro" : null) ||
         (raw.isStandard ? "standard" : null) ||
         (raw.isDemo ? "demo" : null);
-      return inferred ? { tier: inferred } : null;
+      return inferred ? { ...raw, tier: inferred } : null;
     }
     return null;
   };
@@ -5477,6 +5491,53 @@ const LicenseCore = (()=> {
       }
     }catch(_){}
     return null;
+  };
+
+  const readLocalStateRaw = ()=>{
+    try{
+      const raw = localStorage?.getItem?.(LS_STATE_KEYS[0]);
+      if(!raw) return null;
+      const parsed = JSON.parse(raw);
+      return parsed && typeof parsed === "object" ? parsed : null;
+    }catch(_){
+      return null;
+    }
+  };
+
+  const getOrCreateDeviceId = ()=>{
+    try{
+      const existing = localStorage?.getItem?.(LICENSE_DEVICE_ID_KEY);
+      if(existing) return existing;
+      const fallback = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+      const next = (window.crypto?.randomUUID?.() || fallback);
+      localStorage?.setItem?.(LICENSE_DEVICE_ID_KEY, next);
+      return next;
+    }catch(_){
+      return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+    }
+  };
+
+  const getLicenseServerBase = ()=>{
+    try{
+      return String(localStorage?.getItem?.(LICENSE_SERVER_BASE_KEY) || "").trim();
+    }catch(_){
+      return "";
+    }
+  };
+
+  const saveLocalLicenseState = (payload)=>{
+    if(!payload || !payload.tier) return;
+    try{
+      localStorage?.setItem?.(LS_STATE_KEYS[0], JSON.stringify(payload));
+    }catch(_){}
+  };
+
+  const clearLocalLicenseStorage = ()=>{
+    try{
+      LS_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
+      localStorage?.removeItem?.(LS_KEY_LAST);
+      LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
+    }catch(_){}
   };
 
   const readWindowSync = ()=>{
@@ -5532,6 +5593,7 @@ const LicenseCore = (()=> {
   const buildState = (base, options = {})=>{
     const now = Date.now();
     const tier = (base && base.tier) ? base.tier : "demo";
+    const isOffline = (typeof navigator !== "undefined" && navigator.onLine === false);
     if(options.touchOnline && tier === "standard"){
       touchStandardLastOnlineOkAt(now);
     }
@@ -5570,8 +5632,10 @@ const LicenseCore = (()=> {
       standard.auth.graceRemainingMinutes = graceRemainingMinutes;
     }
     if(tier === "standard"){
+      standard.offlineDegraded = !!isOffline;
       standard.exportBlockedReason = isHardExpired ? "standard_auth_expired" : null;
     }else{
+      standard.offlineDegraded = false;
       standard.exportBlockedReason = null;
     }
     return { ...base, tier, demo, standard };
@@ -5594,7 +5658,7 @@ const LicenseCore = (()=> {
   const _refreshState = (reason, options = {})=>{
     const next = getStateSafeInternal({ touchOnline: options.touchOnline });
     stateCache.tier = next.tier;
-    stateCache.source = reason || stateCache.source;
+    stateCache.source = next.source || reason || stateCache.source;
     stateCache.updatedAt = Date.now();
     const payload = { ...stateCache, demo: next.demo, standard: next.standard };
     listeners.forEach((fn)=>{ try{ fn(payload); }catch(_){ } });
@@ -5618,6 +5682,11 @@ const LicenseCore = (()=> {
         }
       }
       _lastStdHardExpired = stdHardExpired;
+      const stdOffline = !!next.standard?.offlineDegraded;
+      if(_lastStdOfflineDegraded !== stdOffline){
+        console.log(`[License] standard offline degrade ${stdOffline ? "on" : "off"}`);
+        _lastStdOfflineDegraded = stdOffline;
+      }
       if(stdInGrace){
         const startedAt = next.standard?.auth?.graceStartedAt;
         const shownFor = readStandardGraceModalShownFor();
@@ -5633,6 +5702,7 @@ const LicenseCore = (()=> {
       }
     }else{
       _lastStdHardExpired = null;
+      _lastStdOfflineDegraded = null;
     }
     if(isChange) _lastRefreshSummary = summary;
     return payload;
@@ -5653,32 +5723,33 @@ const LicenseCore = (()=> {
     try{
       const st = getStateSafeInternal({ touchOnline: false });
       const tier = (st && st.tier) ? st.tier : "demo";
+      const effectiveTier = (tier === "standard" && st?.standard?.offlineDegraded) ? "demo" : tier;
       const rule = policy[action] || { minTier: "demo" };
-      let ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
+      let ok = (tierRank[effectiveTier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
       let reason = ok ? undefined : (rule.reason || "restricted");
-      if(action === "exportSingle" && tier === "standard" && st?.standard?.auth?.isHardExpired){
+      if(action === "exportSingle" && effectiveTier === "standard" && st?.standard?.auth?.isHardExpired){
         ok = false;
         reason = "standard-auth-expired";
       }
-      if(action === "exportSingle" && tier === "demo" && isDemoLocked(st)){
+      if(action === "exportSingle" && effectiveTier === "demo" && isDemoLocked(st)){
         ok = false;
         reason = st?.demo?.demoBlockedReason || "demo_expired";
       }
-      if(action === "preset" && tier === "demo"){
+      if(action === "preset" && effectiveTier === "demo"){
         ok = false;
         reason = "demo-locked";
       }
-      if(action === "backup" && tier === "demo"){
+      if(action === "backup" && effectiveTier === "demo"){
         ok = false;
         reason = "demo-locked";
       }
-      if(action === "history" && tier !== "pro"){
+      if(action === "history" && effectiveTier !== "pro"){
         ok = false;
         reason = "pro-only";
       }
-      const res = { ok, tier, reason };
+      const res = { ok, tier: effectiveTier, reason };
       const reasonTxt = reason ? ` reason=${reason}` : "";
-      console.log(`[License] tier=${tier} action=${action} ok=${ok ? 1 : 0}${reasonTxt}`);
+      console.log(`[License] tier=${effectiveTier} action=${action} ok=${ok ? 1 : 0}${reasonTxt}`);
       return res;
     }catch(e){
       console.error("[License] non-fatal", e);
@@ -5689,38 +5760,120 @@ const LicenseCore = (()=> {
   const setKeySafe = async (key)=>{
     try{
       const value = String(key || "").trim();
-      if(!value) return { ok: false, reason: "empty" };
+      if(!value) return { ok: false, reason: "empty", message: "empty" };
+      console.log("[License] activate start");
+      const deviceId = getOrCreateDeviceId();
+      const serverBase = getLicenseServerBase();
       const keyTier = normalizeKeyTier(value);
       try{ localStorage?.setItem?.(LS_KEY_LAST, value); }catch(_){}
-      const fns = [
-        window.wavcue?.setLicenseKey,
-        window.wavcue?.activateLicense,
-        window.wavcue?.setLicense,
-      ].filter((fn)=> typeof fn === "function");
-      if(!fns.length){
-        if(keyTier) setCache({ tier: keyTier }, "activationKey");
-        _refreshState("key", { touchOnline: true });
-        return { ok: true };
-      }
-      const res = fns[0](value);
-      let next = res;
-      if(res && typeof res.then === "function"){
-        try{
-          next = await res;
-        }catch(e){
-          console.error("[License] non-fatal", e);
-          return { ok: false, reason: "activation-failed" };
+      if(!serverBase){
+        const upper = value.toUpperCase();
+        const localTier = upper.startsWith("WAVCUE-STANDARD-")
+          ? "standard"
+          : (upper.startsWith("WAVCUE-PRO-") ? "pro" : null);
+        if(!localTier){
+          console.log("[License] activate failed reason=server-unconfigured message=server base empty");
+          return { ok: false, reason: "server-unconfigured", message: "server base empty" };
         }
+        const payload = {
+          tier: localTier,
+          source: "local-dev",
+          updatedAt: Date.now(),
+          proofToken: "LOCALDEV",
+          deviceId,
+          serverBase: "",
+        };
+        saveLocalLicenseState(payload);
+        setCache({ tier: localTier }, "activation");
+        if(localTier === "standard") touchStandardLastOnlineOkAt(Date.now());
+        _refreshState("key", { touchOnline: true });
+        console.log(`[License] activate success tier=${localTier}`);
+        return { ok: true, tier: localTier, source: "local-dev", message: "local dev activation" };
       }
-      const norm = normalizeState(next);
-      const decidedTier = decideTier(keyTier, norm?.tier);
-      setCache({ tier: decidedTier }, norm ? "activation" : "activationKey");
+      const url = `${serverBase.replace(/\\/$/, "")}/activate`;
+      let payload = null;
+      try{
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ key: value, deviceId }),
+        });
+        payload = await res.json();
+      }catch(e){
+        console.log(`[License] activate failed reason=network message=${e?.message || "network error"}`);
+        return { ok: false, reason: "network", message: e?.message || "network error" };
+      }
+      if(!payload || payload.ok !== true){
+        const reason = payload?.reason || "activation-failed";
+        const message = payload?.message || "activation failed";
+        console.log(`[License] activate failed reason=${reason} message=${message}`);
+        return { ok: false, reason, message };
+      }
+      const decidedTier = normalizeTier(payload.tier) || decideTier(keyTier, payload.tier);
+      if(!decidedTier){
+        console.log("[License] activate failed reason=invalid-tier message=unknown tier");
+        return { ok: false, reason: "invalid-tier", message: "unknown tier" };
+      }
+      const nextState = {
+        tier: decidedTier,
+        source: "activation",
+        updatedAt: Date.now(),
+        proofToken: payload.proofToken || "",
+        deviceId,
+        serverBase,
+      };
+      saveLocalLicenseState(nextState);
+      setCache({ tier: decidedTier }, "activation");
       if(decidedTier === "standard") touchStandardLastOnlineOkAt(Date.now());
       _refreshState("key", { touchOnline: true });
-      return { ok: true };
+      console.log(`[License] activate success tier=${decidedTier}`);
+      return { ok: true, tier: decidedTier, source: "activation", message: payload.message || "" };
     }catch(e){
       console.error("[License] non-fatal", e);
-      return { ok: false, reason: "exception" };
+      return { ok: false, reason: "exception", message: e?.message || "exception" };
+    }
+  };
+
+  const clearKeySafe = async ()=>{
+    try{
+      console.log("[License] deactivate start");
+      const storedState = readLocalStateRaw();
+      const storedKey = localStorage?.getItem?.(LS_KEY_LAST) || "";
+      const serverBase = (storedState?.serverBase || getLicenseServerBase() || "").trim();
+      if(!serverBase || storedState?.source === "local-dev"){
+        clearLocalLicenseStorage();
+        console.log("[License] deactivate success");
+        return { ok: true, message: "local clear" };
+      }
+      const url = `${serverBase.replace(/\\/$/, "")}/deactivate`;
+      let payload = null;
+      try{
+        const res = await fetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            key: storedKey,
+            deviceId: storedState?.deviceId || getOrCreateDeviceId(),
+            proofToken: storedState?.proofToken || "",
+          }),
+        });
+        payload = await res.json();
+      }catch(e){
+        console.log(`[License] deactivate failed reason=network message=${e?.message || "network error"}`);
+        return { ok: false, reason: "network", message: e?.message || "network error" };
+      }
+      if(!payload || payload.ok !== true){
+        const reason = payload?.reason || "deactivate-failed";
+        const message = payload?.message || "deactivate failed";
+        console.log(`[License] deactivate failed reason=${reason} message=${message}`);
+        return { ok: false, reason, message };
+      }
+      clearLocalLicenseStorage();
+      console.log("[License] deactivate success");
+      return { ok: true, message: payload.message || "" };
+    }catch(e){
+      console.log(`[License] deactivate failed reason=exception message=${e?.message || "exception"}`);
+      return { ok: false, reason: "exception", message: e?.message || "exception" };
     }
   };
 
@@ -5854,6 +6007,7 @@ const LicenseCore = (()=> {
     getStateSafe,
     guard,
     setKeySafe,
+    clearKeySafe,
     onChange,
     isDemoLocked,
     isStandardAuthFresh,
@@ -5870,6 +6024,7 @@ window.WavCueLicense = {
   getStateSafe: LicenseCore.getStateSafe,
   guard: LicenseCore.guard,
   setKeySafe: LicenseCore.setKeySafe,
+  clearKeySafe: LicenseCore.clearKeySafe,
   onChange: LicenseCore.onChange,
   resetDemoTrial: LicenseCore.resetDemoTrial,
   recordExportOk: LicenseCore.recordExportOk,
@@ -6133,13 +6288,25 @@ async function restoreSavedLicenseKey(){
   if(_licenseRestoreDone) return;
   _licenseRestoreDone = true;
   try{
-    const saved = localStorage?.getItem?.(LICENSE_STORAGE_KEY);
-    if(saved){
-      await window.WavCueLicense?.setKeySafe?.(saved);
+    let localStateValid = false;
+    try{
+      const raw = localStorage?.getItem?.(LICENSE_STATE_KEYS[0]);
+      if(raw){
+        const parsed = JSON.parse(raw);
+        const tier = String(parsed?.tier || "").toLowerCase();
+        localStateValid = tier === "standard" || tier === "pro";
+        if(!localStateValid){
+          LICENSE_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
+          localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
+        }
+      }
+    }catch(_){
+      LICENSE_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
+      localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
     }
     const st = await window.WavCueLicense?.getStateSafe?.();
     if(st){
-      if(String(st.tier || "demo").toLowerCase() === "demo"){
+      if(String(st.tier || "demo").toLowerCase() === "demo" && !localStateValid){
         localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
       }
       applyAllLicenseUi(st);
@@ -6206,6 +6373,8 @@ function updateActivationUi(state){
   const storedKey = getStoredLicenseKey();
   const isActivated = tier !== "demo" && !!storedKey;
   const maskedKey = isActivated ? maskLicenseKey(storedKey) : storedKey;
+  const source = String(state?.source || "");
+  const offlineDegraded = tier === "standard" && !!state?.standard?.offlineDegraded;
   const overlayInput = document.getElementById("activationOverlayKey");
   const overlayError = document.getElementById("activationOverlayError");
   const overlayActivate = document.getElementById("activationOverlayActivate");
@@ -6227,7 +6396,13 @@ function updateActivationUi(state){
   if(settingsActivate) settingsActivate.disabled = isActivated;
   if(settingsClear) settingsClear.disabled = !isActivated;
   if(settingsStatus){
-    settingsStatus.textContent = isActivated ? `有効化済み（${tier.toUpperCase()}）` : "";
+    if(isActivated){
+      const localDevNote = source.includes("local-dev") ? " / 開発用: サーバ未設定のためローカル判定" : "";
+      const offlineNote = offlineDegraded ? " / オフラインのためDEMO制限中" : "";
+      settingsStatus.textContent = `有効化済み（${tier.toUpperCase()}）${localDevNote}${offlineNote}`;
+    }else{
+      settingsStatus.textContent = "";
+    }
   }
   if(settingsError && isActivated) settingsError.textContent = "";
 }
@@ -6306,8 +6481,10 @@ const applyLicenseUi = (state)=>{
   try{
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
+    const standardOffline = tier === "standard" && !!state?.standard?.offlineDegraded;
+    const effectiveTier = standardOffline ? "demo" : tier;
     const demoInfo = state?.demo;
-    const isDemo = tier === "demo";
+    const isDemo = effectiveTier === "demo";
     const demoBlockedReason = demoInfo?.demoBlockedReason || null;
     const isDemoLocked = isDemo && !!demoInfo?.isLocked;
     const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
@@ -6333,6 +6510,9 @@ const applyLicenseUi = (state)=>{
           ? LICENSE_TEXT.demoExportLimitBanner
           : LICENSE_TEXT.demoExpiredBanner;
         isDangerBanner = true;
+      }else if(tier === "standard" && standardOffline){
+        bannerText = LICENSE_TEXT.standardOfflineBanner;
+        isStandardBanner = true;
       }else if(tier === "standard" && standardInGrace){
         bannerText = LICENSE_TEXT.standardGraceBanner;
         if(Number.isFinite(standardAuth.graceRemainingMinutes) && standardAuth.graceRemainingMinutes > 0){
@@ -12570,7 +12750,14 @@ licenseClearCancel?.addEventListener("click", closeLicenseClearConfirm);
 licenseClearConfirm?.addEventListener("click", (e)=>{ if(e.target === licenseClearConfirm){ closeLicenseClearConfirm(); } });
 licenseClearConfirmOk?.addEventListener("click", async ()=>{
   try{
-    await window.WavCueLicense?.clearKeySafe?.();
+    const res = await window.WavCueLicense?.clearKeySafe?.();
+    if(!res?.ok){
+      if(settingsLicenseError){
+        settingsLicenseError.textContent = res?.message || "解除に失敗しました。";
+      }
+      console.log("[License] deactivate failed");
+      return;
+    }
     clearLicenseResiduals();
     const st = await window.WavCueLicense?.getStateSafe?.();
     if(st) applyAllLicenseUi(st);
@@ -12602,6 +12789,8 @@ settingsTabButtons.forEach((btn)=>{
 
 const resolveActivationErrorMessage = (reason)=>{
   if(reason === "empty") return "ライセンスキーを入力してください。";
+  if(reason === "server-unconfigured") return "サーバ未設定のため有効化できません。";
+  if(reason === "network") return "ネットワーク接続を確認してください。";
   if(reason === "activation-failed") return "有効化に失敗しました。キーを確認してください。";
   return "有効化に失敗しました。";
 };
@@ -12622,7 +12811,8 @@ const runActivationFlow = async (source)=>{
     const tier = String(st?.tier || "demo").toLowerCase();
     if(!res?.ok || tier === "demo"){
       localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
-      if(errorEl) errorEl.textContent = "ライセンスキーが無効です。入力内容をご確認ください。";
+      const fallback = resolveActivationErrorMessage(res?.reason);
+      if(errorEl) errorEl.textContent = res?.message || fallback;
       console.log("[License] activation failed", res?.reason || "invalid");
       return;
     }
