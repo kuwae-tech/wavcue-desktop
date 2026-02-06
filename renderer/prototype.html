@@ -5244,6 +5244,23 @@ body, #appRoot, .appRoot, .mainLayout{
 /* ===============================
    License Core (single safe API)
 ================================ */
+let _lastOfflineDegrade = null;
+const applyStandardOfflineDegrade = (state)=>{
+  if(!state) return state;
+  const baseTier = String(state.tier || "demo").toLowerCase();
+  const isOnline = navigator.onLine !== false;
+  const effectiveTier = (baseTier === "standard" && !isOnline) ? "demo" : baseTier;
+  const degraded = baseTier === "standard" && effectiveTier === "demo";
+  if(_lastOfflineDegrade !== degraded){
+    console.log(`[License] standard offline degrade ${degraded ? "ON" : "OFF"} (baseTier=${baseTier} effectiveTier=${effectiveTier} onLine=${isOnline})`);
+    _lastOfflineDegrade = degraded;
+  }
+  if(effectiveTier !== baseTier || state.baseTier == null){
+    return { ...state, tier: effectiveTier, baseTier };
+  }
+  return state;
+};
+
 const LicenseCore = (()=> {
   const listeners = new Set();
   const tierRank = { demo: 0, standard: 1, pro: 2 };
@@ -5652,7 +5669,8 @@ const LicenseCore = (()=> {
   const guard = (action, ctx)=>{
     try{
       const st = getStateSafeInternal({ touchOnline: false });
-      const tier = (st && st.tier) ? st.tier : "demo";
+      const effectiveState = applyStandardOfflineDegrade(st);
+      const tier = (effectiveState && effectiveState.tier) ? effectiveState.tier : "demo";
       const rule = policy[action] || { minTier: "demo" };
       let ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
       let reason = ok ? undefined : (rule.reason || "restricted");
@@ -6163,7 +6181,7 @@ function clearLicenseResiduals(){
   }catch(_){}
 }
 function applyAllLicenseUi(state){
-  const next = applyDebugOverride(state);
+  const next = applyStandardOfflineDegrade(applyDebugOverride(state));
   try{ updateTierBadge(next); }catch(_){}
   try{ applyProUi(next); }catch(_){}
   try{ applyLicenseUi(next); }catch(_){}
@@ -6476,6 +6494,14 @@ Promise.resolve().then(restoreSavedLicenseKey).catch((e)=>{
 if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> applyAllLicenseUi(st));
 }
+window.addEventListener("online", ()=>{
+  const st = window.WavCueLicense?.getStateSafe?.();
+  if(st) applyAllLicenseUi(st);
+});
+window.addEventListener("offline", ()=>{
+  const st = window.WavCueLicense?.getStateSafe?.();
+  if(st) applyAllLicenseUi(st);
+});
 (function(){
   const log = ()=>{
     const el = document.querySelector('.bottomRow') || document.querySelector('.proBottomRow');
