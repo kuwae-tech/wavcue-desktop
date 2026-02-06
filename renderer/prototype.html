@@ -211,6 +211,36 @@
     background:rgba(248,113,113,.16);
     color:rgba(254,202,202,.98);
   }
+  #licenseBanner.licenseBanner--withActions{
+    background:transparent;
+    border-color:transparent;
+    padding:0;
+  }
+  #licenseBanner .licenseBannerBody{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  #licenseBanner.licenseBanner--withActions .licenseBannerBody{
+    flex:1;
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid rgba(248,113,113,.45);
+    background:rgba(248,113,113,.12);
+    color:rgba(254,202,202,.95);
+  }
+  #licenseBanner.licenseBanner--withActions .licenseBannerBody.licenseBannerBody--standard,
+  #licenseBanner.licenseBanner--withActions .licenseBannerBody.licenseBannerBody--grace{
+    border-color:rgba(251,191,36,.45);
+    background:rgba(251,191,36,.14);
+    color:rgba(254,243,199,.98);
+  }
+  #licenseBanner.licenseBanner--withActions .licenseBannerBody.licenseBannerBody--danger{
+    border-color:rgba(248,113,113,.6);
+    background:rgba(248,113,113,.16);
+    color:rgba(254,202,202,.98);
+  }
   #licenseBanner .licenseBannerActions{
     display:flex;
     align-items:center;
@@ -931,6 +961,19 @@
   .settingsDialog .settingsLicenseRow input[type="text"]{
     flex:1;
     min-width:220px;
+  }
+  .settingsDialog .settingsInfoList{
+    display:grid;
+    gap:6px;
+    font-size:12px;
+  }
+  .settingsDialog .settingsInfoRow{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .settingsDialog .settingsInfoValue{
+    text-align:right;
   }
   .settingsDialog .settingsError{
     color:rgba(252,165,165,.95);
@@ -4468,7 +4511,7 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="activationOverlayTitle" id="activationOverlayTitle">WavCue 体験版のご案内</div>
     <div class="activationOverlayText" id="activationOverlayText">
       体験版をご利用いただけます。<br/>
-      1週間・書き出し20回までお試しできます。<br/>
+      1週間・書き出し20回までお試しできます。<br/><br/>
       続行するか、ライセンスキーを入力して有効化してください。
     </div>
     <div class="activationOverlayInput">
@@ -4478,9 +4521,6 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="activationOverlayActions">
       <button class="btn good" id="activationOverlayActivate" type="button">有効化</button>
       <button class="btn" id="activationOverlayContinue" type="button">DEMOで続ける</button>
-    </div>
-    <div class="activationOverlaySubActions">
-      <button class="btnGhost" id="activationOverlayOpenSettings" type="button">キーを入力して有効化</button>
     </div>
   </div>
 </div>
@@ -5031,6 +5071,32 @@ body, #appRoot, .appRoot, .mainLayout{
               <div class="settingsStatus" id="settingsLicenseStatus"></div>
               <div class="settingsError" id="settingsLicenseError"></div>
               <div class="muted">有効化後は入力欄がロックされ、解除はこの画面からのみ行えます。</div>
+            </div>
+            <div class="settingsBlock">
+              <div class="settingsBlockTitle">現在の状態</div>
+              <div class="settingsInfoList">
+                <div class="settingsInfoRow">
+                  <span class="muted">現在のプラン</span>
+                  <span class="settingsInfoValue" id="settingsLicensePlan">—</span>
+                </div>
+                <div class="settingsInfoRow">
+                  <span class="muted">DEMO残り</span>
+                  <span class="settingsInfoValue" id="settingsLicenseDemoRemaining">—</span>
+                </div>
+                <div class="settingsInfoRow">
+                  <span class="muted">ロック理由</span>
+                  <span class="settingsInfoValue" id="settingsLicenseLockReason">—</span>
+                </div>
+              </div>
+              <div class="muted" id="settingsLicenseDebugOverride" style="font-size:11px;margin-top:6px"></div>
+            </div>
+            <div class="settingsBlock">
+              <div class="settingsBlockTitle">有効化でできること</div>
+              <ul class="muted" style="margin:0;padding-left:18px;font-size:12px;line-height:1.6">
+                <li>書き出し・バックアップ機能の制限解除</li>
+                <li>規格チェックや履歴機能を全開放</li>
+                <li>PRO機能の利用</li>
+              </ul>
             </div>
           </section>
         </div>
@@ -5941,6 +6007,7 @@ const LICENSE_EXTRA_KEYS = [
   "wavcue_std_grace_expires_at",
   "wavcue_std_grace_modal_shown_for_started_at",
 ];
+const DEBUG_TIER_OVERRIDE_KEY = "wavcue_debug_tier_override";
 
 function getStoredLicenseKey(){
   try{ return localStorage?.getItem?.(LICENSE_STORAGE_KEY) || ""; }catch(_){ return ""; }
@@ -5963,6 +6030,33 @@ function setSettingsTab(tabName){
   });
   try{ localStorage?.setItem?.(SETTINGS_TAB_KEY, tab); }catch(_){}
   return tab;
+}
+function getDebugTierOverride(){
+  try{
+    const raw = localStorage?.getItem?.(DEBUG_TIER_OVERRIDE_KEY);
+    const val = String(raw || "").toLowerCase();
+    if(val === "demo" || val === "standard" || val === "pro") return val;
+    return null;
+  }catch(_){
+    return null;
+  }
+}
+function isValidDebugToken(token){
+  const value = String(token || "");
+  if(!value.startsWith("WCDBG:")) return false;
+  if(!value.includes("NORI-KAERU")) return false;
+  if(!value.includes("@")) return false;
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const suffix = `${y}${m}${d}`.slice(-4);
+  return value.endsWith(suffix);
+}
+function applyDebugOverride(state){
+  const override = getDebugTierOverride();
+  if(!override || !state) return state;
+  return { ...state, tier: override, source: `${state.source || "state"}+debug` };
 }
 function getStoredSettingsTab(){
   try{
@@ -6027,9 +6121,11 @@ function clearLicenseResiduals(){
   }catch(_){}
 }
 function applyAllLicenseUi(state){
-  try{ updateTierBadge(state); }catch(_){}
-  try{ applyProUi(state); }catch(_){}
-  try{ applyLicenseUi(state); }catch(_){}
+  const next = applyDebugOverride(state);
+  try{ updateTierBadge(next); }catch(_){}
+  try{ applyProUi(next); }catch(_){}
+  try{ applyLicenseUi(next); }catch(_){}
+  try{ updateLicenseInfo(next); }catch(_){}
 }
 if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "function"){
   window.WavCueLicense.clearKeySafe = async ()=>{
@@ -6037,6 +6133,31 @@ if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "functio
     return { ok: true };
   };
 }
+window.WavCueLicenseDebug = {
+  switchTier: (targetTier, token)=>{
+    const tier = String(targetTier || "").toLowerCase();
+    if(!isValidDebugToken(token) || !["demo","standard","pro"].includes(tier)){
+      console.warn("[DBG] invalid token");
+      return false;
+    }
+    try{ localStorage?.setItem?.(DEBUG_TIER_OVERRIDE_KEY, tier); }catch(_){}
+    const st = window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    console.log("[DBG] tier override ->", tier);
+    return true;
+  },
+  clearOverride: (token)=>{
+    if(!isValidDebugToken(token)){
+      console.warn("[DBG] invalid token");
+      return false;
+    }
+    try{ localStorage?.removeItem?.(DEBUG_TIER_OVERRIDE_KEY); }catch(_){}
+    const st = window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    console.log("[DBG] tier override ->", "cleared");
+    return true;
+  },
+};
 function updateActivationUi(state){
   const tierRaw = state && state.tier ? state.tier : "demo";
   const tier = String(tierRaw).toLowerCase();
@@ -6077,6 +6198,52 @@ function updateActivationOverlayVisibility(state){
   const tier = String(tierRaw).toLowerCase();
   const shouldShow = tier === "demo" && !isDemoPromptDone();
   activationOverlay.classList.toggle("show", shouldShow);
+}
+function openActivationOverlay(){
+  if(!activationOverlay) return false;
+  activationOverlay.classList.add("show");
+  if(activationOverlayKey && !activationOverlayKey.disabled){
+    activationOverlayKey.focus();
+    activationOverlayKey.select?.();
+  }
+  return true;
+}
+function openLicenseEntryFlow(){
+  try{
+    const st = window.WavCueLicense?.getStateSafe?.();
+    const tier = String(st?.tier || "demo").toLowerCase();
+    if(tier === "demo" && !isDemoPromptDone()){
+      if(openActivationOverlay()) return;
+    }
+  }catch(_){}
+  openSettingsModalSafe("license");
+}
+function updateLicenseInfo(state){
+  const tierRaw = state && state.tier ? state.tier : "demo";
+  const tier = String(tierRaw).toLowerCase();
+  const tierLabel = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
+  if(settingsLicensePlan) settingsLicensePlan.textContent = tierLabel;
+  const demoInfo = state?.demo || {};
+  const remainingDays = Number.isFinite(demoInfo.remainingDays) ? demoInfo.remainingDays : null;
+  const remainingExports = Number.isFinite(demoInfo.remainingExports) ? demoInfo.remainingExports : null;
+  const remainText = (remainingDays != null || remainingExports != null)
+    ? `${remainingDays != null ? `${remainingDays}日` : "—"} / ${remainingExports != null ? `${remainingExports}回` : "—"}`
+    : "—";
+  if(settingsLicenseDemoRemaining) settingsLicenseDemoRemaining.textContent = remainText;
+  const storedKey = getStoredLicenseKey();
+  let lockReason = "—";
+  if(tier === "demo" && demoInfo?.isLocked){
+    lockReason = demoInfo.demoBlockedReason === "demo_export_limit"
+      ? "書き出し回数制限に達しました"
+      : "利用期間が終了しました";
+  }else if(tier !== "demo" && storedKey){
+    lockReason = "解除まで編集できません";
+  }
+  if(settingsLicenseLockReason) settingsLicenseLockReason.textContent = lockReason;
+  const override = getDebugTierOverride();
+  if(settingsLicenseDebugOverride){
+    settingsLicenseDebugOverride.textContent = override ? `開発者用: debug override = ${override}` : "";
+  }
 }
 const applyLicenseUi = (state)=>{
   try{
@@ -6122,28 +6289,34 @@ const applyLicenseUi = (state)=>{
       }
       while(banner.firstChild) banner.removeChild(banner.firstChild);
       if(bannerText){
+        const body = document.createElement("span");
+        body.className = "licenseBannerBody";
+        if(isDangerBanner) body.classList.add("licenseBannerBody--danger");
+        if(isStandardBanner) body.classList.add("licenseBannerBody--standard");
+        if(isGraceBanner) body.classList.add("licenseBannerBody--grace");
         const textSpan = document.createElement("span");
         textSpan.className = "licenseBannerText";
         textSpan.textContent = bannerText;
-        banner.appendChild(textSpan);
+        body.appendChild(textSpan);
         if(bannerMeta){
           const metaSpan = document.createElement("span");
           metaSpan.className = "licenseBannerMeta";
           metaSpan.textContent = bannerMeta;
-          banner.appendChild(metaSpan);
+          body.appendChild(metaSpan);
         }
         if(showDemoRemaining){
-          banner.appendChild(renderDemoRemainingChip(demoParts));
+          body.appendChild(renderDemoRemainingChip(demoParts));
           hasChip = true;
         }
+        banner.appendChild(body);
         if(isDemoLocked || isStandardBanner){
           const actions = document.createElement("span");
           actions.className = "licenseBannerActions";
           const openBtn = document.createElement("button");
           openBtn.className = "btnGhost licenseBannerBtn";
           openBtn.type = "button";
-          openBtn.textContent = "設定を開く";
-          openBtn.addEventListener("click", ()=> openSettingsModalSafe("license"));
+          openBtn.textContent = "ライセンスキーを入力";
+          openBtn.addEventListener("click", openLicenseEntryFlow);
           actions.appendChild(openBtn);
           banner.appendChild(actions);
           hasActions = true;
@@ -6233,19 +6406,11 @@ const applyLicenseUi = (state)=>{
   try{ updateDemoRemainingBanner(state); }catch(_){}
 };
 
-Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
-  console.error("[License] non-fatal", e);
-});
-Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyProUi).catch((e)=>{
-  console.error("[ProUI] non-fatal", e);
-});
-Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyLicenseUi).catch((e)=>{
+Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyAllLicenseUi).catch((e)=>{
   console.error("[License] non-fatal", e);
 });
 if(typeof window.WavCueLicense?.onChange === "function"){
-  window.WavCueLicense.onChange((st)=> updateTierBadge(st));
-  window.WavCueLicense.onChange((st)=> applyProUi(st));
-  window.WavCueLicense.onChange((st)=> applyLicenseUi(st));
+  window.WavCueLicense.onChange((st)=> applyAllLicenseUi(st));
 }
 (function(){
   const log = ()=>{
@@ -12180,6 +12345,10 @@ const settingsLicenseActivate = $("settingsLicenseActivate");
 const settingsLicenseClear = $("settingsLicenseClear");
 const settingsLicenseStatus = $("settingsLicenseStatus");
 const settingsLicenseError = $("settingsLicenseError");
+const settingsLicensePlan = $("settingsLicensePlan");
+const settingsLicenseDemoRemaining = $("settingsLicenseDemoRemaining");
+const settingsLicenseLockReason = $("settingsLicenseLockReason");
+const settingsLicenseDebugOverride = $("settingsLicenseDebugOverride");
 const licenseClearConfirm = $("licenseClearConfirm");
 const licenseClearCancel = $("licenseClearCancel");
 const licenseClearConfirmOk = $("licenseClearConfirmOk");
@@ -12189,7 +12358,6 @@ const activationOverlay = $("activationOverlay");
 const activationOverlayKey = $("activationOverlayKey");
 const activationOverlayActivate = $("activationOverlayActivate");
 const activationOverlayContinue = $("activationOverlayContinue");
-const activationOverlayOpenSettings = $("activationOverlayOpenSettings");
 const activationOverlayError = $("activationOverlayError");
 let _settingsTabHeightLocked = false;
 let cachedAutoBackupEnabled = true;
@@ -12405,7 +12573,6 @@ const runActivationFlow = async (source)=>{
 
 activationOverlayActivate?.addEventListener("click", ()=> runActivationFlow("overlay"));
 settingsLicenseActivate?.addEventListener("click", ()=> runActivationFlow("settings"));
-activationOverlayOpenSettings?.addEventListener("click", ()=> openSettingsModalSafe("license"));
 activationOverlayContinue?.addEventListener("click", ()=>{
   try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
   activationOverlay?.classList.remove("show");
