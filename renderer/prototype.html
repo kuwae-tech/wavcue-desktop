@@ -163,6 +163,12 @@
     justify-content:space-between;
     gap:12px;
   }
+  #licenseBanner.licenseBanner--withActions{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:12px;
+  }
   #licenseBanner.licenseBanner--grace{
     align-items:center;
     justify-content:space-between;
@@ -200,6 +206,61 @@
     color:rgba(255,255,255,.98);
     text-shadow:0 0 6px rgba(255,255,255,.28);
   }
+  #licenseBanner.licenseBanner--danger{
+    border-color:rgba(248,113,113,.6);
+    background:rgba(248,113,113,.16);
+    color:rgba(254,202,202,.98);
+  }
+  #licenseBanner.licenseBanner--withActions{
+    background:transparent;
+    border-color:transparent;
+    padding:0;
+  }
+  #licenseBanner .licenseBannerBody{
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    flex-wrap:wrap;
+  }
+  #licenseBanner.licenseBanner--withActions .licenseBannerBody{
+    flex:1;
+    padding:10px 14px;
+    border-radius:12px;
+    border:1px solid rgba(248,113,113,.45);
+    background:rgba(248,113,113,.12);
+    color:rgba(254,202,202,.95);
+  }
+  #licenseBanner.licenseBanner--withActions .licenseBannerBody.licenseBannerBody--standard,
+  #licenseBanner.licenseBanner--withActions .licenseBannerBody.licenseBannerBody--grace{
+    border-color:rgba(251,191,36,.45);
+    background:rgba(251,191,36,.14);
+    color:rgba(254,243,199,.98);
+  }
+  #licenseBanner.licenseBanner--withActions .licenseBannerBody.licenseBannerBody--danger{
+    border-color:rgba(248,113,113,.6);
+    background:rgba(248,113,113,.16);
+    color:rgba(254,202,202,.98);
+  }
+  #licenseBanner .licenseBannerActions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    flex-wrap:wrap;
+    background:transparent;
+  }
+  #licenseBanner .licenseBannerBtn{
+    border-radius:999px;
+    padding:6px 10px;
+    font-size:11px;
+    background:rgba(255,255,255,.04);
+    border:1px solid var(--line);
+    color:var(--text);
+    position:relative;
+    z-index:2;
+  }
+  #licenseBanner .licenseBannerBtn:hover{
+    background:rgba(255,255,255,.07);
+  }
   #licenseBanner.show{
     display:block;
   }
@@ -207,6 +268,9 @@
     display:flex;
   }
   #licenseBanner.licenseBanner--withChip.show{
+    display:flex;
+  }
+  #licenseBanner.licenseBanner--withActions.show{
     display:flex;
   }
   .brand{
@@ -863,6 +927,121 @@
     display:grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
     gap:10px;
+  }
+  .settingsDialog .settingsTabs{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:12px;
+  }
+  .settingsDialog .settingsTabs .tabBar{
+    gap:6px;
+  }
+  .settingsDialog .settingsTabs .tabBtn{
+    padding:7px 12px;
+  }
+  .settingsDialog .settingsTabPanels{
+    display:block;
+    height:auto;
+    overflow:hidden;
+  }
+  .settingsDialog .settingsTabPanel{
+    display:none;
+    flex-direction:column;
+    gap:10px;
+    height:100%;
+    overflow:auto;
+  }
+  .settingsDialog .settingsTabPanel.active{
+    display:flex;
+  }
+  .settingsDialog .settingsLicenseRow{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    align-items:center;
+  }
+  .settingsDialog .settingsLicenseRow input[type="text"]{
+    flex:1;
+    min-width:220px;
+  }
+  .settingsDialog .settingsInfoList{
+    display:grid;
+    gap:6px;
+    font-size:12px;
+  }
+  .settingsDialog .settingsInfoRow{
+    display:flex;
+    justify-content:space-between;
+    gap:10px;
+  }
+  .settingsDialog .settingsInfoValue{
+    text-align:right;
+  }
+  .settingsDialog .settingsLimitList{
+    margin:0;
+    padding-left:18px;
+    font-size:12px;
+    line-height:1.6;
+  }
+  .settingsDialog .settingsError{
+    color:rgba(252,165,165,.95);
+    font-size:12px;
+  }
+  .settingsDialog .settingsStatus{
+    color:rgba(167,243,208,.92);
+    font-size:12px;
+  }
+  .activationOverlay{
+    position:fixed;
+    inset:0;
+    background:rgba(10,15,25,.72);
+    display:none;
+    align-items:center;
+    justify-content:center;
+    z-index:1200;
+  }
+  .activationOverlay.show{
+    display:flex;
+  }
+  .activationOverlayCard{
+    width:min(520px, calc(100% - 32px));
+    border-radius:18px;
+    border:1px solid var(--line);
+    background:rgba(15,23,42,.95);
+    padding:18px 18px 16px;
+    box-shadow:0 10px 30px rgba(0,0,0,.35);
+  }
+  .activationOverlayTitle{
+    font-size:15px;
+    font-weight:700;
+    margin-bottom:8px;
+  }
+  .activationOverlayText{
+    font-size:13px;
+    line-height:1.6;
+    color:rgba(226,232,240,.92);
+  }
+  .activationOverlayInput{
+    width:100%;
+    margin-top:12px;
+  }
+  .activationOverlayActions{
+    display:flex;
+    gap:8px;
+    flex-wrap:wrap;
+    margin-top:12px;
+  }
+  .activationOverlaySubActions{
+    display:flex;
+    justify-content:flex-end;
+    margin-top:6px;
+  }
+  .activationOverlayError{
+    margin-top:8px;
+    color:rgba(252,165,165,.95);
+    font-size:12px;
+    min-height:16px;
   }
   .settingsDialog .settingsCard{
     border:1px solid var(--line);
@@ -3247,6 +3426,27 @@ body, #appRoot, .appRoot, .mainLayout{
   margin-top:10px;
 }
 .btnGhost{ background:transparent; border:1px solid rgba(255,255,255,0.18); padding:4px 10px; border-radius:10px; }
+.tierDisabled{
+  opacity:0.5;
+  pointer-events:none;
+  cursor:not-allowed;
+}
+.tierNote{
+  margin-top:6px;
+  font-size:11px;
+  color:rgba(226,232,240,.7);
+}
+.tierNoteRow{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  flex-wrap:wrap;
+}
+.tierNoteInline{
+  margin-left:auto;
+  font-size:11px;
+  color:rgba(226,232,240,.7);
+}
 .proHistoryDialog .proJobPanel{
   position:static;
   width:100%;
@@ -4336,6 +4536,24 @@ body, #appRoot, .appRoot, .mainLayout{
   </div>
 </header>
 <div id="licenseBanner" role="status" aria-live="polite"></div>
+<div class="activationOverlay" id="activationOverlay" role="dialog" aria-modal="true" aria-labelledby="activationOverlayTitle" aria-describedby="activationOverlayText">
+  <div class="activationOverlayCard">
+    <div class="activationOverlayTitle" id="activationOverlayTitle">WavCue 体験版のご案内</div>
+    <div class="activationOverlayText" id="activationOverlayText">
+      体験版をご利用いただけます。<br/>
+      1週間・書き出し20回までお試しできます。<br/><br/>
+      続行するか、ライセンスキーを入力して有効化してください。
+    </div>
+    <div class="activationOverlayInput">
+      <input class="txt" id="activationOverlayKey" placeholder="ライセンスキーを入力" type="text"/>
+    </div>
+    <div class="activationOverlayError" id="activationOverlayError"></div>
+    <div class="activationOverlayActions">
+      <button class="btn good" id="activationOverlayActivate" type="button">有効化</button>
+      <button class="btn" id="activationOverlayContinue" type="button">DEMOで続ける</button>
+    </div>
+  </div>
+</div>
 <dialog id="standardGraceDialog" class="standardGraceDialog" data-lock-close="1" aria-labelledby="standardGraceTitle" aria-describedby="standardGraceMessage">
   <div class="stdGraceBody">
     <div class="stdGraceTitle" id="standardGraceTitle">Standard認証のご案内</div>
@@ -4489,11 +4707,12 @@ body, #appRoot, .appRoot, .mainLayout{
       </div>
     </div>
 
-    <div style="display:flex;align-items:center;gap:10px;margin:10px 0 8px">
+    <div class="tierNoteRow" style="margin:10px 0 8px">
       <div class="tabBar" role="tablist" aria-label="cmcd タブ">
         <button class="tabBtn active" type="button" role="tab" aria-selected="true" data-tab="cmcdIn">入力</button>
         <button class="tabBtn" type="button" role="tab" aria-selected="false" data-tab="cmcdPreset">プリセット</button>
       </div>
+      <div class="tierNoteInline" id="cmcdPresetTierNote" style="display:none">DEMO版ではプリセット機能は使用できません</div>
     </div>
 
     <div class="tabPanels" style="min-height:0">
@@ -4637,11 +4856,12 @@ body, #appRoot, .appRoot, .mainLayout{
 </div>
 </div>
 <div class="modalBody">
-<div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+<div class="tierNoteRow" style="margin-bottom:10px">
 <div aria-label="規格チェック タブ" class="tabBar" role="tablist">
 <button aria-controls="sc_resultsPane" aria-selected="true" class="tabBtn active" id="sc_tab_results" role="tab" type="button">チェック</button>
 <button aria-controls="sc_presetMgr" aria-selected="false" class="tabBtn" id="sc_tab_preset" role="tab" type="button">プリセット編集</button>
 </div>
+<div class="tierNoteInline" id="scPresetTierNote" style="display:none">DEMO版ではプリセット機能は使用できません</div>
 </div>
 <div class="scPresetMgr" id="sc_presetMgr" style="display:none;padding:12px;border:1px solid var(--line);border-radius:16px;background:transparent">
 <div class="scPmHeadRow" style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
@@ -4769,96 +4989,142 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="modalHead">
     <div class="title">
       <b>設定</b>
-      <span class="muted">バックアップ管理</span>
+      <span class="muted">バックアップ / ライセンス</span>
     </div>
   </div>
   <div class="modalBody">
-    <div class="settingsGrid">
-      <section class="settingsCard" style="grid-column:1/-1">
-        <h3>バックアップ管理</h3>
-        <div class="muted" id="settingsBackupDemoNote" style="display:none;margin-top:-4px;margin-bottom:8px;">Demoではバックアップ機能は利用できません。</div>
-        <div class="settingsBlock">
-          <div class="settingsBlockTitle">状態・操作</div>
-          <div class="row" style="gap:8px;flex-wrap:wrap">
-            <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
-            <button class="btn danger" id="settingsCleanupNow" type="button">今すぐ完全クリーンアップ</button>
-            <button class="btn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
-          </div>
-          <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
-          <div class="muted" id="settingsCleanupResult"></div>
-          <div class="muted" id="settingsCleanupProgress"></div>
-        </div>
-        <div class="settingsBlock">
-          <div class="settingsBlockTitle">自動クリーンアップ</div>
-          <div class="switchWrap">
-            <label class="switch">
-              <input id="settingsAutoCleanup" type="checkbox"/>
-              <span class="slider"></span>
-            </label>
-            <div class="switchText">
-              <span class="switchLabel"><strong>自動クリーンアップ（古いバックアップを削除）</strong></span>
-              <span class="muted">書き出し完了後に実行します</span>
+    <div class="settingsTabs">
+      <div class="tabBar" role="tablist" aria-label="設定タブ">
+        <button class="tabBtn active" data-settings-tab="backup" role="tab" aria-selected="true" type="button">バックアップ</button>
+        <button class="tabBtn" data-settings-tab="license" role="tab" aria-selected="false" type="button">ライセンス/アクティベート</button>
+      </div>
+    </div>
+    <div class="settingsTabPanels">
+      <div class="settingsTabPanel active" data-settings-tabpanel="backup" role="tabpanel">
+        <div class="settingsGrid">
+          <section class="settingsCard" style="grid-column:1/-1">
+            <h3>バックアップ管理</h3>
+            <div class="muted" id="settingsBackupDemoNote" style="display:none;margin-top:-4px;margin-bottom:8px;">Demoではバックアップ機能は利用できません。</div>
+            <div class="settingsBlock">
+              <div class="settingsBlockTitle">状態・操作</div>
+              <div class="row" style="gap:8px;flex-wrap:wrap">
+                <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
+                <button class="btn danger" id="settingsCleanupNow" type="button">今すぐ完全クリーンアップ</button>
+                <button class="btn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
+              </div>
+              <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
+              <div class="muted" id="settingsCleanupResult"></div>
+              <div class="muted" id="settingsCleanupProgress"></div>
             </div>
-          </div>
-        </div>
-        <div class="settingsBlock">
-          <div class="settingsBlockTitleRow">
-            <div class="settingsBlockTitle">保存ルール</div>
-            <span class="settingsBadge" id="settingsRulesBadge">推奨</span>
-          </div>
-          <div class="rulesCard">
-            <div class="rulesGrid">
-              <label class="settingsField">
-                <span class="muted">保存期間</span>
-                <select id="settingsRetentionDays">
-                  <option value="7">7日</option>
-                  <option value="14">14日</option>
-                  <option value="30">30日（推奨）</option>
-                  <option value="90">90日</option>
-                  <option value="36500">無制限（注意）</option>
-                </select>
-                <span class="fieldNote">無制限は容量が増え続けます</span>
-              </label>
-              <label class="settingsField">
-                <span class="muted">使用容量上限</span>
-                <select id="settingsBackupQuotaGB">
-                  <option value="5">5GB（推奨）</option>
-                  <option value="10">10GB</option>
-                  <option value="25">25GB</option>
-                  <option value="50">50GB</option>
-                  <option value="9999">制限なし（注意）</option>
-                </select>
-                <span class="fieldNote is-empty">　</span>
-              </label>
-              <label class="settingsField">
-                <span class="muted">最低保持数</span>
-                <select id="settingsMinKeepCount">
-                  <option value="5">5件</option>
-                  <option value="10">10件</option>
-                  <option value="20">20件（推奨）</option>
-                  <option value="50">50件</option>
-                </select>
-                <span class="fieldNote is-empty">　</span>
-              </label>
-              <label class="settingsField">
-                <span class="muted">削除方法</span>
-                <select id="settingsDeleteMethod">
-                  <option value="trash">ゴミ箱へ移動（推奨）</option>
-                  <option value="delete">完全に削除（注意）</option>
-                </select>
-                <span class="fieldNote">完全削除は元に戻せません</span>
-              </label>
+            <div class="settingsBlock">
+              <div class="settingsBlockTitle">自動クリーンアップ</div>
+              <div class="switchWrap">
+                <label class="switch">
+                  <input id="settingsAutoCleanup" type="checkbox"/>
+                  <span class="slider"></span>
+                </label>
+                <div class="switchText">
+                  <span class="switchLabel"><strong>自動クリーンアップ（古いバックアップを削除）</strong></span>
+                  <span class="muted">書き出し完了後に実行します</span>
+                </div>
+              </div>
             </div>
-          </div>
-          <div class="rulesNote">保存期間と容量上限のどちらかに到達すると、古いものから削除されます（最低保持数は残します）</div>
+            <div class="settingsBlock">
+              <div class="settingsBlockTitleRow">
+                <div class="settingsBlockTitle">保存ルール</div>
+                <span class="settingsBadge" id="settingsRulesBadge">推奨</span>
+              </div>
+              <div class="rulesCard">
+                <div class="rulesGrid">
+                  <label class="settingsField">
+                    <span class="muted">保存期間</span>
+                    <select id="settingsRetentionDays">
+                      <option value="7">7日</option>
+                      <option value="14">14日</option>
+                      <option value="30">30日（推奨）</option>
+                      <option value="90">90日</option>
+                      <option value="36500">無制限（注意）</option>
+                    </select>
+                    <span class="fieldNote">無制限は容量が増え続けます</span>
+                  </label>
+                  <label class="settingsField">
+                    <span class="muted">使用容量上限</span>
+                    <select id="settingsBackupQuotaGB">
+                      <option value="5">5GB（推奨）</option>
+                      <option value="10">10GB</option>
+                      <option value="25">25GB</option>
+                      <option value="50">50GB</option>
+                      <option value="9999">制限なし（注意）</option>
+                    </select>
+                    <span class="fieldNote is-empty">　</span>
+                  </label>
+                  <label class="settingsField">
+                    <span class="muted">最低保持数</span>
+                    <select id="settingsMinKeepCount">
+                      <option value="5">5件</option>
+                      <option value="10">10件</option>
+                      <option value="20">20件（推奨）</option>
+                      <option value="50">50件</option>
+                    </select>
+                    <span class="fieldNote is-empty">　</span>
+                  </label>
+                  <label class="settingsField">
+                    <span class="muted">削除方法</span>
+                    <select id="settingsDeleteMethod">
+                      <option value="trash">ゴミ箱へ移動（推奨）</option>
+                      <option value="delete">完全に削除（注意）</option>
+                    </select>
+                    <span class="fieldNote">完全削除は元に戻せません</span>
+                  </label>
+                </div>
+              </div>
+              <div class="rulesNote">保存期間と容量上限のどちらかに到達すると、古いものから削除されます（最低保持数は残します）</div>
+            </div>
+            <button class="btn" id="settingsSave" type="button">設定を保存</button>
+            <div class="settingsHint" id="settingsToastDebug">debug line: —</div>
+          </section>
+          <section class="settingsCard" style="grid-column:1/-1">
+            <h3>ログ</h3>
+            <div class="settingsLog" id="settingsLog">準備完了</div>
+          </section>
         </div>
-        <button class="btn" id="settingsSave" type="button">設定を保存</button>
-        <div class="settingsHint" id="settingsToastDebug">debug line: —</div>
-      </section>
-      <section class="settingsCard" style="grid-column:1/-1">
-        <h3>ログ</h3>
-        <div class="settingsLog" id="settingsLog">準備完了</div>
-      </section>
+      </div>
+      <div class="settingsTabPanel" data-settings-tabpanel="license" role="tabpanel">
+        <div class="settingsGrid">
+          <section class="settingsCard" style="grid-column:1/-1">
+            <h3>ライセンス/アクティベート</h3>
+            <div class="settingsBlock">
+              <div class="settingsBlockTitle">ライセンスキー</div>
+              <div class="settingsLicenseRow">
+                <input class="txt" id="settingsLicenseKey" placeholder="ライセンスキーを入力" type="text"/>
+                <button class="btn good" id="settingsLicenseActivate" type="button">有効化</button>
+                <button class="btn danger" id="settingsLicenseClear" type="button">解除</button>
+              </div>
+              <div class="settingsStatus" id="settingsLicenseStatus"></div>
+              <div class="settingsError" id="settingsLicenseError"></div>
+              <div class="muted">有効化後は入力欄がロックされ、解除はこの画面からのみ行えます。</div>
+            </div>
+            <div class="settingsBlock">
+              <div class="settingsBlockTitle">現在の状態</div>
+              <div class="settingsInfoList">
+                <div class="settingsInfoRow">
+                  <span class="muted">現在のプラン</span>
+                  <span class="settingsInfoValue" id="settingsLicensePlan">—</span>
+                </div>
+                <div class="settingsInfoRow">
+                  <span class="muted">DEMO残り</span>
+                  <span class="settingsInfoValue" id="settingsLicenseDemoRemaining">—</span>
+                </div>
+            </div>
+            <div class="muted" id="settingsLicenseDebugOverride" style="font-size:11px;margin-top:6px"></div>
+          </div>
+          <div class="settingsBlock">
+            <div class="settingsBlockTitle">機能制限</div>
+            <ul class="muted settingsLimitList" id="settingsLicenseLimits"></ul>
+          </div>
+        </section>
+      </div>
+    </div>
     </div>
   </div>
 </dialog>
@@ -4878,6 +5144,25 @@ body, #appRoot, .appRoot, .mainLayout{
       <div class="confirmActions">
         <button class="btn" id="settingsCleanupConfirmCancel" type="button">キャンセル</button>
         <button class="btn danger" id="settingsCleanupConfirmRun" type="button">完全クリーンアップを実行</button>
+      </div>
+    </div>
+  </div>
+</dialog>
+<dialog class="confirmDialog" id="licenseClearConfirm">
+  <div class="modalHead">
+    <div class="title">
+      <b>ライセンスを解除しますか？</b>
+    </div>
+  </div>
+  <div class="modalBody">
+    <div class="confirmBody">
+      <ul class="confirmList">
+        <li>ライセンスキーが削除され、Demoへ戻ります</li>
+        <li>解除後は再度キーを入力して有効化できます</li>
+      </ul>
+      <div class="confirmActions">
+        <button class="btn" id="licenseClearCancel" type="button">キャンセル</button>
+        <button class="btn danger" id="licenseClearConfirmOk" type="button">解除する</button>
       </div>
     </div>
   </div>
@@ -5727,6 +6012,296 @@ const updateDemoRemainingBanner = (state)=>{
     console.error("[DemoRemainingUI] non-fatal", e);
   }
 };
+const LICENSE_STORAGE_KEY = "wavcue_license_key";
+const LICENSE_STATE_KEYS = [
+  "wavcue_license_state",
+  "wavcue_license",
+  "wavcue_license_v1",
+  "wavcue_license_info",
+];
+const SETTINGS_TAB_KEY = "wavcue_settings_tab";
+const DEMO_PROMPT_KEY = "wavcue_demo_prompt_done";
+const LICENSE_EXTRA_KEYS = [
+  "wavcue_license_key_locked",
+  "wavcue_license_key_lock",
+  "wavcue_demo_activated_at",
+  "wavcue_demo_export_ok_count",
+  "wavcue_standard_last_online_ok_at",
+  "wavcue_std_grace_started_at",
+  "wavcue_std_grace_expires_at",
+  "wavcue_std_grace_modal_shown_for_started_at",
+];
+const DEBUG_TIER_OVERRIDE_KEY = "wavcue_debug_tier_override";
+let _licenseRestoreDone = false;
+
+function getStoredLicenseKey(){
+  try{ return localStorage?.getItem?.(LICENSE_STORAGE_KEY) || ""; }catch(_){ return ""; }
+}
+function maskLicenseKey(raw){
+  const value = String(raw || "").trim();
+  if(!value) return "";
+  const tail = value.slice(-4);
+  return `••••-••••-${tail}`;
+}
+function setSettingsTab(tabName){
+  const tab = tabName === "license" ? "license" : "backup";
+  document.querySelectorAll("[data-settings-tab]").forEach((btn)=>{
+    const isActive = btn.dataset.settingsTab === tab;
+    btn.classList.toggle("active", isActive);
+    btn.setAttribute("aria-selected", String(isActive));
+  });
+  document.querySelectorAll("[data-settings-tabpanel]").forEach((panel)=>{
+    panel.classList.toggle("active", panel.dataset.settingsTabpanel === tab);
+  });
+  try{ localStorage?.setItem?.(SETTINGS_TAB_KEY, tab); }catch(_){}
+  return tab;
+}
+function getDebugTierOverride(){
+  try{
+    const raw = localStorage?.getItem?.(DEBUG_TIER_OVERRIDE_KEY);
+    const val = String(raw || "").toLowerCase();
+    if(val === "demo" || val === "standard" || val === "pro") return val;
+    return null;
+  }catch(_){
+    return null;
+  }
+}
+function isValidDebugToken(token){
+  const value = String(token || "");
+  if(!value.startsWith("WCDBG:")) return false;
+  if(!value.includes("NORI-KAERU")) return false;
+  if(!value.includes("@")) return false;
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = String(now.getMonth() + 1).padStart(2, "0");
+  const d = String(now.getDate()).padStart(2, "0");
+  const suffix = `${y}${m}${d}`.slice(-4);
+  return value.endsWith(suffix);
+}
+function applyDebugOverride(state){
+  const override = getDebugTierOverride();
+  if(!override || !state) return state;
+  return { ...state, tier: override, source: `${state.source || "state"}+debug` };
+}
+function getStoredSettingsTab(){
+  try{
+    const raw = localStorage?.getItem?.(SETTINGS_TAB_KEY);
+    return raw === "license" ? "license" : "backup";
+  }catch(_){
+    return "backup";
+  }
+}
+function focusSettingsLicenseInput(){
+  const input = document.getElementById("settingsLicenseKey");
+  if(input && !input.disabled){
+    input.focus();
+    input.select?.();
+  }
+}
+function openSettingsModalSafe(preferTab){
+  const targets = [
+    window.openSettingsModal,
+    window.openSettingsDialog,
+    window.showSettings,
+    window.toggleSettingsModal,
+    (typeof openSettingsDialog === "function" ? openSettingsDialog : null),
+  ].filter((fn)=> typeof fn === "function");
+  let opened = false;
+  for(const fn of targets){
+    try{
+      const res = fn();
+      opened = true;
+      if(res && typeof res.then === "function"){
+        res.then(()=>{ if(preferTab) setSettingsTab(preferTab); focusSettingsLicenseInput(); }).catch(()=>{});
+      }else if(preferTab){
+        setTimeout(()=>{ setSettingsTab(preferTab); focusSettingsLicenseInput(); }, 0);
+      }
+      break;
+    }catch(_){}
+  }
+  if(!opened){
+    const gear = document.getElementById("btnSettings");
+    if(gear){
+      gear.click();
+      if(preferTab){
+        setTimeout(()=>{ setSettingsTab(preferTab); focusSettingsLicenseInput(); }, 0);
+      }
+    }
+  }
+}
+async function restoreSavedLicenseKey(){
+  if(_licenseRestoreDone) return;
+  _licenseRestoreDone = true;
+  try{
+    const saved = localStorage?.getItem?.(LICENSE_STORAGE_KEY);
+    if(saved){
+      await window.WavCueLicense?.setKeySafe?.(saved);
+    }
+    const st = await window.WavCueLicense?.getStateSafe?.();
+    if(st){
+      if(String(st.tier || "demo").toLowerCase() === "demo"){
+        localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
+      }
+      applyAllLicenseUi(st);
+    }
+  }catch(_){}
+}
+function clearLicenseKeySafe(){
+  try{
+    LICENSE_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
+    localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
+    LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
+  }catch(_){}
+  try{ window.WavCueLicense?.resetDemoTrial?.(); }catch(_){}
+  try{ window.WavCueLicense?.__debugRefreshLicense?.(); }catch(_){}
+}
+function clearLicenseResiduals(){
+  try{
+    LICENSE_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
+    localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
+    LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
+  }catch(_){}
+}
+function applyAllLicenseUi(state){
+  const next = applyDebugOverride(state);
+  try{ updateTierBadge(next); }catch(_){}
+  try{ applyProUi(next); }catch(_){}
+  try{ applyLicenseUi(next); }catch(_){}
+  try{ updateLicenseInfo(next); }catch(_){}
+}
+if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "function"){
+  window.WavCueLicense.clearKeySafe = async ()=>{
+    clearLicenseKeySafe();
+    return { ok: true };
+  };
+}
+window.WavCueLicenseDebug = {
+  switchTier: (targetTier, token)=>{
+    const tier = String(targetTier || "").toLowerCase();
+    if(!isValidDebugToken(token) || !["demo","standard","pro"].includes(tier)){
+      console.warn("[DBG] invalid token");
+      return false;
+    }
+    try{ localStorage?.setItem?.(DEBUG_TIER_OVERRIDE_KEY, tier); }catch(_){}
+    const st = window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    console.log("[DBG] tier override ->", tier);
+    return true;
+  },
+  clearOverride: (token)=>{
+    if(!isValidDebugToken(token)){
+      console.warn("[DBG] invalid token");
+      return false;
+    }
+    try{ localStorage?.removeItem?.(DEBUG_TIER_OVERRIDE_KEY); }catch(_){}
+    const st = window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    console.log("[DBG] tier override ->", "cleared");
+    return true;
+  },
+};
+function updateActivationUi(state){
+  const tierRaw = state && state.tier ? state.tier : "demo";
+  const tier = String(tierRaw).toLowerCase();
+  const storedKey = getStoredLicenseKey();
+  const isActivated = tier !== "demo" && !!storedKey;
+  const maskedKey = isActivated ? maskLicenseKey(storedKey) : storedKey;
+  const overlayInput = document.getElementById("activationOverlayKey");
+  const overlayError = document.getElementById("activationOverlayError");
+  const overlayActivate = document.getElementById("activationOverlayActivate");
+  if(overlayInput){
+    overlayInput.value = maskedKey || "";
+    overlayInput.disabled = isActivated;
+  }
+  if(overlayActivate) overlayActivate.disabled = isActivated;
+  if(overlayError && isActivated) overlayError.textContent = "";
+  const settingsInput = document.getElementById("settingsLicenseKey");
+  const settingsStatus = document.getElementById("settingsLicenseStatus");
+  const settingsError = document.getElementById("settingsLicenseError");
+  const settingsActivate = document.getElementById("settingsLicenseActivate");
+  const settingsClear = document.getElementById("settingsLicenseClear");
+  if(settingsInput){
+    settingsInput.value = maskedKey || "";
+    settingsInput.disabled = isActivated;
+  }
+  if(settingsActivate) settingsActivate.disabled = isActivated;
+  if(settingsClear) settingsClear.disabled = !isActivated;
+  if(settingsStatus){
+    settingsStatus.textContent = isActivated ? `有効化済み（${tier.toUpperCase()}）` : "";
+  }
+  if(settingsError && isActivated) settingsError.textContent = "";
+}
+function isDemoPromptDone(){
+  try{ return localStorage?.getItem?.(DEMO_PROMPT_KEY) === "1"; }catch(_){ return false; }
+}
+function updateActivationOverlayVisibility(state){
+  if(!activationOverlay) return;
+  const tierRaw = state && state.tier ? state.tier : "demo";
+  const tier = String(tierRaw).toLowerCase();
+  const shouldShow = tier === "demo" && !isDemoPromptDone();
+  activationOverlay.classList.toggle("show", shouldShow);
+}
+function openActivationOverlay(){
+  if(!activationOverlay) return false;
+  activationOverlay.classList.add("show");
+  if(activationOverlayKey && !activationOverlayKey.disabled){
+    activationOverlayKey.focus();
+    activationOverlayKey.select?.();
+  }
+  return true;
+}
+function openLicenseEntryFlow(){
+  try{
+    const st = window.WavCueLicense?.getStateSafe?.();
+    const tier = String(st?.tier || "demo").toLowerCase();
+    if(tier === "demo" && !isDemoPromptDone()){
+      if(openActivationOverlay()) return;
+    }
+  }catch(_){}
+  openSettingsModalSafe("license");
+}
+function updateLicenseInfo(state){
+  const tierRaw = state && state.tier ? state.tier : "demo";
+  const tier = String(tierRaw).toLowerCase();
+  const tierLabel = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
+  if(settingsLicensePlan) settingsLicensePlan.textContent = tierLabel;
+  const demoInfo = state?.demo || {};
+  const remainingDays = Number.isFinite(demoInfo.remainingDays) ? demoInfo.remainingDays : null;
+  const remainingExports = Number.isFinite(demoInfo.remainingExports) ? demoInfo.remainingExports : null;
+  const remainText = (remainingDays != null || remainingExports != null)
+    ? `${remainingDays != null ? `${remainingDays}日` : "—"} / ${remainingExports != null ? `${remainingExports}回` : "—"}`
+    : "—";
+  if(settingsLicenseDemoRemaining) settingsLicenseDemoRemaining.textContent = remainText;
+  const storedKey = getStoredLicenseKey();
+  const override = getDebugTierOverride();
+  if(settingsLicenseDebugOverride){
+    settingsLicenseDebugOverride.textContent = override ? `開発者用: debug override = ${override}` : "";
+  }
+  if(settingsLicenseLimits){
+    const lines = [];
+    if(tier === "demo"){
+      const daysTxt = Number.isFinite(remainingDays) ? `${remainingDays}日` : "—";
+      const exportTxt = Number.isFinite(remainingExports) ? `${remainingExports}回` : "—";
+      lines.push(`有効期限: 残り${daysTxt}`);
+      lines.push(`書き出し回数制限: 残り${exportTxt}`);
+      lines.push("プリセット編集 不可");
+      lines.push("一括読み込み / 一括チェック / 一括書き出し 不可");
+    }else if(tier === "standard"){
+      lines.push("一括読み込み / 一括チェック / 一括書き出し 不可");
+    }else{
+      lines.push("制限なし");
+    }
+    settingsLicenseLimits.innerHTML = "";
+    lines.forEach((line)=>{
+      const li = document.createElement("li");
+      li.textContent = line;
+      settingsLicenseLimits.appendChild(li);
+    });
+  }
+  if(tier !== "demo" && storedKey){
+    // keep lock state in status area only
+  }
+}
 const applyLicenseUi = (state)=>{
   try{
     const tierRaw = state && state.tier ? state.tier : "demo";
@@ -5751,10 +6326,13 @@ const applyLicenseUi = (state)=>{
       let isGraceBanner = false;
       let isDemoBanner = false;
       let hasChip = false;
+      let hasActions = false;
+      let isDangerBanner = false;
       if(isDemoLocked){
         bannerText = (demoBlockedReason === "demo_export_limit")
           ? LICENSE_TEXT.demoExportLimitBanner
           : LICENSE_TEXT.demoExpiredBanner;
+        isDangerBanner = true;
       }else if(tier === "standard" && standardInGrace){
         bannerText = LICENSE_TEXT.standardGraceBanner;
         if(Number.isFinite(standardAuth.graceRemainingMinutes) && standardAuth.graceRemainingMinutes > 0){
@@ -5768,19 +6346,37 @@ const applyLicenseUi = (state)=>{
       }
       while(banner.firstChild) banner.removeChild(banner.firstChild);
       if(bannerText){
+        const body = document.createElement("span");
+        body.className = "licenseBannerBody";
+        if(isDangerBanner) body.classList.add("licenseBannerBody--danger");
+        if(isStandardBanner) body.classList.add("licenseBannerBody--standard");
+        if(isGraceBanner) body.classList.add("licenseBannerBody--grace");
         const textSpan = document.createElement("span");
         textSpan.className = "licenseBannerText";
         textSpan.textContent = bannerText;
-        banner.appendChild(textSpan);
+        body.appendChild(textSpan);
         if(bannerMeta){
           const metaSpan = document.createElement("span");
           metaSpan.className = "licenseBannerMeta";
           metaSpan.textContent = bannerMeta;
-          banner.appendChild(metaSpan);
+          body.appendChild(metaSpan);
         }
         if(showDemoRemaining){
-          banner.appendChild(renderDemoRemainingChip(demoParts));
+          body.appendChild(renderDemoRemainingChip(demoParts));
           hasChip = true;
+        }
+        banner.appendChild(body);
+        if(isDemoLocked || isStandardBanner){
+          const actions = document.createElement("span");
+          actions.className = "licenseBannerActions";
+          const openBtn = document.createElement("button");
+          openBtn.className = "btn licenseBannerBtn";
+          openBtn.type = "button";
+          openBtn.textContent = "ライセンスキーを入力";
+          openBtn.addEventListener("click", openLicenseEntryFlow);
+          actions.appendChild(openBtn);
+          banner.appendChild(actions);
+          hasActions = true;
         }
       }else if(showDemoRemaining){
         banner.appendChild(renderDemoRemainingNode(demoParts));
@@ -5790,6 +6386,8 @@ const applyLicenseUi = (state)=>{
       banner.classList.toggle("licenseBanner--grace", isGraceBanner);
       banner.classList.toggle("licenseBanner--demo", isDemoBanner);
       banner.classList.toggle("licenseBanner--withChip", hasChip);
+      banner.classList.toggle("licenseBanner--withActions", hasActions);
+      banner.classList.toggle("licenseBanner--danger", isDangerBanner);
       banner.classList.toggle("show", !!bannerText || isDemoBanner);
     }
     if(isDemo && !_demoStartupNoticeShown){
@@ -5840,6 +6438,13 @@ const applyLicenseUi = (state)=>{
       "sc_pm_silmax",
     ].map(id=> document.getElementById(id));
     presetEls.forEach(el=> setDisabled(el, presetDisabled));
+    const cmcdPresetBtn = document.querySelector('[data-tab="cmcdPreset"]');
+    const scPresetBtn = document.getElementById("sc_tab_preset");
+    [cmcdPresetBtn, scPresetBtn].filter(Boolean).forEach((el)=> el.classList.toggle("tierDisabled", presetDisabled));
+    const cmcdNote = document.getElementById("cmcdPresetTierNote");
+    if(cmcdNote) cmcdNote.style.display = presetDisabled ? "block" : "none";
+    const scNote = document.getElementById("scPresetTierNote");
+    if(scNote) scNote.style.display = presetDisabled ? "block" : "none";
 
     const backupDisabled = isDemo;
     const backupEls = [
@@ -5857,25 +6462,19 @@ const applyLicenseUi = (state)=>{
     document.querySelectorAll("[data-settings-folder]").forEach((el)=> setDisabled(el, backupDisabled));
     const demoNote = document.getElementById("settingsBackupDemoNote");
     if(demoNote) demoNote.style.display = backupDisabled ? "block" : "none";
+    updateActivationUi(state);
+    updateActivationOverlayVisibility(state);
   }catch(e){
     console.error("[License] non-fatal", e);
   }
   try{ updateDemoRemainingBanner(state); }catch(_){}
 };
 
-Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(updateTierBadge).catch((e)=>{
-  console.error("[License] non-fatal", e);
-});
-Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyProUi).catch((e)=>{
-  console.error("[ProUI] non-fatal", e);
-});
-Promise.resolve(window.WavCueLicense?.getStateSafe?.()).then(applyLicenseUi).catch((e)=>{
+Promise.resolve().then(restoreSavedLicenseKey).catch((e)=>{
   console.error("[License] non-fatal", e);
 });
 if(typeof window.WavCueLicense?.onChange === "function"){
-  window.WavCueLicense.onChange((st)=> updateTierBadge(st));
-  window.WavCueLicense.onChange((st)=> applyProUi(st));
-  window.WavCueLicense.onChange((st)=> applyLicenseUi(st));
+  window.WavCueLicense.onChange((st)=> applyAllLicenseUi(st));
 }
 (function(){
   const log = ()=>{
@@ -11805,6 +12404,26 @@ const settingsDeleteMethod = $("settingsDeleteMethod");
 const settingsAutoCleanup = $("settingsAutoCleanup");
 const settingsResetRecommended = $("settingsResetRecommended");
 const settingsRulesBadge = $("settingsRulesBadge");
+const settingsLicenseKey = $("settingsLicenseKey");
+const settingsLicenseActivate = $("settingsLicenseActivate");
+const settingsLicenseClear = $("settingsLicenseClear");
+const settingsLicenseStatus = $("settingsLicenseStatus");
+const settingsLicenseError = $("settingsLicenseError");
+const settingsLicensePlan = $("settingsLicensePlan");
+const settingsLicenseDemoRemaining = $("settingsLicenseDemoRemaining");
+const settingsLicenseDebugOverride = $("settingsLicenseDebugOverride");
+const settingsLicenseLimits = $("settingsLicenseLimits");
+const licenseClearConfirm = $("licenseClearConfirm");
+const licenseClearCancel = $("licenseClearCancel");
+const licenseClearConfirmOk = $("licenseClearConfirmOk");
+const settingsTabButtons = document.querySelectorAll("[data-settings-tab]");
+const settingsTabPanels = document.querySelectorAll("[data-settings-tabpanel]");
+const activationOverlay = $("activationOverlay");
+const activationOverlayKey = $("activationOverlayKey");
+const activationOverlayActivate = $("activationOverlayActivate");
+const activationOverlayContinue = $("activationOverlayContinue");
+const activationOverlayError = $("activationOverlayError");
+let _settingsTabHeightLocked = false;
 let cachedAutoBackupEnabled = true;
 
 const RECOMMENDED_SETTINGS = {
@@ -11893,10 +12512,29 @@ const refreshSettingsData = async ()=>{
   }
 };
 
+const lockSettingsTabHeight = ()=>{
+  if(_settingsTabHeightLocked) return;
+  const wrap = document.querySelector(".settingsTabPanels");
+  const backupPanel = document.querySelector('[data-settings-tabpanel="backup"]');
+  if(!wrap || !backupPanel) return;
+  const height = backupPanel.getBoundingClientRect().height;
+  if(height > 0){
+    wrap.style.height = `${Math.ceil(height)}px`;
+    _settingsTabHeightLocked = true;
+  }
+};
+
 const openSettingsDialog = async ()=>{
   if(!settingsDialog) return;
   await refreshSettingsData();
+  const storedTab = getStoredSettingsTab();
+  setSettingsTab("backup");
   try{ settingsDialog.showModal(); }catch(_){ settingsDialog.open = true; }
+  requestAnimationFrame(()=>{
+    lockSettingsTabHeight();
+    setSettingsTab(storedTab);
+    if(storedTab === "license") focusSettingsLicenseInput();
+  });
 };
 
 const openCleanupConfirm = ()=>{
@@ -11907,6 +12545,14 @@ const openCleanupConfirm = ()=>{
 const closeCleanupConfirm = ()=>{
   if(!settingsCleanupConfirm) return;
   _dialogCloseWithGuard(settingsCleanupConfirm);
+};
+const openLicenseClearConfirm = ()=>{
+  if(!licenseClearConfirm) return;
+  try{ licenseClearConfirm.showModal(); }catch(_){ licenseClearConfirm.open = true; }
+};
+const closeLicenseClearConfirm = ()=>{
+  if(!licenseClearConfirm) return;
+  _dialogCloseWithGuard(licenseClearConfirm);
 };
 
 if(settingsButton){
@@ -11920,6 +12566,84 @@ if(settingsCleanupConfirmCancel){
   settingsCleanupConfirmCancel.addEventListener("click", closeCleanupConfirm);
 }
 settingsCleanupConfirm?.addEventListener("click", (e)=>{ if(e.target === settingsCleanupConfirm){ closeCleanupConfirm(); } });
+licenseClearCancel?.addEventListener("click", closeLicenseClearConfirm);
+licenseClearConfirm?.addEventListener("click", (e)=>{ if(e.target === licenseClearConfirm){ closeLicenseClearConfirm(); } });
+licenseClearConfirmOk?.addEventListener("click", async ()=>{
+  try{
+    await window.WavCueLicense?.clearKeySafe?.();
+    clearLicenseResiduals();
+    const st = await window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    const tier = String(st?.tier || "demo").toLowerCase();
+    const keyPresent = !!getStoredLicenseKey();
+    console.log(`[License] deactivated: tier=${tier} keyPresent=${keyPresent ? 1 : 0}`);
+    closeLicenseClearConfirm();
+    if(tier !== "demo"){
+      try{
+        const reloadKey = "wavcue_force_reload_after_deactivate_v1";
+        if(sessionStorage?.getItem?.(reloadKey) !== "1"){
+          sessionStorage?.setItem?.(reloadKey, "1");
+          location.reload();
+        }
+      }catch(_){}
+    }
+  }catch(e){
+    console.warn("[License] deactivated failed");
+  }
+});
+
+settingsTabButtons.forEach((btn)=>{
+  btn.addEventListener("click", ()=>{
+    const tab = btn.dataset.settingsTab;
+    setSettingsTab(tab);
+    if(tab === "license") focusSettingsLicenseInput();
+  });
+});
+
+const resolveActivationErrorMessage = (reason)=>{
+  if(reason === "empty") return "ライセンスキーを入力してください。";
+  if(reason === "activation-failed") return "有効化に失敗しました。キーを確認してください。";
+  return "有効化に失敗しました。";
+};
+const runActivationFlow = async (source)=>{
+  const isOverlay = source === "overlay";
+  const keyInput = isOverlay ? activationOverlayKey : settingsLicenseKey;
+  const errorEl = isOverlay ? activationOverlayError : settingsLicenseError;
+  const rawKey = String(keyInput?.value || "").trim();
+  if(errorEl) errorEl.textContent = "";
+  if(!rawKey){
+    if(errorEl) errorEl.textContent = "キーを入力してください";
+    return;
+  }
+  try{
+    const res = await window.WavCueLicense?.setKeySafe?.(rawKey);
+    const st = await window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    const tier = String(st?.tier || "demo").toLowerCase();
+    if(!res?.ok || tier === "demo"){
+      localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
+      if(errorEl) errorEl.textContent = "ライセンスキーが無効です。入力内容をご確認ください。";
+      console.log("[License] activation failed", res?.reason || "invalid");
+      return;
+    }
+    try{ localStorage?.setItem?.(LICENSE_STORAGE_KEY, rawKey); }catch(_){}
+    if(errorEl) errorEl.textContent = "";
+    console.log("[License] activation ok");
+    try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
+    activationOverlay?.classList.remove("show");
+  }catch(e){
+    if(errorEl) errorEl.textContent = "ライセンスキーが無効です。入力内容をご確認ください。";
+    console.log("[License] activation failed", e?.message || "exception");
+  }
+};
+
+activationOverlayActivate?.addEventListener("click", ()=> runActivationFlow("overlay"));
+settingsLicenseActivate?.addEventListener("click", ()=> runActivationFlow("settings"));
+activationOverlayContinue?.addEventListener("click", ()=>{
+  try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
+  activationOverlay?.classList.remove("show");
+});
+settingsLicenseClear?.addEventListener("click", ()=> openLicenseClearConfirm());
 
 [settingsRetentionDays, settingsBackupQuotaGB, settingsMinKeepCount, settingsDeleteMethod].forEach((select)=>{
   if(!select) return;
