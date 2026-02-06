@@ -216,6 +216,17 @@
     border-color:transparent;
     padding:0;
   }
+  #offlineStandardBanner{
+    display:none;
+    margin:8px 16px 0;
+    padding:8px 12px;
+    border-radius:10px;
+    border:1px solid rgba(251,191,36,.35);
+    background:rgba(15,23,42,.4);
+    color:rgba(226,232,240,.92);
+    font-size:12px;
+    font-weight:600;
+  }
   #licenseBanner .licenseBannerBody{
     display:inline-flex;
     align-items:center;
@@ -4535,6 +4546,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
+<div id="offlineStandardBanner" role="status" aria-live="polite">オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。</div>
 <div id="licenseBanner" role="status" aria-live="polite"></div>
 <div class="activationOverlay" id="activationOverlay" role="dialog" aria-modal="true" aria-labelledby="activationOverlayTitle" aria-describedby="activationOverlayText">
   <div class="activationOverlayCard">
@@ -5245,20 +5257,23 @@ body, #appRoot, .appRoot, .mainLayout{
    License Core (single safe API)
 ================================ */
 let _lastOfflineDegrade = null;
-const applyStandardOfflineDegrade = (state)=>{
-  if(!state) return state;
-  const baseTier = String(state.tier || "demo").toLowerCase();
+const getStandardOfflineGatingTier = (state)=>{
+  const baseTier = String(state?.tier || "demo").toLowerCase();
   const isOnline = navigator.onLine !== false;
+  if(baseTier !== "standard"){
+    _lastOfflineDegrade = null;
+    return { baseTier, effectiveTier: baseTier, isOnline };
+  }
   const effectiveTier = (baseTier === "standard" && !isOnline) ? "demo" : baseTier;
   const degraded = baseTier === "standard" && effectiveTier === "demo";
   if(_lastOfflineDegrade !== degraded){
-    console.log(`[License] standard offline degrade ${degraded ? "ON" : "OFF"} (baseTier=${baseTier} effectiveTier=${effectiveTier} onLine=${isOnline})`);
+    const message = degraded
+      ? "[License][net] offline -> apply demo-like gating for STANDARD, keep display STANDARD"
+      : "[License][net] online -> restore STANDARD gating";
+    console.log(message);
     _lastOfflineDegrade = degraded;
   }
-  if(effectiveTier !== baseTier || state.baseTier == null){
-    return { ...state, tier: effectiveTier, baseTier };
-  }
-  return state;
+  return { baseTier, effectiveTier, isOnline };
 };
 
 const LicenseCore = (()=> {
@@ -5669,8 +5684,8 @@ const LicenseCore = (()=> {
   const guard = (action, ctx)=>{
     try{
       const st = getStateSafeInternal({ touchOnline: false });
-      const effectiveState = applyStandardOfflineDegrade(st);
-      const tier = (effectiveState && effectiveState.tier) ? effectiveState.tier : "demo";
+      const { effectiveTier } = getStandardOfflineGatingTier(st);
+      const tier = effectiveTier || "demo";
       const rule = policy[action] || { minTier: "demo" };
       let ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
       let reason = ok ? undefined : (rule.reason || "restricted");
@@ -6180,12 +6195,21 @@ function clearLicenseResiduals(){
     LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
   }catch(_){}
 }
+function updateOfflineStandardBanner(state){
+  const banner = document.getElementById("offlineStandardBanner");
+  if(!banner) return;
+  const tierRaw = state && state.tier ? state.tier : "demo";
+  const tier = String(tierRaw).toLowerCase();
+  const shouldShow = tier === "standard" && navigator.onLine === false;
+  banner.style.display = shouldShow ? "block" : "none";
+}
 function applyAllLicenseUi(state){
-  const next = applyStandardOfflineDegrade(applyDebugOverride(state));
+  const next = applyDebugOverride(state);
   try{ updateTierBadge(next); }catch(_){}
   try{ applyProUi(next); }catch(_){}
   try{ applyLicenseUi(next); }catch(_){}
   try{ updateLicenseInfo(next); }catch(_){}
+  try{ updateOfflineStandardBanner(next); }catch(_){}
 }
 if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "function"){
   window.WavCueLicense.clearKeySafe = async ()=>{
@@ -6324,10 +6348,13 @@ const applyLicenseUi = (state)=>{
   try{
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
+    const { effectiveTier } = getStandardOfflineGatingTier(state);
+    const gatingTier = effectiveTier || tier;
     const demoInfo = state?.demo;
     const isDemo = tier === "demo";
+    const isGatingDemo = gatingTier === "demo";
     const demoBlockedReason = demoInfo?.demoBlockedReason || null;
-    const isDemoLocked = isDemo && !!demoInfo?.isLocked;
+    const isDemoLocked = isGatingDemo && !!demoInfo?.isLocked;
     const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
     const remainingExports = Number.isFinite(demoInfo?.remainingExports) ? demoInfo.remainingExports : null;
     const demoParts = buildDemoRemainingParts(remainingDays, remainingExports);
@@ -6346,7 +6373,7 @@ const applyLicenseUi = (state)=>{
       let hasChip = false;
       let hasActions = false;
       let isDangerBanner = false;
-      if(isDemoLocked){
+      if(isDemo && isDemoLocked){
         bannerText = (demoBlockedReason === "demo_export_limit")
           ? LICENSE_TEXT.demoExportLimitBanner
           : LICENSE_TEXT.demoExpiredBanner;
@@ -6431,7 +6458,7 @@ const applyLicenseUi = (state)=>{
       setDisabled(document.getElementById("btnExport"), !standardExportAllowed);
     }
 
-    const presetDisabled = isDemo;
+    const presetDisabled = isGatingDemo;
     const presetEls = [
       "sc_tab_preset",
       "sc_presetManage",
@@ -6460,11 +6487,11 @@ const applyLicenseUi = (state)=>{
     const scPresetBtn = document.getElementById("sc_tab_preset");
     [cmcdPresetBtn, scPresetBtn].filter(Boolean).forEach((el)=> el.classList.toggle("tierDisabled", presetDisabled));
     const cmcdNote = document.getElementById("cmcdPresetTierNote");
-    if(cmcdNote) cmcdNote.style.display = presetDisabled ? "block" : "none";
+    if(cmcdNote) cmcdNote.style.display = isDemo ? "block" : "none";
     const scNote = document.getElementById("scPresetTierNote");
-    if(scNote) scNote.style.display = presetDisabled ? "block" : "none";
+    if(scNote) scNote.style.display = isDemo ? "block" : "none";
 
-    const backupDisabled = isDemo;
+    const backupDisabled = isGatingDemo;
     const backupEls = [
       "settingsCleanupNow",
       "settingsResetRecommended",
@@ -6479,7 +6506,7 @@ const applyLicenseUi = (state)=>{
     backupEls.forEach(el=> setDisabled(el, backupDisabled));
     document.querySelectorAll("[data-settings-folder]").forEach((el)=> setDisabled(el, backupDisabled));
     const demoNote = document.getElementById("settingsBackupDemoNote");
-    if(demoNote) demoNote.style.display = backupDisabled ? "block" : "none";
+    if(demoNote) demoNote.style.display = isDemo ? "block" : "none";
     updateActivationUi(state);
     updateActivationOverlayVisibility(state);
   }catch(e){
@@ -6496,10 +6523,12 @@ if(typeof window.WavCueLicense?.onChange === "function"){
 }
 window.addEventListener("online", ()=>{
   const st = window.WavCueLicense?.getStateSafe?.();
+  if(st) getStandardOfflineGatingTier(st);
   if(st) applyAllLicenseUi(st);
 });
 window.addEventListener("offline", ()=>{
   const st = window.WavCueLicense?.getStateSafe?.();
+  if(st) getStandardOfflineGatingTier(st);
   if(st) applyAllLicenseUi(st);
 });
 (function(){
