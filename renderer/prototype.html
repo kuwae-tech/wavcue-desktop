@@ -226,6 +226,12 @@
     color:rgba(226,232,240,.92);
     font-size:12px;
     font-weight:600;
+    line-height:1.5;
+  }
+  #offlineStandardBanner .offlineStandardBannerMeta{
+    font-size:11px;
+    font-weight:600;
+    color:rgba(226,232,240,.86);
   }
   #licenseBanner .licenseBannerBody{
     display:inline-flex;
@@ -4546,7 +4552,10 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div id="offlineStandardBanner" role="status" aria-live="polite">オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。</div>
+<div id="offlineStandardBanner" role="status" aria-live="polite">
+  <div class="offlineStandardBannerText">オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。</div>
+  <div class="offlineStandardBannerMeta" id="offlineStandardBannerMeta"></div>
+</div>
 <div id="licenseBanner" role="status" aria-live="polite"></div>
 <div class="activationOverlay" id="activationOverlay" role="dialog" aria-modal="true" aria-labelledby="activationOverlayTitle" aria-describedby="activationOverlayText">
   <div class="activationOverlayCard">
@@ -5297,6 +5306,7 @@ const LicenseCore = (()=> {
     standardGraceModal: "Standard認証が切れました。1時間後に書き出しのみ停止します。\nネット接続を確認して再認証してください。",
     standardGraceBanner: "認証が切れています（猶予中）。ネット接続を確認して再認証してください。",
     standardAuthBanner: "認証が切れています（書き出しのみ停止）。ネット接続を確認して再認証してください。",
+    standardOfflineToast: "オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。",
   });
   const policy = {
     bulkImport: { minTier: "pro", reason: "pro-only" },
@@ -6195,13 +6205,36 @@ function clearLicenseResiduals(){
     LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
   }catch(_){}
 }
+let _lastOfflineNoticeShown = null;
+const formatShortDate = (stamp)=>{
+  if(!Number.isFinite(stamp)) return "—";
+  const dt = new Date(stamp);
+  if(Number.isNaN(dt.getTime())) return "—";
+  return dt.toISOString().slice(0, 10);
+};
 function updateOfflineStandardBanner(state){
   const banner = document.getElementById("offlineStandardBanner");
   if(!banner) return;
-  const tierRaw = state && state.tier ? state.tier : "demo";
-  const tier = String(tierRaw).toLowerCase();
-  const shouldShow = tier === "standard" && navigator.onLine === false;
+  const meta = document.getElementById("offlineStandardBannerMeta");
+  const { baseTier, isOnline } = getStandardOfflineGatingTier(state);
+  const shouldShow = baseTier === "standard" && !isOnline;
   banner.style.display = shouldShow ? "block" : "none";
+  if(meta){
+    const demoInfo = state?.demo || {};
+    const remainingExports = Number.isFinite(demoInfo.remainingExports) ? demoInfo.remainingExports : null;
+    const expiresAt = Number.isFinite(demoInfo.expiresAt) ? demoInfo.expiresAt : null;
+    const exportText = remainingExports != null ? `${remainingExports}回` : "—";
+    const expiryText = formatShortDate(expiresAt);
+    meta.textContent = shouldShow
+      ? `残り書き出し回数: ${exportText} / 利用期限: ${expiryText}`
+      : "";
+  }
+  if(_lastOfflineNoticeShown !== shouldShow){
+    if(shouldShow){
+      console.log("[License][net] offline STANDARD -> show offline banner + lock preset msg");
+    }
+    _lastOfflineNoticeShown = shouldShow;
+  }
 }
 function applyAllLicenseUi(state){
   const next = applyDebugOverride(state);
@@ -6348,8 +6381,9 @@ const applyLicenseUi = (state)=>{
   try{
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
-    const { effectiveTier } = getStandardOfflineGatingTier(state);
+    const { baseTier, effectiveTier, isOnline } = getStandardOfflineGatingTier(state);
     const gatingTier = effectiveTier || tier;
+    const isStandardOffline = baseTier === "standard" && !isOnline;
     const demoInfo = state?.demo;
     const isDemo = tier === "demo";
     const isGatingDemo = gatingTier === "demo";
@@ -6486,10 +6520,24 @@ const applyLicenseUi = (state)=>{
     const cmcdPresetBtn = document.querySelector('[data-tab="cmcdPreset"]');
     const scPresetBtn = document.getElementById("sc_tab_preset");
     [cmcdPresetBtn, scPresetBtn].filter(Boolean).forEach((el)=> el.classList.toggle("tierDisabled", presetDisabled));
-    const cmcdNote = document.getElementById("cmcdPresetTierNote");
-    if(cmcdNote) cmcdNote.style.display = isDemo ? "block" : "none";
-    const scNote = document.getElementById("scPresetTierNote");
-    if(scNote) scNote.style.display = isDemo ? "block" : "none";
+    const applyPresetNote = (el)=>{
+      if(!el) return;
+      if(!el.dataset.demoText) el.dataset.demoText = el.textContent || "";
+      if(isStandardOffline){
+        el.textContent = "オフラインのため一時的にプリセット機能がロックされています。通信が回復すると自動で復帰します。";
+        el.style.display = "block";
+        return;
+      }
+      if(isDemo){
+        el.textContent = el.dataset.demoText || "";
+        el.style.display = "block";
+        return;
+      }
+      el.textContent = el.dataset.demoText || "";
+      el.style.display = "none";
+    };
+    applyPresetNote(document.getElementById("cmcdPresetTierNote"));
+    applyPresetNote(document.getElementById("scPresetTierNote"));
 
     const backupDisabled = isGatingDemo;
     const backupEls = [
@@ -12273,13 +12321,19 @@ async function exportOneWithSave(options){
 
 async function exportWav(){
   const gate = guardExport({ source: "singleExport" });
-  if(gate?.tier === "demo" && !_demoExportNoticeShown){
+  const st = window.WavCueLicense?.getStateSafe?.();
+  const { baseTier, effectiveTier, isOnline } = getStandardOfflineGatingTier(st);
+  const isStandardOffline = baseTier === "standard" && effectiveTier === "demo" && !isOnline;
+  if(gate?.tier === "demo" && !_demoExportNoticeShown && !isStandardOffline){
     _demoExportNoticeShown = true;
     if(window.safeToast) window.safeToast(LICENSE_TEXT.demoNotice, "info");
   }
   if(!gate.ok){
     if(window.safeToast){
-      if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
+      if(isStandardOffline){
+        console.log("[Export][gate] blocked (STANDARD offline) -> offline toast");
+        window.safeToast(LICENSE_TEXT.standardOfflineToast, "warn");
+      }else if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
       else if(gate.reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
       else if(gate.reason === "demo_expired") window.safeToast(LICENSE_TEXT.demoExpiredToast, "warn");
       else window.safeToast(LICENSE_TEXT.exportStandardRequired, "warn");
@@ -13741,13 +13795,19 @@ function _ecWire(){
 $("btnExport").addEventListener("click", async ()=>{
   try{
     const gate = guardExport({ source: "exportButton" });
-    if(gate?.tier === "demo" && !_demoExportNoticeShown){
+    const st = window.WavCueLicense?.getStateSafe?.();
+    const { baseTier, effectiveTier, isOnline } = getStandardOfflineGatingTier(st);
+    const isStandardOffline = baseTier === "standard" && effectiveTier === "demo" && !isOnline;
+    if(gate?.tier === "demo" && !_demoExportNoticeShown && !isStandardOffline){
       _demoExportNoticeShown = true;
       if(window.safeToast) window.safeToast(LICENSE_TEXT.demoNotice, "info");
     }
     if(!gate.ok){
       if(window.safeToast){
-        if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
+        if(isStandardOffline){
+          console.log("[Export][gate] blocked (STANDARD offline) -> offline toast");
+          window.safeToast(LICENSE_TEXT.standardOfflineToast, "warn");
+        }else if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
         else if(gate.reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
         else if(gate.reason === "demo_expired") window.safeToast(LICENSE_TEXT.demoExpiredToast, "warn");
         else window.safeToast(LICENSE_TEXT.exportStandardRequired, "warn");
