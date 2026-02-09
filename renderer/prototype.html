@@ -5288,6 +5288,9 @@ const getStandardOfflineGatingTier = (state)=>{
 const LicenseCore = (()=> {
   const listeners = new Set();
   const tierRank = { demo: 0, standard: 1, pro: 2 };
+  const LICENSE_CERT_PUBKEY_PEM = `-----BEGIN PUBLIC KEY-----
+MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
+-----END PUBLIC KEY-----`;
   const LICENSE_TEXT = Object.freeze({
     exportStandardRequired: "書き出しはStandard以上で利用できます。",
     exportAuthExpired: "認証が確認できないため書き出しのみ停止しています。",
@@ -5334,6 +5337,9 @@ const LicenseCore = (()=> {
     "wavcue_license_info",
   ];
   const LS_KEY_LAST = "wavcue_license_key";
+  const LS_CERTIFICATE = "wavcue_license_certificate_v1";
+  const LS_DEVICE_ID = "wavcue_device_id_v1";
+  const LS_SERVER_URL_OVERRIDE = "wavcue_license_server_url_override";
   const LS_DEMO_ACTIVATED_AT = "wavcue_demo_activated_at";
   const LS_DEMO_EXPORT_OK_COUNT = "wavcue_demo_export_ok_count";
   const LS_STANDARD_LAST_ONLINE_OK_AT = "wavcue_standard_last_online_ok_at";
@@ -5448,49 +5454,202 @@ const LicenseCore = (()=> {
     return null;
   };
 
-  const normalizeKeyTier = (rawKey)=>{
-    const t = String(rawKey || "").trim().toLowerCase();
-    if(!t) return null;
-    if(t === "wavcue_standard_test" || t === "wavcue_standard") return "standard";
-    if(t.includes("standard") || t.includes("wavcue_standard")) return "standard";
-    if(t.includes("pro")) return "pro";
-    if(t.includes("demo")) return "demo";
-    return null;
+  const readText = (key)=>{
+    try{ return localStorage?.getItem?.(key) || ""; }catch(_){ return ""; }
   };
-
-  const decideTier = (keyTier, normalizedStateTier)=>{
-    if(keyTier === "pro") return "pro";
-    if(keyTier === "standard") return "standard";
-    if(keyTier === "demo") return "demo";
-    if(normalizedStateTier === "pro") return "pro";
-    if(normalizedStateTier === "standard") return "standard";
-    if(normalizedStateTier === "demo") return "demo";
-    return "demo";
+  const writeText = (key, value)=>{
+    try{
+      if(!localStorage?.setItem) return;
+      if(value == null) localStorage.removeItem(key);
+      else localStorage.setItem(key, String(value));
+    }catch(_){}
   };
-
-  const normalizeState = (raw)=>{
+  const getCryptoModule = ()=>{
+    try{
+      return window.require?.("crypto") || globalThis.require?.("crypto") || null;
+    }catch(_){
+      return null;
+    }
+  };
+  const stableStringify = (value)=>{
+    if(value == null) return "";
+    if(typeof value !== "object") return JSON.stringify(value);
+    if(Array.isArray(value)){
+      return `[${value.map((item)=> stableStringify(item)).join(",")}]`;
+    }
+    const keys = Object.keys(value).sort();
+    const entries = keys.map((key)=> `${JSON.stringify(key)}:${stableStringify(value[key])}`);
+    return `{${entries.join(",")}}`;
+  };
+  const parseMaybeJson = (raw)=>{
+    if(typeof raw !== "string") return raw;
+    const trimmed = raw.trim();
+    if(!trimmed) return null;
+    if(trimmed.startsWith("{") || trimmed.startsWith("[")){
+      try{ return JSON.parse(trimmed); }catch(_){ return raw; }
+    }
+    return raw;
+  };
+  const ensureDeviceId = ()=>{
+    const existing = readText(LS_DEVICE_ID).trim();
+    if(existing) return existing;
+    let next = "";
+    if(typeof crypto !== "undefined" && crypto?.randomUUID){
+      next = crypto.randomUUID();
+    }else{
+      const bytes = getCryptoModule()?.randomBytes?.(16);
+      if(bytes){
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = Array.from(bytes).map((b)=> b.toString(16).padStart(2, "0")).join("");
+        next = `${hex.slice(0,8)}-${hex.slice(8,12)}-${hex.slice(12,16)}-${hex.slice(16,20)}-${hex.slice(20)}`;
+      }else{
+        next = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c)=>{
+          const r = Math.random() * 16 | 0;
+          const v = c === "x" ? r : (r & 0x3 | 0x8);
+          return v.toString(16);
+        });
+      }
+    }
+    writeText(LS_DEVICE_ID, next);
+    return next;
+  };
+  const getServerUrl = ()=>{
+    const envUrl = (typeof process !== "undefined" && process?.env?.LICENSE_SERVER_URL)
+      ? String(process.env.LICENSE_SERVER_URL || "").trim()
+      : "";
+    if(envUrl) return envUrl;
+    return readText(LS_SERVER_URL_OVERRIDE).trim();
+  };
+  const setServerUrlOverride = (url)=>{
+    const value = String(url || "").trim();
+    if(!value){
+      writeText(LS_SERVER_URL_OVERRIDE, null);
+      return "";
+    }
+    writeText(LS_SERVER_URL_OVERRIDE, value);
+    return value;
+  };
+  const readCertificate = ()=>{
+    const raw = readText(LS_CERTIFICATE);
     if(!raw) return null;
-    if(typeof raw === "string"){
-      const tier = normalizeTier(raw);
-      return tier ? { tier } : null;
-    }
-    if(typeof raw === "object"){
-      const tier =
-        normalizeTier(raw.tier) ||
-        normalizeTier(raw.plan) ||
-        normalizeTier(raw.type) ||
-        normalizeTier(raw.licenseTier) ||
-        normalizeTier(raw.level) ||
-        normalizeTier(raw.product) ||
-        null;
-      const inferred =
-        tier ||
-        (raw.isPro ? "pro" : null) ||
-        (raw.isStandard ? "standard" : null) ||
-        (raw.isDemo ? "demo" : null);
-      return inferred ? { tier: inferred } : null;
+    const parsed = parseMaybeJson(raw);
+    if(parsed && typeof parsed === "object") return parsed;
+    return null;
+  };
+  const writeCertificate = (cert)=>{
+    if(!cert) return;
+    try{ writeText(LS_CERTIFICATE, JSON.stringify(cert)); }catch(_){}
+  };
+  const clearCertificate = ()=>{
+    writeText(LS_CERTIFICATE, null);
+  };
+  const resolveCertificatePayload = (cert)=>{
+    if(!cert || typeof cert !== "object") return null;
+    if(cert.payload != null) return cert.payload;
+    const clone = { ...cert };
+    delete clone.sig;
+    delete clone.signature;
+    return clone;
+  };
+  const getCertificateField = (cert, key)=>{
+    if(!cert || typeof cert !== "object") return null;
+    if(cert[key] != null) return cert[key];
+    const payload = parseMaybeJson(cert.payload);
+    if(payload && typeof payload === "object" && payload[key] != null) return payload[key];
+    return null;
+  };
+  const decodeSignature = (sig)=>{
+    if(!sig) return null;
+    if(sig instanceof Uint8Array) return sig;
+    if(Array.isArray(sig)) return Uint8Array.from(sig);
+    if(typeof sig === "string"){
+      if(typeof Buffer !== "undefined"){
+        try{
+          const buf = Buffer.from(sig, "base64");
+          if(buf.length > 0) return buf;
+        }catch(_){}
+        try{
+          const buf = Buffer.from(sig, "hex");
+          if(buf.length > 0) return buf;
+        }catch(_){}
+      }
+      if(typeof atob === "function"){
+        try{
+          const binary = atob(sig);
+          const bytes = new Uint8Array(binary.length);
+          for(let i = 0; i < binary.length; i += 1){
+            bytes[i] = binary.charCodeAt(i);
+          }
+          if(bytes.length > 0) return bytes;
+        }catch(_){}
+      }
     }
     return null;
+  };
+  const verifyCertificate = (cert, deviceId)=>{
+    const cryptoModule = getCryptoModule();
+    if(!cryptoModule?.verify || !cryptoModule?.createPublicKey){
+      return { ok: false, reason: "crypto-unavailable" };
+    }
+    if(!cert || typeof cert !== "object"){
+      return { ok: false, reason: "missing-certificate" };
+    }
+    const version = Number(getCertificateField(cert, "v"));
+    if(version !== 1){
+      return { ok: false, reason: "unsupported-version" };
+    }
+    const certDeviceId = String(getCertificateField(cert, "deviceId") || "");
+    if(!certDeviceId || certDeviceId !== deviceId){
+      return { ok: false, reason: "device-mismatch" };
+    }
+    const sig = cert.sig || cert.signature;
+    const sigBytes = decodeSignature(sig);
+    if(!sigBytes){
+      return { ok: false, reason: "missing-signature" };
+    }
+    const payload = resolveCertificatePayload(cert);
+    if(payload == null){
+      return { ok: false, reason: "missing-payload" };
+    }
+    const message = (typeof payload === "string") ? payload : stableStringify(payload);
+    const data = (typeof Buffer !== "undefined")
+      ? Buffer.from(message)
+      : new TextEncoder().encode(message);
+    const key = cryptoModule.createPublicKey(LICENSE_CERT_PUBKEY_PEM);
+    const verified = cryptoModule.verify(null, data, key, sigBytes);
+    if(!verified){
+      return { ok: false, reason: "bad-signature" };
+    }
+    const tierRaw = getCertificateField(cert, "tier");
+    const tier = normalizeTier(tierRaw);
+    if(!tier){
+      return { ok: false, reason: "missing-tier" };
+    }
+    return { ok: true, tier, certificate: cert };
+  };
+  const loadCertificateState = (options = {})=>{
+    const deviceId = ensureDeviceId();
+    const cert = readCertificate();
+    if(!cert){
+      if(options.logBoot){
+        console.log("[License] boot tier=DEMO (no/invalid certificate)");
+      }
+      return { tier: "demo", certificate: null, hasCert: false, deviceId };
+    }
+    const verified = verifyCertificate(cert, deviceId);
+    if(!verified.ok){
+      console.log(`[License] cert verify failed: ${verified.reason}`);
+      clearCertificate();
+      if(options.logBoot){
+        console.log("[License] boot tier=DEMO (no/invalid certificate)");
+      }
+      return { tier: "demo", certificate: null, hasCert: false, deviceId };
+    }
+    if(options.logBoot){
+      console.log(`[License] boot tier=${verified.tier.toUpperCase()} (valid certificate)`);
+    }
+    return { tier: verified.tier, certificate: verified.certificate, hasCert: true, deviceId };
   };
 
   const setCache = (next, source)=>{
@@ -5502,69 +5661,11 @@ const LicenseCore = (()=> {
     return { ...stateCache };
   };
 
-  const readLocalState = ()=>{
-    try{
-      if(!window.localStorage) return null;
-      for(const key of LS_STATE_KEYS){
-        const raw = localStorage.getItem(key);
-        if(!raw) continue;
-        try{
-          const parsed = JSON.parse(raw);
-          const norm = normalizeState(parsed);
-          if(norm) return norm;
-        }catch(_){
-          const norm = normalizeState(raw);
-          if(norm) return norm;
-        }
-      }
-    }catch(_){}
-    return null;
-  };
-
-  const readWindowSync = ()=>{
-    try{
-      const candidates = [
-        window.__wavcueLicenseState,
-        window.WavCue?.licenseState,
-        window.WavCue?.license,
-        window.wavcue?.licenseState,
-        window.wavcue?.licenseInfo,
-      ];
-      for(const raw of candidates){
-        const norm = normalizeState(raw);
-        if(norm) return norm;
-      }
-    }catch(_){}
-    return null;
-  };
-
-  const readWindowAsync = async ()=>{
-    const fns = [
-      window.wavcue?.getLicenseStateSafe,
-      window.wavcue?.getLicenseState,
-      window.wavcue?.getLicenseInfo,
-    ].filter((fn)=> typeof fn === "function");
-    for(const fn of fns){
-      try{
-        const res = await fn();
-        const norm = normalizeState(res);
-        if(norm) return norm;
-      }catch(_){}
-    }
-    return null;
-  };
-
   const init = ()=>{
     try{
+      const certState = loadCertificateState({ logBoot: true });
+      setCache({ tier: certState.tier }, "certificate");
       _refreshState("init", { touchOnline: true });
-      void readWindowAsync().then((asyncState)=>{
-        if(asyncState){
-          setCache(asyncState, "windowAsync");
-          _refreshState("async", { touchOnline: true });
-        }
-      }).catch((e)=>{
-        console.error("[License] non-fatal", e);
-      });
     }catch(e){
       console.error("[License] non-fatal", e);
     }
@@ -5621,11 +5722,8 @@ const LicenseCore = (()=> {
 
   const getStateSafeInternal = (options = {})=>{
     try{
-      const local = readLocalState();
-      if(local) return buildState({ ...stateCache, ...local }, options);
-      const sync = readWindowSync();
-      if(sync) return buildState({ ...stateCache, ...sync }, options);
-      return buildState({ ...stateCache }, options);
+      const certState = loadCertificateState({ logBoot: false });
+      return buildState({ ...stateCache, ...certState }, options);
     }catch(e){
       console.error("[License] non-fatal", e);
       return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
@@ -5733,34 +5831,54 @@ const LicenseCore = (()=> {
     try{
       const value = String(key || "").trim();
       if(!value) return { ok: false, reason: "empty" };
-      const keyTier = normalizeKeyTier(value);
+      const serverUrl = getServerUrl();
+      if(!serverUrl){
+        console.log("[License] activate failed: server-unset");
+        return { ok: false, reason: "server-unset" };
+      }
+      const payload = {
+        licenseKey: value,
+        deviceId: ensureDeviceId(),
+        appVersion: (typeof APP_VERSION === "string") ? APP_VERSION : null,
+        platform: window.platform?.name || window.platform?.platform || navigator?.platform || "unknown",
+      };
+      let response;
+      try{
+        response = await fetch(`${serverUrl.replace(/\\/$/, "")}/v1/activate`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+      }catch(e){
+        console.log(`[License] activate failed: ${e?.message || "network-error"}`);
+        return { ok: false, reason: "network-error" };
+      }
+      let json;
+      try{
+        json = await response.json();
+      }catch(_){
+        json = null;
+      }
+      if(!response.ok || !json?.ok){
+        const code = json?.code || response.status || "error";
+        const message = json?.message || response.statusText || "activation failed";
+        console.log(`[License] activate failed: ${code}/${message}`);
+        return { ok: false, reason: "activation-failed", code, message };
+      }
+      const certRaw = json?.certificate;
+      const cert = parseMaybeJson(certRaw);
+      const verified = verifyCertificate(cert, ensureDeviceId());
+      if(!verified.ok){
+        console.log(`[License] cert verify failed: ${verified.reason}`);
+        return { ok: false, reason: "cert-invalid" };
+      }
+      writeCertificate(verified.certificate);
       try{ localStorage?.setItem?.(LS_KEY_LAST, value); }catch(_){}
-      const fns = [
-        window.wavcue?.setLicenseKey,
-        window.wavcue?.activateLicense,
-        window.wavcue?.setLicense,
-      ].filter((fn)=> typeof fn === "function");
-      if(!fns.length){
-        if(keyTier) setCache({ tier: keyTier }, "activationKey");
-        _refreshState("key", { touchOnline: true });
-        return { ok: true };
-      }
-      const res = fns[0](value);
-      let next = res;
-      if(res && typeof res.then === "function"){
-        try{
-          next = await res;
-        }catch(e){
-          console.error("[License] non-fatal", e);
-          return { ok: false, reason: "activation-failed" };
-        }
-      }
-      const norm = normalizeState(next);
-      const decidedTier = decideTier(keyTier, norm?.tier);
-      setCache({ tier: decidedTier }, norm ? "activation" : "activationKey");
-      if(decidedTier === "standard") touchStandardLastOnlineOkAt(Date.now());
-      _refreshState("key", { touchOnline: true });
-      return { ok: true };
+      setCache({ tier: verified.tier }, "certificate");
+      if(verified.tier === "standard") touchStandardLastOnlineOkAt(Date.now());
+      _refreshState("activation", { touchOnline: true });
+      console.log(`[License] activate ok -> saved certificate -> tier=${verified.tier.toUpperCase()}`);
+      return { ok: true, tier: verified.tier };
     }catch(e){
       console.error("[License] non-fatal", e);
       return { ok: false, reason: "exception" };
@@ -5785,6 +5903,11 @@ const LicenseCore = (()=> {
   };
 
   const peekState = ()=> getStateSafeInternal({ touchOnline: false });
+  const getDeviceId = ()=> ensureDeviceId();
+  const clearCertificateSafe = ()=>{
+    clearCertificate();
+    _refreshState("cert-clear", { touchOnline: false });
+  };
 
   const debug = {
     resetDemo: ()=>{
@@ -5903,6 +6026,10 @@ const LicenseCore = (()=> {
     recordExportOk,
     resetDemoTrial,
     peekState,
+    getDeviceId,
+    getServerUrl,
+    setServerUrlOverride,
+    clearCertificateSafe,
     LICENSE_TEXT,
     debug,
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
@@ -5916,6 +6043,10 @@ window.WavCueLicense = {
   onChange: LicenseCore.onChange,
   resetDemoTrial: LicenseCore.resetDemoTrial,
   recordExportOk: LicenseCore.recordExportOk,
+  getDeviceId: LicenseCore.getDeviceId,
+  getServerUrl: LicenseCore.getServerUrl,
+  setServerUrlOverride: LicenseCore.setServerUrlOverride,
+  clearCertificateSafe: LicenseCore.clearCertificateSafe,
   debug: LicenseCore.debug,
   __debugSetDemoActivatedAt: LicenseCore.debug.setDemoActivatedAt,
   __debugSetDemoExportOkCount: LicenseCore.debug.setDemoExportOkCount,
@@ -6056,6 +6187,9 @@ const updateDemoRemainingBanner = (state)=>{
   }
 };
 const LICENSE_STORAGE_KEY = "wavcue_license_key";
+const LICENSE_CERTIFICATE_KEY = "wavcue_license_certificate_v1";
+const LICENSE_DEVICE_ID_KEY = "wavcue_device_id_v1";
+const LICENSE_SERVER_URL_OVERRIDE_KEY = "wavcue_license_server_url_override";
 const LICENSE_STATE_KEYS = [
   "wavcue_license_state",
   "wavcue_license",
@@ -6073,6 +6207,8 @@ const LICENSE_EXTRA_KEYS = [
   "wavcue_std_grace_started_at",
   "wavcue_std_grace_expires_at",
   "wavcue_std_grace_modal_shown_for_started_at",
+  LICENSE_CERTIFICATE_KEY,
+  LICENSE_SERVER_URL_OVERRIDE_KEY,
 ];
 const DEBUG_TIER_OVERRIDE_KEY = "wavcue_debug_tier_override";
 let _licenseRestoreDone = false;
@@ -6176,15 +6312,8 @@ async function restoreSavedLicenseKey(){
   if(_licenseRestoreDone) return;
   _licenseRestoreDone = true;
   try{
-    const saved = localStorage?.getItem?.(LICENSE_STORAGE_KEY);
-    if(saved){
-      await window.WavCueLicense?.setKeySafe?.(saved);
-    }
     const st = await window.WavCueLicense?.getStateSafe?.();
     if(st){
-      if(String(st.tier || "demo").toLowerCase() === "demo"){
-        localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
-      }
       applyAllLicenseUi(st);
     }
   }catch(_){}
@@ -6195,6 +6324,7 @@ function clearLicenseKeySafe(){
     localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
     LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
   }catch(_){}
+  try{ window.WavCueLicense?.clearCertificateSafe?.(); }catch(_){}
   try{ window.WavCueLicense?.resetDemoTrial?.(); }catch(_){}
   try{ window.WavCueLicense?.__debugRefreshLicense?.(); }catch(_){}
 }
@@ -6204,6 +6334,7 @@ function clearLicenseResiduals(){
     localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
     LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
   }catch(_){}
+  try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){}
 }
 let _lastOfflineNoticeShown = null;
 const formatShortDate = (stamp)=>{
@@ -6275,11 +6406,37 @@ window.WavCueLicenseDebug = {
     return true;
   },
 };
+window.__licenseDebug = {
+  status: ()=>{
+    const st = window.WavCueLicense?.getStateSafe?.();
+    return {
+      tier: String(st?.tier || "demo").toLowerCase(),
+      hasCert: !!st?.hasCert,
+      deviceId: window.WavCueLicense?.getDeviceId?.(),
+      serverUrl: window.WavCueLicense?.getServerUrl?.(),
+    };
+  },
+  clearCert: ()=>{
+    window.WavCueLicense?.clearCertificateSafe?.();
+    try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){}
+    const st = window.WavCueLicense?.getStateSafe?.();
+    if(st) applyAllLicenseUi(st);
+    return { ok: true };
+  },
+  setServerUrl: (url)=>{
+    const next = window.WavCueLicense?.setServerUrlOverride?.(url);
+    return { ok: true, serverUrl: next || window.WavCueLicense?.getServerUrl?.() || "" };
+  },
+  getDeviceId: ()=>{
+    return window.WavCueLicense?.getDeviceId?.();
+  },
+};
 function updateActivationUi(state){
   const tierRaw = state && state.tier ? state.tier : "demo";
   const tier = String(tierRaw).toLowerCase();
   const storedKey = getStoredLicenseKey();
-  const isActivated = tier !== "demo" && !!storedKey;
+  const hasCert = !!state?.hasCert;
+  const isActivated = !!hasCert;
   const maskedKey = isActivated ? maskLicenseKey(storedKey) : storedKey;
   const overlayInput = document.getElementById("activationOverlayKey");
   const overlayError = document.getElementById("activationOverlayError");
@@ -12711,6 +12868,9 @@ settingsTabButtons.forEach((btn)=>{
 
 const resolveActivationErrorMessage = (reason)=>{
   if(reason === "empty") return "ライセンスキーを入力してください。";
+  if(reason === "server-unset") return "ライセンスサーバーが未設定です。";
+  if(reason === "network-error") return "通信に失敗しました。ネットワークをご確認ください。";
+  if(reason === "cert-invalid") return "証明書の検証に失敗しました。";
   if(reason === "activation-failed") return "有効化に失敗しました。キーを確認してください。";
   return "有効化に失敗しました。";
 };
@@ -12730,19 +12890,15 @@ const runActivationFlow = async (source)=>{
     if(st) applyAllLicenseUi(st);
     const tier = String(st?.tier || "demo").toLowerCase();
     if(!res?.ok || tier === "demo"){
-      localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
-      if(errorEl) errorEl.textContent = "ライセンスキーが無効です。入力内容をご確認ください。";
-      console.log("[License] activation failed", res?.reason || "invalid");
+      if(errorEl) errorEl.textContent = resolveActivationErrorMessage(res?.reason);
       return;
     }
     try{ localStorage?.setItem?.(LICENSE_STORAGE_KEY, rawKey); }catch(_){}
     if(errorEl) errorEl.textContent = "";
-    console.log("[License] activation ok");
     try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
     activationOverlay?.classList.remove("show");
   }catch(e){
-    if(errorEl) errorEl.textContent = "ライセンスキーが無効です。入力内容をご確認ください。";
-    console.log("[License] activation failed", e?.message || "exception");
+    if(errorEl) errorEl.textContent = "有効化に失敗しました。";
   }
 };
 
