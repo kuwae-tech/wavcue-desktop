@@ -995,6 +995,23 @@
   .settingsDialog .settingsInfoValue{
     text-align:right;
   }
+  .settingsDialog .settingsCard--license{
+    padding-left:12px;
+    padding-right:12px;
+  }
+  .settingsDialog .settingsDeviceIdValue{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    justify-content:flex-end;
+  }
+  .settingsDialog .settingsDeviceIdText{
+    flex:1;
+    min-width:0;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+  }
   .settingsDialog .settingsLimitList{
     margin:0;
     padding-left:18px;
@@ -5023,7 +5040,7 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="settingsTabPanels">
       <div class="settingsTabPanel active" data-settings-tabpanel="backup" role="tabpanel">
         <div class="settingsGrid">
-          <section class="settingsCard" style="grid-column:1/-1">
+          <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
             <h3>バックアップ管理</h3>
             <div class="muted" id="settingsBackupDemoNote" style="display:none;margin-top:-4px;margin-bottom:8px;">Demoではバックアップ機能は利用できません。</div>
             <div class="settingsBlock">
@@ -5104,7 +5121,7 @@ body, #appRoot, .appRoot, .mainLayout{
             <button class="btn" id="settingsSave" type="button">設定を保存</button>
             <div class="settingsHint" id="settingsToastDebug">debug line: —</div>
           </section>
-          <section class="settingsCard" style="grid-column:1/-1">
+          <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
             <h3>ログ</h3>
             <div class="settingsLog" id="settingsLog">準備完了</div>
           </section>
@@ -5112,7 +5129,7 @@ body, #appRoot, .appRoot, .mainLayout{
       </div>
       <div class="settingsTabPanel" data-settings-tabpanel="license" role="tabpanel">
         <div class="settingsGrid">
-          <section class="settingsCard" style="grid-column:1/-1">
+          <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
             <h3>ライセンス/アクティベート</h3>
             <div class="settingsBlock">
               <div class="settingsBlockTitle">ライセンスキー</div>
@@ -5147,8 +5164,8 @@ body, #appRoot, .appRoot, .mainLayout{
                 </div>
                 <div class="settingsInfoRow">
                   <span class="muted">端末ID</span>
-                  <span class="settingsInfoValue">
-                    <span id="settingsDeviceId">—</span>
+                  <span class="settingsInfoValue settingsDeviceIdValue">
+                    <span class="settingsDeviceIdText" id="settingsDeviceId" title="端末ID">—</span>
                     <button class="btn" id="settingsDeviceIdCopy" type="button">コピー</button>
                   </span>
                 </div>
