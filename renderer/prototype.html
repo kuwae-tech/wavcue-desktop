@@ -5119,22 +5119,16 @@ body, #appRoot, .appRoot, .mainLayout{
               <div class="settingsLicenseRow">
                 <input class="txt" id="settingsLicenseKey" placeholder="ライセンスキーを入力" type="text"/>
                 <button class="btn good" id="settingsLicenseActivate" type="button">有効化</button>
-                <button class="btn danger" id="settingsLicenseClear" type="button">解除</button>
               </div>
               <div class="settingsStatus" id="settingsLicenseStatus"></div>
               <div class="settingsError" id="settingsLicenseError"></div>
-              <div class="muted">未認証の状態は常にDEMOとして扱われます。</div>
-              <div class="muted">有効化にはインターネット接続が必要です。</div>
-              <div class="muted">端末変更（移行）は最大2回まで。超過時はサポート対応となります。</div>
-              <div class="muted">ライセンスサーバー未設定の状態では移行は利用できません。</div>
             </div>
             <div class="settingsBlock">
               <div class="settingsBlockTitle">移行（端末変更）</div>
               <div class="settingsLicenseRow">
                 <button class="btn" id="settingsLicenseTransfer" type="button">移行</button>
+                <span class="muted" id="settingsLicenseTransferRemainingInline">残り: —</span>
               </div>
-              <div class="settingsError" id="settingsLicenseTransferNote"></div>
-              <div class="settingsStatus" id="settingsLicenseTransferSuccess"></div>
             </div>
             <div class="settingsBlock">
               <div class="settingsBlockTitle">現在の状態</div>
@@ -6431,9 +6425,6 @@ function handleDeactivateSuccess(){
   try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){}
   const st = window.WavCueLicense?.getStateSafe?.();
   if(st) applyAllLicenseUi(st);
-  if(settingsLicenseTransferSuccess){
-    settingsLicenseTransferSuccess.textContent = "解除しました。別端末で同じキーを入力して有効化してください。";
-  }
   if(window.safeToast){
     window.safeToast("解除しました。別端末で同じキーを入力して有効化してください", "ok", 3200);
   }
@@ -6521,13 +6512,11 @@ function updateActivationUi(state){
   const settingsStatus = document.getElementById("settingsLicenseStatus");
   const settingsError = document.getElementById("settingsLicenseError");
   const settingsActivate = document.getElementById("settingsLicenseActivate");
-  const settingsClear = document.getElementById("settingsLicenseClear");
   if(settingsInput){
     settingsInput.value = maskedKey || "";
     settingsInput.disabled = isActivated;
   }
   if(settingsActivate) settingsActivate.disabled = isActivated;
-  if(settingsClear) settingsClear.disabled = !isActivated;
   if(settingsStatus){
     settingsStatus.textContent = isActivated ? `有効化済み（${tier.toUpperCase()}）` : "";
   }
@@ -6535,9 +6524,6 @@ function updateActivationUi(state){
   if(settingsLicenseTransfer){
     const hasKey = !!storedKey;
     settingsLicenseTransfer.disabled = !hasServerUrl || !hasKey;
-  }
-  if(settingsLicenseTransferNote){
-    settingsLicenseTransferNote.textContent = hasServerUrl ? "" : "ライセンスサーバーが未設定のため、移行は利用できません。";
   }
 }
 function isDemoPromptDone(){
@@ -6589,6 +6575,14 @@ function updateLicenseInfo(state){
   if(settingsDeviceId){
     const deviceId = window.WavCueLicense?.getDeviceId?.();
     settingsDeviceId.textContent = deviceId || "—";
+  }
+  if(settingsLicenseTransferRemainingInline){
+    const remaining = state?.transfer?.remainingTransfers;
+    if(Number.isFinite(remaining)){
+      settingsLicenseTransferRemainingInline.textContent = `残り: ${remaining}回`;
+    }else{
+      settingsLicenseTransferRemainingInline.textContent = "残り: —";
+    }
   }
   if(settingsLicenseTransferRemainingRow){
     const remaining = state?.transfer?.remainingTransfers;
@@ -12761,16 +12755,14 @@ const settingsResetRecommended = $("settingsResetRecommended");
 const settingsRulesBadge = $("settingsRulesBadge");
 const settingsLicenseKey = $("settingsLicenseKey");
 const settingsLicenseActivate = $("settingsLicenseActivate");
-const settingsLicenseClear = $("settingsLicenseClear");
 const settingsLicenseTransfer = $("settingsLicenseTransfer");
-const settingsLicenseTransferNote = $("settingsLicenseTransferNote");
-const settingsLicenseTransferSuccess = $("settingsLicenseTransferSuccess");
 const settingsLicenseStatus = $("settingsLicenseStatus");
 const settingsLicenseError = $("settingsLicenseError");
 const settingsLicensePlan = $("settingsLicensePlan");
 const settingsLicenseDemoRemaining = $("settingsLicenseDemoRemaining");
 const settingsLicenseTransferRemainingRow = $("settingsLicenseTransferRemainingRow");
 const settingsLicenseTransferRemaining = $("settingsLicenseTransferRemaining");
+const settingsLicenseTransferRemainingInline = $("settingsLicenseTransferRemainingInline");
 const settingsDeviceId = $("settingsDeviceId");
 const settingsDeviceIdCopy = $("settingsDeviceIdCopy");
 const settingsLicenseDebugOverride = $("settingsLicenseDebugOverride");
@@ -13002,15 +12994,17 @@ licenseTransferConfirm?.addEventListener("click", (e)=>{ if(e.target === license
 licenseTransferConfirmOk?.addEventListener("click", async ()=>{
   closeLicenseTransferConfirm();
   const serverUrl = normalizeServerUrl(window.WavCueLicense?.getServerUrl?.() || "");
-  if(settingsLicenseTransferNote) settingsLicenseTransferNote.textContent = "";
-  if(settingsLicenseTransferSuccess) settingsLicenseTransferSuccess.textContent = "";
   if(!serverUrl){
-    if(settingsLicenseTransferNote) settingsLicenseTransferNote.textContent = "ライセンスサーバーが未設定のため、移行は利用できません。";
+    if(window.safeToast) window.safeToast("ライセンスサーバーが未設定のため移行できません。", "warn", 2600);
+    return;
+  }
+  if(navigator.onLine === false){
+    if(window.safeToast) window.safeToast("インターネット未接続のため移行できません。接続後に再度お試しください。", "warn", 3200);
     return;
   }
   const licenseKey = getStoredLicenseKey();
   if(!licenseKey){
-    if(settingsLicenseTransferNote) settingsLicenseTransferNote.textContent = "ライセンスキーが未入力です。";
+    if(window.safeToast) window.safeToast("ライセンスキーが未入力です。", "warn", 2600);
     return;
   }
   const deviceId = window.WavCueLicense?.getDeviceId?.();
@@ -13029,14 +13023,14 @@ licenseTransferConfirmOk?.addEventListener("click", async ()=>{
     if(!response.ok || !json?.ok){
       const code = json?.code || response.status || "error";
       const message = json?.message || response.statusText || "deactivate failed";
-      if(settingsLicenseTransferNote) settingsLicenseTransferNote.textContent = message;
       console.log(`[License] deactivate failed: ${code}/${message}`);
+      if(window.safeToast) window.safeToast(message || "移行に失敗しました。", "warn", 3200);
       return;
     }
     handleDeactivateSuccess();
   }catch(e){
-    if(settingsLicenseTransferNote) settingsLicenseTransferNote.textContent = "通信に失敗しました。ネットワークをご確認ください。";
     console.log(`[License] deactivate failed: ${e?.message || "network-error"}`);
+    if(window.safeToast) window.safeToast("通信に失敗しました。ネットワークをご確認ください。", "warn", 3200);
   }
 });
 
@@ -13062,6 +13056,15 @@ const runActivationFlow = async (source)=>{
   const errorEl = isOverlay ? activationOverlayError : settingsLicenseError;
   const rawKey = String(keyInput?.value || "").trim();
   if(errorEl) errorEl.textContent = "";
+  if(navigator.onLine === false){
+    if(window.safeToast) window.safeToast("インターネット未接続のため有効化できません。接続後に再度お試しください。", "warn", 3200);
+    return;
+  }
+  const serverUrl = window.WavCueLicense?.getServerUrl?.() || "";
+  if(!String(serverUrl).trim()){
+    if(window.safeToast) window.safeToast("ライセンスサーバーが未設定のため有効化できません。", "warn", 2600);
+    return;
+  }
   if(!rawKey){
     if(errorEl) errorEl.textContent = "キーを入力してください";
     return;
@@ -13090,8 +13093,18 @@ activationOverlayContinue?.addEventListener("click", ()=>{
   try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
   activationOverlay?.classList.remove("show");
 });
-settingsLicenseClear?.addEventListener("click", ()=> openLicenseClearConfirm());
-settingsLicenseTransfer?.addEventListener("click", ()=> openLicenseTransferConfirm());
+settingsLicenseTransfer?.addEventListener("click", ()=>{
+  const serverUrl = normalizeServerUrl(window.WavCueLicense?.getServerUrl?.() || "");
+  if(!serverUrl){
+    if(window.safeToast) window.safeToast("ライセンスサーバーが未設定のため移行できません。", "warn", 2600);
+    return;
+  }
+  if(navigator.onLine === false){
+    if(window.safeToast) window.safeToast("インターネット未接続のため移行できません。接続後に再度お試しください。", "warn", 3200);
+    return;
+  }
+  openLicenseTransferConfirm();
+});
 settingsDeviceIdCopy?.addEventListener("click", async ()=>{
   const deviceId = window.WavCueLicense?.getDeviceId?.();
   if(!deviceId) return;
