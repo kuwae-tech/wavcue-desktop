@@ -5490,6 +5490,15 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     }
     return raw;
   };
+  const makeSafeRegExp = (pattern, flags)=>{
+    try{
+      return new RegExp(pattern, flags);
+    }catch(_){
+      const invalidFlags = new RegExp("[^gimsuy]", "g");
+      const safeFlags = String(flags || "").replace(invalidFlags, "");
+      return new RegExp(pattern, safeFlags);
+    }
+  };
   const ensureDeviceId = ()=>{
     const existing = readText(LS_DEVICE_ID).trim();
     if(existing) return existing;
@@ -5844,7 +5853,8 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       };
       let response;
       try{
-        response = await fetch(`${serverUrl.replace(/\\/$/, "")}/v1/activate`, {
+        const urlRoot = serverUrl.replace(makeSafeRegExp("\\/$", ""), "");
+        response = await fetch(`${urlRoot}/v1/activate`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
