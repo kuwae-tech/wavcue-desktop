@@ -918,6 +918,13 @@
   .dialogShell .modalHead,
   .dialogShell .dlgHead{padding-right:52px}
   .dialogShell .modalBody{padding-right:52px}
+  /* --- settings dialog padding balance (keep dialog size; shift content slightly right) --- */
+  .settingsDialog .modalHead,
+  .settingsDialog .modalBody{
+    padding-left:30px;
+    padding-right:44px;
+  }
+  /* --- /settings dialog padding balance --- */
   .dialogShellBare{padding-top:36px;padding-right:36px}
   .modalCloseBtn{
     position:absolute;
@@ -1344,6 +1351,7 @@
   .attachListWrap{margin:10px 0 6px;}
   .attachListHead{display:flex;align-items:center;justify-content:space-between;margin:0 0 6px 0;}
   .attachCount{font-size:12px; opacity:.75;}
+  .attachLimit{font-size:12px; opacity:.8;}
   .attachList{border:1px solid rgba(255,255,255,.16); border-radius:14px; background:rgba(255,255,255,.03); max-height:220px; overflow:auto; padding:6px;}
   .attachItem{display:flex; gap:10px; align-items:flex-start; padding:8px 10px; border-radius:12px; cursor:pointer; user-select:none;}
   .attachItem:hover{background:rgba(255,255,255,.05);}
@@ -4820,7 +4828,7 @@ body, #appRoot, .appRoot, .mainLayout{
 </dialog><!-- ===== PDF ATTACH ===== --><dialog class="dlg" id="pdfAttachDialog"><div class="dlgHead"><div class="dlgTitle">ファイル添付</div></div><div class="dlgSub"><span class="attachDescSmall">
       CSV / PDF / XML / TEXT をWAVへ添付します。既に添付があるWAVを読み込んだ場合もここで確認できます。
     </span>
-    </div><div class=\"pdfZone\" id="pdfAttachDrop"><div class="attachHintBox"><div class="pdfZoneTitle">ここにファイルをドラッグ＆ドロップ</div><div class="pdfZoneSub">または <button class="btn" id="btnPdfAttachPick" type="button">ファイルを選択</button><input accept=".pdf,.csv,.xml,.txt,.text,application/pdf,text/csv,application/csv,application/xml,text/xml,text/plain" id="pdfAttachInput" style="display:none" type="file"/></div><div class="pdfZoneHint">最大9件 / ドラッグで順序を変更できます</div></div></div><div class="attachListWrap"><div class="attachListHead"><div>添付一覧</div><div class="attachCount" id="attachCount">0/9</div></div><div class="attachList" id="attachList" role="listbox" aria-label="添付一覧"></div><div class="attachOrderHint">上から順に <b>#1〜#9</b> として扱われます（並び替えで番号が変わります）</div></div><div class="pdfActions"><button class="btn" id="btnPdfAttachView">確認（ビューア）</button><button class="btn" disabled="" id="btnPdfAttachDownload">ダウンロード</button><button class="btn" id="btnPdfAttachClear">解除</button></div><div class="pdfGrid" style="grid-template-columns: 1fr;"><label class="pdfRow"><span class="pdfKey">添付ファイル名</span><input class="pdfVal" id="pdfAttachName" placeholder="未添付" readonly=""/></label><label class="pdfRow"><span class="pdfKey">状態</span><input class="pdfVal" id="pdfAttachStatus" placeholder="未添付" readonly=""/></label></div></dialog><dialog class="dlg" id="pdfViewDialog" style="max-width:min(1100px, 96vw); width:min(1100px, 96vw);"><div class="dlgHead"><div class="dlgTitle">添付ファイルビューア</div></div><div class="pdfViewerWrap"><iframe class="pdfViewerFrame" id="pdfViewerFrame" title="PDF Viewer"></iframe><textarea class="fileTextPreview" id="fileTextPreview" readonly="" spellcheck="false"></textarea></div></dialog><!-- ===== /PDF ATTACH ===== -->
+    </div><div class=\"pdfZone\" id="pdfAttachDrop"><div class="attachHintBox"><div class="pdfZoneTitle">ここにファイルをドラッグ＆ドロップ</div><div class="pdfZoneSub">または <button class="btn" id="btnPdfAttachPick" type="button">ファイルを選択</button><input accept=".pdf,.csv,.xml,.txt,.text,application/pdf,text/csv,application/csv,application/xml,text/xml,text/plain" id="pdfAttachInput" style="display:none" type="file"/></div></div></div><div class="attachListWrap"><div class="attachListHead"><div>添付一覧</div><div style="display:flex;align-items:center;gap:10px"><div class="attachLimit">（最大9件）</div><div class="attachCount" id="attachCount">0/9</div></div></div><div class="attachList" id="attachList" role="listbox" aria-label="添付一覧"></div><div class="attachOrderHint">上から順に <b>#1〜#9</b> として扱われます（並び替えで番号が変わります）</div></div><div class="pdfActions"><button class="btn" id="btnPdfAttachView">確認（ビューア）</button><button class="btn" disabled="" id="btnPdfAttachDownload">ダウンロード</button><button class="btn" id="btnPdfAttachClear">解除</button></div></dialog><dialog class="dlg" id="pdfViewDialog" style="max-width:min(1100px, 96vw); width:min(1100px, 96vw);"><div class="dlgHead"><div class="dlgTitle">添付ファイルビューア</div></div><div class="pdfViewerWrap"><iframe class="pdfViewerFrame" id="pdfViewerFrame" title="PDF Viewer"></iframe><textarea class="fileTextPreview" id="fileTextPreview" readonly="" spellcheck="false"></textarea></div></dialog><!-- ===== /PDF ATTACH ===== -->
 <!-- ===== Export Check (pre-export modal) ===== -->
 <dialog class="exportCheckDialog" id="exportCheckDialog">
 <div class="modalHead ecModalHead">
@@ -5416,6 +5424,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const LS_STANDARD_GRACE_STARTED_AT = "wavcue_std_grace_started_at";
   const LS_STANDARD_GRACE_EXPIRES_AT = "wavcue_std_grace_expires_at";
   const LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT = "wavcue_std_grace_modal_shown_for_started_at";
+  const LS_DEBUG_TIER_OVERRIDE = "wavcue_debug_tier_override";
 
   const readNumber = (key)=>{
     try{
@@ -5799,13 +5808,29 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     return { ...base, tier, demo, standard };
   };
 
+
+  const getDebugOverrideTier = ()=>{
+    try{
+      const val = String(localStorage?.getItem?.(LS_DEBUG_TIER_OVERRIDE) || "").toLowerCase();
+      if(val === "demo" || val === "standard" || val === "pro") return val;
+      return null;
+    }catch(_){
+      return null;
+    }
+  };
+  const withDebugTier = (st)=>{
+    const override = getDebugOverrideTier();
+    if(!override || !st) return st;
+    return { ...st, tier: override, source: `${st.source || "state"}+debug` };
+  };
+
   const getStateSafeInternal = (options = {})=>{
     try{
       const certState = loadCertificateState({ logBoot: false });
-      return buildState({ ...stateCache, ...certState }, options);
+      return withDebugTier(buildState({ ...stateCache, ...certState }, options));
     }catch(e){
       console.error("[License] non-fatal", e);
-      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
+      return withDebugTier(buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options));
     }
   };
 
@@ -10696,6 +10721,8 @@ function renderCmcdForm(){
 // ===============================
 const CMCD_PRESET_STORAGE_KEY = "wavcue_cmcd_presets_v1";
 const CMCD_PRESET_ORDER_STORAGE_KEY = "wavcue_cmcd_preset_order_v1";
+const CMCD_LAST_PRESET_STORAGE_KEY = "wavcue_last_cmcd_preset";
+const QC_LAST_PRESET_STORAGE_KEY = "wavcue_last_qc_preset";
 
 function _cmcdLoadPresetOrder(){
   if(state.cmcdPresetOrderLoaded) return state.cmcdPresetOrder || [];
@@ -11023,7 +11050,8 @@ function _cmcdPopulatePresetSelects(){
 
   const sel = $("cmcd_preset");
   if(sel){
-    const keep = (state.cmcdPresetId || "");
+    const saved = (()=>{ try{ return localStorage?.getItem?.(CMCD_LAST_PRESET_STORAGE_KEY) || ""; }catch(_){ return ""; } })();
+    const keep = (state.cmcdPresetId || saved || "");
     sel.innerHTML = "";
     const o0 = document.createElement("option");
     o0.value = "";
@@ -11036,6 +11064,7 @@ function _cmcdPopulatePresetSelects(){
       sel.appendChild(o);
     }
     sel.value = (keep && _cmcdGetPresetById(keep)) ? keep : "";
+    state.cmcdPresetId = sel.value || "";
   }
 
   const pick = $("cmcd_pm_pick");
@@ -11135,6 +11164,10 @@ function setupCmcdDialog(){
   $("cmcd_preset")?.addEventListener("change", (e)=>{
     const id = (e.target && e.target.value) ? String(e.target.value) : "";
     state.cmcdPresetId = id;
+    try{
+      if(id) localStorage?.setItem?.(CMCD_LAST_PRESET_STORAGE_KEY, id);
+      else localStorage?.removeItem?.(CMCD_LAST_PRESET_STORAGE_KEY);
+    }catch(_){}
     if(id) {
       undoCheckpoint();
       _cmcdApplyPreset(id);
@@ -15056,8 +15089,11 @@ function _scPopulatePresetSelect(){
       opt.textContent = p.name + (isCustom ? "（カスタム）" : "");
       sel.appendChild(opt);
     }
-    const cur = state.qcPresetId || CFG.QC_DEFAULT_PRESET_ID || (list[0] && list[0].id);
+    const saved = (()=>{ try{ return localStorage?.getItem?.(QC_LAST_PRESET_STORAGE_KEY) || ""; }catch(_){ return ""; } })();
+    const preferred = (saved && list.some(p=>p.id===saved)) ? saved : "";
+    const cur = preferred || state.qcPresetId || CFG.QC_DEFAULT_PRESET_ID || (list[0] && list[0].id);
     if(cur) sel.value = cur;
+    state.qcPresetId = sel.value || state.qcPresetId || null;
   }
 
   // preset pick (for editing)
@@ -16260,6 +16296,7 @@ function _scWire(){
         return;
       }
       state.qcPresetId = $("sc_preset").value;
+      try{ if(state.qcPresetId) localStorage?.setItem?.(QC_LAST_PRESET_STORAGE_KEY, state.qcPresetId); }catch(_){}
       _scRenderTargets(_scGetPresetById(state.qcPresetId));
       _scUpdatePresetDesc();
       state.qcHasRun = false;
