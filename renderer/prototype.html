@@ -915,9 +915,17 @@
   }
   .modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);position:relative}
   .dlgHead{position:relative}
+  /* --- dialogShell padding balance (keep dialog size; shift inner content slightly right) --- */
   .dialogShell .modalHead,
-  .dialogShell .dlgHead{padding-right:52px}
-  .dialogShell .modalBody{padding-right:52px}
+  .dialogShell .dlgHead{
+    padding-right:52px;
+    padding-left:32px;
+  }
+  .dialogShell .modalBody{
+    padding-right:52px;
+    padding-left:32px;
+  }
+  /* --- /dialogShell padding balance --- */
   .dialogShellBare{padding-top:36px;padding-right:36px}
   .modalCloseBtn{
     position:absolute;
