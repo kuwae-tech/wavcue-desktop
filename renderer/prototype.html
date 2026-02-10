@@ -999,6 +999,19 @@
     padding-left:12px;
     padding-right:12px;
   }
+  .settingsDialog .licenseStatusGrid{
+    display:grid;
+    grid-template-columns: 1fr auto;
+    column-gap:16px;
+    row-gap:8px;
+  }
+  .settingsDialog .licenseStatusMain{
+    min-width:0;
+  }
+  .settingsDialog .licenseStatusSide{
+    justify-self:end;
+    text-align:right;
+  }
   .settingsDialog .settingsDeviceIdValue{
     display:flex;
     align-items:center;
@@ -5040,7 +5053,7 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="settingsTabPanels">
       <div class="settingsTabPanel active" data-settings-tabpanel="backup" role="tabpanel">
         <div class="settingsGrid">
-          <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
+          <section class="settingsCard" style="grid-column:1/-1">
             <h3>バックアップ管理</h3>
             <div class="muted" id="settingsBackupDemoNote" style="display:none;margin-top:-4px;margin-bottom:8px;">Demoではバックアップ機能は利用できません。</div>
             <div class="settingsBlock">
@@ -5148,33 +5161,38 @@ body, #appRoot, .appRoot, .mainLayout{
               </div>
             </div>
             <div class="settingsBlock">
-              <div class="settingsBlockTitle">現在の状態</div>
-              <div class="settingsInfoList">
-                <div class="settingsInfoRow">
-                  <span class="muted">現在のプラン</span>
-                  <span class="settingsInfoValue" id="settingsLicensePlan">—</span>
+              <div class="licenseStatusGrid">
+                <div class="licenseStatusMain">
+                  <div class="settingsBlockTitle">機能制限</div>
+                  <ul class="muted settingsLimitList" id="settingsLicenseLimits"></ul>
                 </div>
-                <div class="settingsInfoRow">
-                  <span class="muted">DEMO残り</span>
-                  <span class="settingsInfoValue" id="settingsLicenseDemoRemaining">—</span>
+                <div class="licenseStatusSide">
+                  <div class="settingsBlockTitle">現在の状態</div>
+                  <div class="settingsInfoList">
+                    <div class="settingsInfoRow">
+                      <span class="muted">現在のプラン</span>
+                      <span class="settingsInfoValue" id="settingsLicensePlan">—</span>
+                    </div>
+                    <div class="settingsInfoRow">
+                      <span class="muted">DEMO残り</span>
+                      <span class="settingsInfoValue" id="settingsLicenseDemoRemaining">—</span>
+                    </div>
+                    <div class="settingsInfoRow" id="settingsLicenseTransferRemainingRow" style="display:none">
+                      <span class="muted">移行残り</span>
+                      <span class="settingsInfoValue" id="settingsLicenseTransferRemaining">—</span>
+                    </div>
+                    <div class="settingsInfoRow">
+                      <span class="muted">端末ID</span>
+                      <span class="settingsInfoValue settingsDeviceIdValue">
+                        <span class="settingsDeviceIdText" id="settingsDeviceId" title="端末ID">—</span>
+                        <button class="btn" id="settingsDeviceIdCopy" type="button">コピー</button>
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <div class="settingsInfoRow" id="settingsLicenseTransferRemainingRow" style="display:none">
-                  <span class="muted">移行残り</span>
-                  <span class="settingsInfoValue" id="settingsLicenseTransferRemaining">—</span>
-                </div>
-                <div class="settingsInfoRow">
-                  <span class="muted">端末ID</span>
-                  <span class="settingsInfoValue settingsDeviceIdValue">
-                    <span class="settingsDeviceIdText" id="settingsDeviceId" title="端末ID">—</span>
-                    <button class="btn" id="settingsDeviceIdCopy" type="button">コピー</button>
-                  </span>
-                </div>
+              </div>
+              <div class="muted" id="settingsLicenseDebugOverride" style="font-size:11px;margin-top:6px"></div>
             </div>
-            <div class="muted" id="settingsLicenseDebugOverride" style="font-size:11px;margin-top:6px"></div>
-          </div>
-          <div class="settingsBlock">
-            <div class="settingsBlockTitle">機能制限</div>
-            <ul class="muted settingsLimitList" id="settingsLicenseLimits"></ul>
           </div>
         </section>
       </div>
