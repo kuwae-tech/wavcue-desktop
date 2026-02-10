@@ -5424,7 +5424,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const LS_STANDARD_GRACE_STARTED_AT = "wavcue_std_grace_started_at";
   const LS_STANDARD_GRACE_EXPIRES_AT = "wavcue_std_grace_expires_at";
   const LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT = "wavcue_std_grace_modal_shown_for_started_at";
-  const LS_DEBUG_TIER_OVERRIDE = "wavcue_debug_tier_override";
 
   const readNumber = (key)=>{
     try{
@@ -5910,28 +5909,13 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   };
 
 
-  const getDebugOverrideTier = ()=>{
-    try{
-      const val = String(localStorage?.getItem?.(LS_DEBUG_TIER_OVERRIDE) || "").toLowerCase();
-      if(val === "demo" || val === "standard" || val === "pro") return val;
-      return null;
-    }catch(_){
-      return null;
-    }
-  };
-  const withDebugTier = (st)=>{
-    const override = getDebugOverrideTier();
-    if(!override || !st) return st;
-    return { ...st, tier: override, source: `${st.source || "state"}+debug` };
-  };
-
   const getStateSafeInternal = (options = {})=>{
     try{
       const certState = loadCertificateState({ logBoot: false });
-      return withDebugTier(buildState({ ...stateCache, ...certState }, options));
+      return buildState({ ...stateCache, ...certState }, options);
     }catch(e){
       console.error("[License] non-fatal", e);
-      return withDebugTier(buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options));
+      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
     }
   };
 
@@ -6118,111 +6102,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     _refreshState("cert-clear", { touchOnline: false });
   };
 
-  const debug = {
-    resetDemo: ()=>{
-      resetDemoTrial();
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] resetDemo");
-    },
-    setDemoActivatedAt: (ts)=>{
-      const stamp = Number.isFinite(ts) ? ts : Date.now();
-      writeNumber(LS_DEMO_ACTIVATED_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setDemoActivatedAt", stamp);
-      return stamp;
-    },
-    forceDemoExpired: ()=>{
-      const expiredAt = Date.now() - (DEMO_TRIAL_MS + 1000);
-      writeNumber(LS_DEMO_ACTIVATED_AT, expiredAt);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] forceDemoExpired", expiredAt);
-    },
-    setDemoExportOkCount: (n)=>{
-      const count = setDemoExportOkCount(n);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setDemoExportOkCount", count);
-      return count;
-    },
-    setStandardLastOnlineOkAt: (ms)=>{
-      const stamp = Number.isFinite(ms) ? ms : Date.now();
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setStandardLastOnlineOkAt", stamp);
-      return stamp;
-    },
-    setStandardAuthFresh: (fresh)=>{
-      const stamp = fresh ? Date.now() : (Date.now() - (STANDARD_AUTH_FRESH_MS + 1000));
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setStandardAuthFresh", !!fresh);
-      return stamp;
-    },
-    forceStandardAuthStale: ()=>{
-      const stamp = Date.now() - (STANDARD_AUTH_FRESH_MS + 1000);
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] forceStandardAuthStale", stamp);
-      return stamp;
-    },
-    getDebugState: ()=>{
-      const st = _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] state", st);
-      return st;
-    },
-    expireDemoNow: ()=>{
-      const expiredAt = Date.now() - (DEMO_TRIAL_MS + 1000);
-      writeNumber(LS_DEMO_ACTIVATED_AT, expiredAt);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] expireDemoNow");
-      return expiredAt;
-    },
-    resetDemoLimits: ()=>{
-      const now = Date.now();
-      writeNumber(LS_DEMO_ACTIVATED_AT, now);
-      writeNumber(LS_DEMO_EXPORT_OK_COUNT, 0);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] resetDemoLimits");
-      return now;
-    },
-    setStandardAuthLastOkAt: (ms)=>{
-      const stamp = Number.isFinite(ms) ? ms : Date.now();
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setStandardAuthLastOkAt", stamp);
-      return stamp;
-    },
-    expireStandardAuthNow: ()=>{
-      const stamp = Date.now() - (STANDARD_AUTH_FRESH_MS + 1000);
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] expireStandardAuthNow");
-      return stamp;
-    },
-    startStandardGraceNow: ()=>{
-      const now = Date.now();
-      const stamp = now - (STANDARD_AUTH_FRESH_MS + 1000);
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      writeStandardGraceState(now, now + STANDARD_AUTH_GRACE_MS);
-      writeNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT, null);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] startStandardGraceNow", now);
-      return now;
-    },
-    forceStandardHardExpireNow: ()=>{
-      const now = Date.now();
-      const stamp = now - (STANDARD_AUTH_FRESH_MS + 1000);
-      const startedAt = now - (STANDARD_AUTH_GRACE_MS + 60 * 1000);
-      const expiresAt = now - (60 * 1000);
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      writeStandardGraceState(startedAt, expiresAt);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] forceStandardHardExpireNow", { startedAt, expiresAt });
-      return { startedAt, expiresAt };
-    },
-    refreshLicense: ()=>{
-      return _refreshState("debug", { touchOnline: false });
-    },
-  };
 
   return {
     init,
@@ -6240,7 +6119,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     setServerUrlOverride,
     clearCertificateSafe,
     LICENSE_TEXT,
-    debug,
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
 })();
@@ -6256,18 +6134,6 @@ window.WavCueLicense = {
   getServerUrl: LicenseCore.getServerUrl,
   setServerUrlOverride: LicenseCore.setServerUrlOverride,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
-  debug: LicenseCore.debug,
-  __debugSetDemoActivatedAt: LicenseCore.debug.setDemoActivatedAt,
-  __debugSetDemoExportOkCount: LicenseCore.debug.setDemoExportOkCount,
-  __debugSetStandardLastOnlineOkAt: LicenseCore.debug.setStandardLastOnlineOkAt,
-  __debugSetStandardAuthFresh: LicenseCore.debug.setStandardAuthFresh,
-  __debugExpireDemoNow: LicenseCore.debug.expireDemoNow,
-  __debugResetDemoLimits: LicenseCore.debug.resetDemoLimits,
-  __debugSetStandardAuthLastOkAt: LicenseCore.debug.setStandardAuthLastOkAt,
-  __debugExpireStandardAuthNow: LicenseCore.debug.expireStandardAuthNow,
-  __debugStartStandardGraceNow: LicenseCore.debug.startStandardGraceNow,
-  __debugForceStandardHardExpireNow: LicenseCore.debug.forceStandardHardExpireNow,
-  __debugRefreshLicense: LicenseCore.debug.refreshLicense,
 };
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
@@ -6419,7 +6285,6 @@ const LICENSE_EXTRA_KEYS = [
   LICENSE_CERTIFICATE_KEY,
   LICENSE_SERVER_URL_OVERRIDE_KEY,
 ];
-const DEBUG_TIER_OVERRIDE_KEY = "wavcue_debug_tier_override";
 let _licenseRestoreDone = false;
 
 function getStoredLicenseKey(){
@@ -6444,33 +6309,7 @@ function setSettingsTab(tabName){
   try{ localStorage?.setItem?.(SETTINGS_TAB_KEY, tab); }catch(_){}
   return tab;
 }
-function getDebugTierOverride(){
-  try{
-    const raw = localStorage?.getItem?.(DEBUG_TIER_OVERRIDE_KEY);
-    const val = String(raw || "").toLowerCase();
-    if(val === "demo" || val === "standard" || val === "pro") return val;
-    return null;
-  }catch(_){
-    return null;
-  }
-}
-function isValidDebugToken(token){
-  const value = String(token || "");
-  if(!value.startsWith("WCDBG:")) return false;
-  if(!value.includes("NORI-KAERU")) return false;
-  if(!value.includes("@")) return false;
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const suffix = `${y}${m}${d}`.slice(-4);
-  return value.endsWith(suffix);
-}
-function applyDebugOverride(state){
-  const override = getDebugTierOverride();
-  if(!override || !state) return state;
-  return { ...state, tier: override, source: `${state.source || "state"}+debug` };
-}
+
 function getStoredSettingsTab(){
   try{
     const raw = localStorage?.getItem?.(SETTINGS_TAB_KEY);
@@ -6535,7 +6374,6 @@ function clearLicenseKeySafe(){
   }catch(_){}
   try{ window.WavCueLicense?.clearCertificateSafe?.(); }catch(_){}
   try{ window.WavCueLicense?.resetDemoTrial?.(); }catch(_){}
-  try{ window.WavCueLicense?.__debugRefreshLicense?.(); }catch(_){}
 }
 function clearLicenseResiduals(){
   try{
@@ -6577,7 +6415,7 @@ function updateOfflineStandardBanner(state){
   }
 }
 function applyAllLicenseUi(state){
-  const next = applyDebugOverride(state);
+  const next = state;
   try{ updateTierBadge(next); }catch(_){}
   try{ applyProUi(next); }catch(_){}
   try{ applyLicenseUi(next); }catch(_){}
@@ -6600,60 +6438,7 @@ if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "functio
     return { ok: true };
   };
 }
-window.WavCueLicenseDebug = {
-  switchTier: (targetTier, token)=>{
-    const tier = String(targetTier || "").toLowerCase();
-    if(!isValidDebugToken(token) || !["demo","standard","pro"].includes(tier)){
-      console.warn("[DBG] invalid token");
-      return false;
-    }
-    try{ localStorage?.setItem?.(DEBUG_TIER_OVERRIDE_KEY, tier); }catch(_){}
-    const st = window.WavCueLicense?.getStateSafe?.();
-    if(st) applyAllLicenseUi(st);
-    console.log("[DBG] tier override ->", tier);
-    return true;
-  },
-  clearOverride: (token)=>{
-    if(!isValidDebugToken(token)){
-      console.warn("[DBG] invalid token");
-      return false;
-    }
-    try{ localStorage?.removeItem?.(DEBUG_TIER_OVERRIDE_KEY); }catch(_){}
-    const st = window.WavCueLicense?.getStateSafe?.();
-    if(st) applyAllLicenseUi(st);
-    console.log("[DBG] tier override ->", "cleared");
-    return true;
-  },
-};
-window.__licenseDebug = {
-  status: ()=>{
-    const st = window.WavCueLicense?.getStateSafe?.();
-    return {
-      tier: String(st?.tier || "demo").toLowerCase(),
-      hasCert: !!st?.hasCert,
-      deviceId: window.WavCueLicense?.getDeviceId?.(),
-      serverUrl: window.WavCueLicense?.getServerUrl?.(),
-    };
-  },
-  clearCert: ()=>{
-    window.WavCueLicense?.clearCertificateSafe?.();
-    try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){}
-    const st = window.WavCueLicense?.getStateSafe?.();
-    if(st) applyAllLicenseUi(st);
-    return { ok: true };
-  },
-  setServerUrl: (url)=>{
-    const next = window.WavCueLicense?.setServerUrlOverride?.(url);
-    return { ok: true, serverUrl: next || window.WavCueLicense?.getServerUrl?.() || "" };
-  },
-  simulateDeactivateSuccess: ()=>{
-    handleDeactivateSuccess();
-    return { ok: true };
-  },
-  getDeviceId: ()=>{
-    return window.WavCueLicense?.getDeviceId?.();
-  },
-};
+
 function updateActivationUi(state){
   const tierRaw = state && state.tier ? state.tier : "demo";
   const tier = String(tierRaw).toLowerCase();
@@ -6732,10 +6517,7 @@ function updateLicenseInfo(state){
     : "—";
   if(settingsLicenseDemoRemaining) settingsLicenseDemoRemaining.textContent = remainText;
   const storedKey = getStoredLicenseKey();
-  const override = getDebugTierOverride();
-  if(settingsLicenseDebugOverride){
-    settingsLicenseDebugOverride.textContent = override ? `開発者用: debug override = ${override}` : "";
-  }
+  if(settingsLicenseDebugOverride) settingsLicenseDebugOverride.textContent = "";
   if(settingsDeviceId){
     const deviceId = window.WavCueLicense?.getDeviceId?.();
     settingsDeviceId.textContent = deviceId || "—";
