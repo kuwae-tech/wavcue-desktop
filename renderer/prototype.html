@@ -974,6 +974,9 @@
     flex-direction:column;
     gap:10px;
     height:100%;
+    overflow:hidden;
+  }
+  .settingsDialog [data-settings-tabpanel="license"]{
     overflow:auto;
   }
   .settingsDialog .settingsTabPanel.active{
@@ -1130,7 +1133,17 @@
     display:flex;
     align-items:center;
     justify-content:space-between;
+    gap:10px;
+  }
+  .settingsDialog .settingsBlockTitleActions{
+    display:flex;
+    align-items:center;
     gap:8px;
+  }
+  .settingsDialog .settingsResetBtn{
+    padding:5px 10px;
+    font-size:11px;
+    white-space:nowrap;
   }
   .settingsDialog .settingsBadge{
     display:inline-flex;
@@ -1154,9 +1167,11 @@
     padding:10px;
     font-size:12px;
     white-space:pre-wrap;
-    min-height:120px;
-    max-height:200px;
-    overflow:auto;
+    height:96px;
+    min-height:96px;
+    max-height:96px;
+    overflow-y:auto;
+    overflow-x:hidden;
     font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     color:rgba(229,231,235,.9);
   }
@@ -5069,7 +5084,6 @@ body, #appRoot, .appRoot, .mainLayout{
               <div class="row" style="gap:8px;flex-wrap:wrap">
                 <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
                 <button class="btn danger" id="settingsCleanupNow" type="button">今すぐ完全クリーンアップ</button>
-                <button class="btn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
               </div>
               <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
               <div class="muted" id="settingsCleanupResult"></div>
@@ -5091,7 +5105,10 @@ body, #appRoot, .appRoot, .mainLayout{
             <div class="settingsBlock">
               <div class="settingsBlockTitleRow">
                 <div class="settingsBlockTitle">保存ルール</div>
-                <span class="settingsBadge" id="settingsRulesBadge">推奨</span>
+                <div class="settingsBlockTitleActions">
+                  <span class="settingsBadge" id="settingsRulesBadge">推奨</span>
+                  <button class="btn settingsResetBtn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
+                </div>
               </div>
               <div class="rulesCard">
                 <div class="rulesGrid">
@@ -5104,7 +5121,7 @@ body, #appRoot, .appRoot, .mainLayout{
                       <option value="90">90日</option>
                       <option value="36500">無制限（注意）</option>
                     </select>
-                    <span class="fieldNote">無制限は容量が増え続けます</span>
+                    <span class="fieldNote is-empty">　</span>
                   </label>
                   <label class="settingsField">
                     <span class="muted">使用容量上限</span>
@@ -5133,14 +5150,13 @@ body, #appRoot, .appRoot, .mainLayout{
                       <option value="trash">ゴミ箱へ移動（推奨）</option>
                       <option value="delete">完全に削除（注意）</option>
                     </select>
-                    <span class="fieldNote">完全削除は元に戻せません</span>
+                    <span class="fieldNote is-empty">　</span>
                   </label>
                 </div>
               </div>
               <div class="rulesNote">保存期間と容量上限のどちらかに到達すると、古いものから削除されます（最低保持数は残します）</div>
             </div>
             <button class="btn" id="settingsSave" type="button">設定を保存</button>
-            <div class="settingsHint" id="settingsToastDebug">debug line: —</div>
           </section>
           <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
             <h3>ログ</h3>
@@ -12877,7 +12893,9 @@ const lockSettingsTabHeight = ()=>{
   const wrap = document.querySelector(".settingsTabPanels");
   const backupPanel = document.querySelector('[data-settings-tabpanel="backup"]');
   if(!wrap || !backupPanel) return;
-  const height = backupPanel.getBoundingClientRect().height;
+  const panelRectHeight = backupPanel.getBoundingClientRect().height;
+  const contentHeight = backupPanel.scrollHeight;
+  const height = Math.max(panelRectHeight, contentHeight);
   if(height > 0){
     wrap.style.height = `${Math.ceil(height)}px`;
     _settingsTabHeightLocked = true;
