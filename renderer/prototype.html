@@ -5403,7 +5403,11 @@ const licenseVerifyUiState = {
   visible: false,
 };
 const setLicenseVerifyBadgeVisible = (visible)=>{
-  licenseVerifyUiState.visible = !!visible;
+  const nextVisible = !!visible;
+  if(licenseVerifyUiState.visible !== nextVisible){
+    console.log(`[LicenseUI] busy=${nextVisible ? "true" : "false"}`);
+  }
+  licenseVerifyUiState.visible = nextVisible;
   const badge = document.getElementById("licenseVerifyBadge");
   if(badge) badge.classList.toggle("show", licenseVerifyUiState.visible);
 };
@@ -6025,7 +6029,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     const stdBlocked = next.standard?.exportBlockedReason || "none";
     const summary = `${next.tier}|${demoBlocked}|${stdStrict}|${stdInGrace}|${stdHardExpired}|${stdBlocked}`;
     const isChange = summary !== _lastRefreshSummary;
-    const shouldLog = (reason === "debug" || reason === "key")
+    const shouldLog = (reason === "debug" || reason === "key" || reason === "storage-watch")
       || (reason === "tick" && isChange);
     if(shouldLog){
       console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} strict=${stdStrict} grace=${stdInGrace} hard=${stdHardExpired} stdExportBlocked=${stdBlocked}`);
@@ -6194,6 +6198,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     clearCertificate();
     _refreshState("cert-clear", { touchOnline: false });
   };
+  const refreshFromStorageWatch = ()=> _refreshState("storage-watch", { touchOnline: false });
 
 
   return {
@@ -6211,6 +6216,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     getServerUrl,
     setServerUrlOverride,
     clearCertificateSafe,
+    refreshFromStorageWatch,
     LICENSE_TEXT,
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
@@ -6227,9 +6233,58 @@ window.WavCueLicense = {
   getServerUrl: LicenseCore.getServerUrl,
   setServerUrlOverride: LicenseCore.setServerUrlOverride,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
+  refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
 };
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
+
+const LICENSE_STORAGE_WATCH_KEYS = [
+  "wavcue_license_certificate_v1",
+  "wavcue_license_key",
+];
+const _licenseStorageWatchState = {
+  cert: null,
+  key: null,
+};
+const readLicenseWatchValue = (key)=>{
+  try{
+    const raw = localStorage?.getItem?.(key);
+    return raw == null ? "" : String(raw);
+  }catch(_){
+    return "";
+  }
+};
+const runLicenseStorageWatchRefresh = async ()=>{
+  const endVerify = beginLicenseVerification("storage-watch");
+  try{
+    const st = await Promise.resolve(window.WavCueLicense?.refreshFromStorageWatch?.());
+    if(st) applyAllLicenseUi(st);
+  }catch(e){
+    console.error("[License] non-fatal", e);
+  }finally{
+    endVerify();
+  }
+};
+const startLicenseStorageWatch = ()=>{
+  _licenseStorageWatchState.cert = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[0]);
+  _licenseStorageWatchState.key = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[1]);
+  setInterval(()=>{
+    const nextCert = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[0]);
+    const nextKey = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[1]);
+    if(nextCert !== _licenseStorageWatchState.cert){
+      console.log(`[License][watch] changed key=${LICENSE_STORAGE_WATCH_KEYS[0]} from=${JSON.stringify(_licenseStorageWatchState.cert)} to=${JSON.stringify(nextCert)}`);
+      _licenseStorageWatchState.cert = nextCert;
+      void runLicenseStorageWatchRefresh();
+      return;
+    }
+    if(nextKey !== _licenseStorageWatchState.key){
+      console.log(`[License][watch] changed key=${LICENSE_STORAGE_WATCH_KEYS[1]} from=${JSON.stringify(_licenseStorageWatchState.key)} to=${JSON.stringify(nextKey)}`);
+      _licenseStorageWatchState.key = nextKey;
+      void runLicenseStorageWatchRefresh();
+    }
+  }, 200);
+};
+startLicenseStorageWatch();
 
 const LICENSE_TEXT = LicenseCore.LICENSE_TEXT;
 let _tierBadgeLast = null;
@@ -6918,6 +6973,56 @@ window._guardExportSingle = guardExport;
 window._guardHistory = guardHistory;
 window._guardPreset = guardPreset;
 window._guardBackup = guardBackup;
+
+window.__wavcueLicenseTest = {
+  installTimestampLogger: ()=>{
+    const logger = console;
+    if(logger.__wavcueTimestampWrapped) return;
+    const wrap = (method)=>{
+      const original = logger[method]?.bind(logger);
+      if(typeof original !== "function") return;
+      logger[`__wavcueOriginal_${method}`] = original;
+      logger[method] = (...args)=> original(new Date().toISOString(), ...args);
+    };
+    wrap("log");
+    wrap("warn");
+    wrap("error");
+    logger.__wavcueTimestampWrapped = true;
+    console.log("[LicenseTest] timestamp logger installed");
+  },
+  makeFakeToken: (tier)=>{
+    const normalizedTier = String(tier || "demo").toLowerCase();
+    const safeTier = (normalizedTier === "pro" || normalizedTier === "standard") ? normalizedTier : "demo";
+    let deviceId = "";
+    try{ deviceId = String(localStorage?.getItem?.("wavcue_device_id_v1") || ""); }catch(_){ deviceId = ""; }
+    if(!deviceId){
+      deviceId = window.WavCueLicense?.getDeviceId?.() || "";
+    }
+    const payload = { v: 1, deviceId: String(deviceId || ""), tier: safeTier };
+    const payloadJson = JSON.stringify(payload);
+    const bytes = (typeof TextEncoder !== "undefined") ? new TextEncoder().encode(payloadJson) : Uint8Array.from(Array.from(payloadJson).map(ch=> ch.charCodeAt(0)));
+    let b64 = "";
+    if(typeof Buffer !== "undefined"){
+      b64 = Buffer.from(bytes).toString("base64");
+    }else{
+      let binary = "";
+      bytes.forEach((b)=>{ binary += String.fromCharCode(b); });
+      b64 = btoa(binary);
+    }
+    const b64url = b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    return `${b64url}.AA`;
+  },
+  setCert: (tier)=>{
+    const token = window.__wavcueLicenseTest.makeFakeToken(tier);
+    try{ localStorage?.setItem?.("wavcue_license_certificate_v1", token); }catch(_){ }
+    void runLicenseStorageWatchRefresh();
+    return token;
+  },
+  clearCert: ()=>{
+    try{ localStorage?.removeItem?.("wavcue_license_certificate_v1"); }catch(_){ }
+    void runLicenseStorageWatchRefresh();
+  },
+};
 
 (() => {
 "use strict";
