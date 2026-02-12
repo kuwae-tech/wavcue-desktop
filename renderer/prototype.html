@@ -12893,7 +12893,9 @@ const lockSettingsTabHeight = ()=>{
   const wrap = document.querySelector(".settingsTabPanels");
   const backupPanel = document.querySelector('[data-settings-tabpanel="backup"]');
   if(!wrap || !backupPanel) return;
-  const height = backupPanel.getBoundingClientRect().height;
+  const panelRectHeight = backupPanel.getBoundingClientRect().height;
+  const contentHeight = backupPanel.scrollHeight;
+  const height = Math.max(panelRectHeight, contentHeight);
   if(height > 0){
     wrap.style.height = `${Math.ceil(height)}px`;
     _settingsTabHeightLocked = true;
