@@ -1154,8 +1154,8 @@
     padding:10px;
     font-size:12px;
     white-space:pre-wrap;
-    min-height:120px;
-    max-height:200px;
+    min-height:82px;
+    max-height:120px;
     overflow:auto;
     font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     color:rgba(229,231,235,.9);
@@ -1205,6 +1205,11 @@
   .settingsDialog .rulesNote{
     font-size:11px;
     color:rgba(229,231,235,.65);
+  }
+  .settingsDialog .settingsRuleActions{
+    margin-top:6px;
+    display:flex;
+    justify-content:flex-end;
   }
   .settingsDialog .fieldNote{
     font-size:10px;
@@ -5069,7 +5074,6 @@ body, #appRoot, .appRoot, .mainLayout{
               <div class="row" style="gap:8px;flex-wrap:wrap">
                 <button class="btn" data-settings-folder="backups" type="button">バックアップを開く</button>
                 <button class="btn danger" id="settingsCleanupNow" type="button">今すぐ完全クリーンアップ</button>
-                <button class="btn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
               </div>
               <div class="muted" id="settingsBackupStatus">バックアップ状況: —</div>
               <div class="muted" id="settingsCleanupResult"></div>
@@ -5104,7 +5108,7 @@ body, #appRoot, .appRoot, .mainLayout{
                       <option value="90">90日</option>
                       <option value="36500">無制限（注意）</option>
                     </select>
-                    <span class="fieldNote">無制限は容量が増え続けます</span>
+                    <span class="fieldNote is-empty">　</span>
                   </label>
                   <label class="settingsField">
                     <span class="muted">使用容量上限</span>
@@ -5133,14 +5137,16 @@ body, #appRoot, .appRoot, .mainLayout{
                       <option value="trash">ゴミ箱へ移動（推奨）</option>
                       <option value="delete">完全に削除（注意）</option>
                     </select>
-                    <span class="fieldNote">完全削除は元に戻せません</span>
+                    <span class="fieldNote is-empty">　</span>
                   </label>
                 </div>
               </div>
               <div class="rulesNote">保存期間と容量上限のどちらかに到達すると、古いものから削除されます（最低保持数は残します）</div>
+              <div class="settingsRuleActions">
+                <button class="btn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
+              </div>
             </div>
             <button class="btn" id="settingsSave" type="button">設定を保存</button>
-            <div class="settingsHint" id="settingsToastDebug">debug line: —</div>
           </section>
           <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
             <h3>ログ</h3>
