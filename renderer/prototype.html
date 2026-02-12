@@ -5618,7 +5618,23 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     return value;
   };
   const readCertificate = ()=>{
-    const raw = readText(LS_CERTIFICATE);
+    let raw = readText(LS_CERTIFICATE);
+    if(!raw){
+      const fallbackRaw = readText(LS_KEY_LAST);
+      if(fallbackRaw){
+        const fallbackParsed = parseMaybeJson(fallbackRaw);
+        const fallbackToken = String(fallbackRaw || "").trim();
+        const fallbackParts = fallbackToken.split(".");
+        const fallbackIsToken = !!(fallbackToken && !/\s/.test(fallbackToken) && fallbackParts.length === 2 && fallbackParts[0] && fallbackParts[1]);
+        const fallbackIsObject = !!(fallbackParsed && typeof fallbackParsed === "object");
+        if(fallbackIsToken || fallbackIsObject){
+          raw = fallbackRaw;
+          writeText(LS_CERTIFICATE, fallbackRaw);
+          writeText(LS_KEY_LAST, null);
+          console.log("[License] migrated wavcue_license_key -> wavcue_license_certificate_v1");
+        }
+      }
+    }
     if(!raw) return null;
     const parsed = parseMaybeJson(raw);
     if(parsed && typeof parsed === "object") return parsed;
