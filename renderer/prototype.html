@@ -2109,6 +2109,25 @@
   .toast.ok{ border-color: rgba(53,208,127,.45); }
   .toast.warn{ border-color: rgba(255,210,74,.45); }
   .toast.err{ border-color: rgba(255,91,110,.45); }
+  .toast,
+  .toast:focus,
+  .toast:focus-within,
+  .toastHost:focus,
+  .toastHost:focus-within,
+  dialog.toastLayer:focus,
+  dialog.toastLayer:focus-visible{
+    outline: none !important;
+  }
+  .toast button:focus,
+  .toast .btn:focus{
+    outline: none;
+  }
+  .toast button:focus-visible,
+  .toast .btn:focus-visible{
+    outline: none !important;
+    border-color: rgba(126,193,255,.66) !important;
+    box-shadow: 0 0 0 2px rgba(126,193,255,.34), 0 0 0 6px rgba(126,193,255,.16) !important;
+  }
 
   /* Toast top-layer (always above any dialog) */
   dialog.toastLayer{
