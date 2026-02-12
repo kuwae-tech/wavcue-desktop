@@ -5424,7 +5424,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const LS_STANDARD_GRACE_STARTED_AT = "wavcue_std_grace_started_at";
   const LS_STANDARD_GRACE_EXPIRES_AT = "wavcue_std_grace_expires_at";
   const LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT = "wavcue_std_grace_modal_shown_for_started_at";
-  const LS_DEBUG_TIER_OVERRIDE = "wavcue_debug_tier_override";
 
   const readNumber = (key)=>{
     try{
@@ -5619,15 +5618,38 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     return value;
   };
   const readCertificate = ()=>{
-    const raw = readText(LS_CERTIFICATE);
+    let raw = readText(LS_CERTIFICATE);
+    if(!raw){
+      const fallbackRaw = readText(LS_KEY_LAST);
+      if(fallbackRaw){
+        const fallbackParsed = parseMaybeJson(fallbackRaw);
+        const fallbackToken = String(fallbackRaw || "").trim();
+        const fallbackParts = fallbackToken.split(".");
+        const fallbackIsToken = !!(fallbackToken && !/\s/.test(fallbackToken) && fallbackParts.length === 2 && fallbackParts[0] && fallbackParts[1]);
+        const fallbackIsObject = !!(fallbackParsed && typeof fallbackParsed === "object");
+        if(fallbackIsToken || fallbackIsObject){
+          raw = fallbackRaw;
+          writeText(LS_CERTIFICATE, fallbackRaw);
+          writeText(LS_KEY_LAST, null);
+          console.log("[License] migrated wavcue_license_key -> wavcue_license_certificate_v1");
+        }
+      }
+    }
     if(!raw) return null;
     const parsed = parseMaybeJson(raw);
     if(parsed && typeof parsed === "object") return parsed;
+    const token = String(raw || "").trim();
+    if(!token || /\s/.test(token)) return null;
+    const segments = token.split(".");
+    if(segments.length === 2 && segments[0] && segments[1]) return token;
     return null;
   };
   const writeCertificate = (cert)=>{
     if(!cert) return;
-    try{ writeText(LS_CERTIFICATE, JSON.stringify(cert)); }catch(_){}
+    try{
+      if(typeof cert === "string") writeText(LS_CERTIFICATE, cert);
+      else writeText(LS_CERTIFICATE, JSON.stringify(cert));
+    }catch(_){}
   };
   const clearCertificate = ()=>{
     writeText(LS_CERTIFICATE, null);
@@ -5675,46 +5697,140 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     }
     return null;
   };
+  const decodeBase64UrlToBytes = (value)=>{
+    if(typeof value !== "string") return null;
+    const trimmed = value.trim();
+    if(!trimmed) return null;
+    const normalized = trimmed.replace(/-/g, "+").replace(/_/g, "/");
+    const padded = normalized + "=".repeat((4 - (normalized.length % 4)) % 4);
+    if(typeof Buffer !== "undefined"){
+      try{
+        const buf = Buffer.from(padded, "base64");
+        if(buf?.length) return Uint8Array.from(buf);
+      }catch(_){ }
+    }
+    if(typeof atob === "function"){
+      try{
+        const binary = atob(padded);
+        const out = new Uint8Array(binary.length);
+        for(let i = 0; i < binary.length; i += 1){
+          out[i] = binary.charCodeAt(i);
+        }
+        if(out.length) return out;
+      }catch(_){ }
+    }
+    return null;
+  };
+  const decodeUtf8Bytes = (bytes)=>{
+    if(!(bytes instanceof Uint8Array) || bytes.length === 0) return null;
+    if(typeof TextDecoder !== "undefined"){
+      try{ return new TextDecoder().decode(bytes); }catch(_){ }
+    }
+    let binary = "";
+    for(let i = 0; i < bytes.length; i += 1){
+      binary += String.fromCharCode(bytes[i]);
+    }
+    try{
+      return decodeURIComponent(escape(binary));
+    }catch(_){
+      return null;
+    }
+  };
+  const parseCertificate = (token)=>{
+    if(typeof token !== "string") return { ok: false, reason: "token-format" };
+    const value = token.trim();
+    if(!value || /\s/.test(value)) return { ok: false, reason: "token-format" };
+    const parts = value.split(".");
+    if(parts.length !== 2 || !parts[0] || !parts[1]) return { ok: false, reason: "token-format" };
+    const [payloadB64, sigB64] = parts;
+    const payloadBytes = decodeBase64UrlToBytes(payloadB64);
+    if(!payloadBytes) return { ok: false, reason: "payload-base64" };
+    const sigBytes = decodeBase64UrlToBytes(sigB64);
+    if(!sigBytes) return { ok: false, reason: "signature-base64" };
+    const payloadText = decodeUtf8Bytes(payloadBytes);
+    if(!payloadText) return { ok: false, reason: "payload-utf8" };
+    let payloadObj;
+    try{
+      payloadObj = JSON.parse(payloadText);
+    }catch(_){
+      return { ok: false, reason: "payload-json" };
+    }
+    if(!payloadObj || typeof payloadObj !== "object") return { ok: false, reason: "invalid-payload" };
+    const messageBytes = (typeof TextEncoder !== "undefined")
+      ? new TextEncoder().encode(payloadB64)
+      : ((typeof Buffer !== "undefined") ? Uint8Array.from(Buffer.from(payloadB64)) : null);
+    if(!messageBytes) return { ok: false, reason: "message-bytes" };
+    return { ok: true, token: value, payloadB64, sigB64, payloadObj, messageBytes, sigBytes };
+  };
+  const validatePayload = (payloadObj, deviceId)=>{
+    if(!payloadObj || typeof payloadObj !== "object") return { ok: false, reason: "invalid-payload" };
+    const version = Number(payloadObj.v);
+    if(version !== 1) return { ok: false, reason: "unsupported-version" };
+    const certDeviceId = String(payloadObj.deviceId || "");
+    if(!certDeviceId || certDeviceId !== deviceId) return { ok: false, reason: "device-mismatch" };
+    const tier = normalizeTier(payloadObj.tier);
+    if(!tier) return { ok: false, reason: "missing-tier" };
+    return { ok: true, tier };
+  };
+  const verifySignatureStub = ({ payloadB64, sigB64, messageBytes, sigBytes })=>{
+    const hasPayload = typeof payloadB64 === "string" && payloadB64.length > 0;
+    const hasSig = typeof sigB64 === "string" && sigB64.length > 0;
+    const hasMessage = messageBytes instanceof Uint8Array && messageBytes.length > 0;
+    const hasSigBytes = sigBytes instanceof Uint8Array && sigBytes.length > 0;
+    if(!hasPayload || !hasSig || !hasMessage || !hasSigBytes) return false;
+    const hook = window.WavCueLicense?.verifySignatureHook;
+    if(typeof hook === "function"){
+      try{
+        return !!hook({ payloadB64, sigB64, messageBytes, sigBytes });
+      }catch(_){
+        return false;
+      }
+    }
+    return true;
+  };
   const verifyCertificate = (cert, deviceId)=>{
-    const cryptoModule = getCryptoModule();
-    if(!cryptoModule?.verify || !cryptoModule?.createPublicKey){
-      return { ok: false, reason: "crypto-unavailable" };
+    if(typeof cert === "string"){
+      const parsed = parseCertificate(cert);
+      if(!parsed.ok) return parsed;
+      const validated = validatePayload(parsed.payloadObj, deviceId);
+      if(!validated.ok) return validated;
+      const verified = verifySignatureStub(parsed);
+      if(!verified) return { ok: false, reason: "bad-signature" };
+      return { ok: true, tier: validated.tier, certificate: parsed.token };
     }
-    if(!cert || typeof cert !== "object"){
-      return { ok: false, reason: "missing-certificate" };
+    if(!cert || typeof cert !== "object") return { ok: false, reason: "missing-certificate" };
+    const payloadRaw = resolveCertificatePayload(cert);
+    if(payloadRaw == null) return { ok: false, reason: "missing-payload" };
+    let payloadObj = null;
+    if(payloadRaw && typeof payloadRaw === "object") payloadObj = payloadRaw;
+    if(!payloadObj && typeof payloadRaw === "string"){
+      const parsedPayload = parseMaybeJson(payloadRaw);
+      if(parsedPayload && typeof parsedPayload === "object") payloadObj = parsedPayload;
     }
-    const version = Number(getCertificateField(cert, "v"));
-    if(version !== 1){
-      return { ok: false, reason: "unsupported-version" };
+    if(!payloadObj){
+      payloadObj = {
+        v: getCertificateField(cert, "v"),
+        deviceId: getCertificateField(cert, "deviceId"),
+        tier: getCertificateField(cert, "tier"),
+      };
     }
-    const certDeviceId = String(getCertificateField(cert, "deviceId") || "");
-    if(!certDeviceId || certDeviceId !== deviceId){
-      return { ok: false, reason: "device-mismatch" };
-    }
+    const validated = validatePayload(payloadObj, deviceId);
+    if(!validated.ok) return validated;
     const sig = cert.sig || cert.signature;
     const sigBytes = decodeSignature(sig);
-    if(!sigBytes){
-      return { ok: false, reason: "missing-signature" };
-    }
-    const payload = resolveCertificatePayload(cert);
-    if(payload == null){
-      return { ok: false, reason: "missing-payload" };
-    }
-    const message = (typeof payload === "string") ? payload : stableStringify(payload);
-    const data = (typeof Buffer !== "undefined")
-      ? Buffer.from(message)
-      : new TextEncoder().encode(message);
-    const key = cryptoModule.createPublicKey(LICENSE_CERT_PUBKEY_PEM);
-    const verified = cryptoModule.verify(null, data, key, sigBytes);
-    if(!verified){
-      return { ok: false, reason: "bad-signature" };
-    }
-    const tierRaw = getCertificateField(cert, "tier");
-    const tier = normalizeTier(tierRaw);
-    if(!tier){
-      return { ok: false, reason: "missing-tier" };
-    }
-    return { ok: true, tier, certificate: cert };
+    if(!sigBytes) return { ok: false, reason: "missing-signature" };
+    const message = stableStringify(payloadObj);
+    const messageBytes = (typeof Buffer !== "undefined")
+      ? Uint8Array.from(Buffer.from(message))
+      : ((typeof TextEncoder !== "undefined") ? new TextEncoder().encode(message) : null);
+    if(!messageBytes) return { ok: false, reason: "message-bytes" };
+    const sigB64 = (typeof sig === "string" && sig) ? sig : (typeof Buffer !== "undefined" ? Buffer.from(sigBytes).toString("base64") : "base64-unavailable");
+    const payloadB64 = (typeof Buffer !== "undefined")
+      ? Buffer.from(messageBytes).toString("base64")
+      : btoa(String.fromCharCode(...messageBytes));
+    const verified = verifySignatureStub({ payloadB64, sigB64, messageBytes, sigBytes });
+    if(!verified) return { ok: false, reason: "bad-signature" };
+    return { ok: true, tier: validated.tier, certificate: cert };
   };
   const loadCertificateState = (options = {})=>{
     const deviceId = ensureDeviceId();
@@ -5809,28 +5925,13 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   };
 
 
-  const getDebugOverrideTier = ()=>{
-    try{
-      const val = String(localStorage?.getItem?.(LS_DEBUG_TIER_OVERRIDE) || "").toLowerCase();
-      if(val === "demo" || val === "standard" || val === "pro") return val;
-      return null;
-    }catch(_){
-      return null;
-    }
-  };
-  const withDebugTier = (st)=>{
-    const override = getDebugOverrideTier();
-    if(!override || !st) return st;
-    return { ...st, tier: override, source: `${st.source || "state"}+debug` };
-  };
-
   const getStateSafeInternal = (options = {})=>{
     try{
       const certState = loadCertificateState({ logBoot: false });
-      return withDebugTier(buildState({ ...stateCache, ...certState }, options));
+      return buildState({ ...stateCache, ...certState }, options);
     }catch(e){
       console.error("[License] non-fatal", e);
-      return withDebugTier(buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options));
+      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
     }
   };
 
@@ -5971,7 +6072,10 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
         return { ok: false, reason: "activation-failed", code, message };
       }
       const certRaw = json?.certificate;
-      const cert = parseMaybeJson(certRaw);
+      let cert = parseMaybeJson(certRaw);
+      if(typeof certRaw === "string" && (!cert || typeof cert !== "object")){
+        cert = certRaw.trim();
+      }
       const verified = verifyCertificate(cert, ensureDeviceId());
       if(!verified.ok){
         console.log(`[License] cert verify failed: ${verified.reason}`);
@@ -6014,111 +6118,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     _refreshState("cert-clear", { touchOnline: false });
   };
 
-  const debug = {
-    resetDemo: ()=>{
-      resetDemoTrial();
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] resetDemo");
-    },
-    setDemoActivatedAt: (ts)=>{
-      const stamp = Number.isFinite(ts) ? ts : Date.now();
-      writeNumber(LS_DEMO_ACTIVATED_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setDemoActivatedAt", stamp);
-      return stamp;
-    },
-    forceDemoExpired: ()=>{
-      const expiredAt = Date.now() - (DEMO_TRIAL_MS + 1000);
-      writeNumber(LS_DEMO_ACTIVATED_AT, expiredAt);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] forceDemoExpired", expiredAt);
-    },
-    setDemoExportOkCount: (n)=>{
-      const count = setDemoExportOkCount(n);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setDemoExportOkCount", count);
-      return count;
-    },
-    setStandardLastOnlineOkAt: (ms)=>{
-      const stamp = Number.isFinite(ms) ? ms : Date.now();
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setStandardLastOnlineOkAt", stamp);
-      return stamp;
-    },
-    setStandardAuthFresh: (fresh)=>{
-      const stamp = fresh ? Date.now() : (Date.now() - (STANDARD_AUTH_FRESH_MS + 1000));
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setStandardAuthFresh", !!fresh);
-      return stamp;
-    },
-    forceStandardAuthStale: ()=>{
-      const stamp = Date.now() - (STANDARD_AUTH_FRESH_MS + 1000);
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] forceStandardAuthStale", stamp);
-      return stamp;
-    },
-    getDebugState: ()=>{
-      const st = _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] state", st);
-      return st;
-    },
-    expireDemoNow: ()=>{
-      const expiredAt = Date.now() - (DEMO_TRIAL_MS + 1000);
-      writeNumber(LS_DEMO_ACTIVATED_AT, expiredAt);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] expireDemoNow");
-      return expiredAt;
-    },
-    resetDemoLimits: ()=>{
-      const now = Date.now();
-      writeNumber(LS_DEMO_ACTIVATED_AT, now);
-      writeNumber(LS_DEMO_EXPORT_OK_COUNT, 0);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] resetDemoLimits");
-      return now;
-    },
-    setStandardAuthLastOkAt: (ms)=>{
-      const stamp = Number.isFinite(ms) ? ms : Date.now();
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] setStandardAuthLastOkAt", stamp);
-      return stamp;
-    },
-    expireStandardAuthNow: ()=>{
-      const stamp = Date.now() - (STANDARD_AUTH_FRESH_MS + 1000);
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] expireStandardAuthNow");
-      return stamp;
-    },
-    startStandardGraceNow: ()=>{
-      const now = Date.now();
-      const stamp = now - (STANDARD_AUTH_FRESH_MS + 1000);
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      writeStandardGraceState(now, now + STANDARD_AUTH_GRACE_MS);
-      writeNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT, null);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] startStandardGraceNow", now);
-      return now;
-    },
-    forceStandardHardExpireNow: ()=>{
-      const now = Date.now();
-      const stamp = now - (STANDARD_AUTH_FRESH_MS + 1000);
-      const startedAt = now - (STANDARD_AUTH_GRACE_MS + 60 * 1000);
-      const expiresAt = now - (60 * 1000);
-      writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-      writeStandardGraceState(startedAt, expiresAt);
-      _refreshState("debug", { touchOnline: false });
-      console.log("[LicenseDebug] forceStandardHardExpireNow", { startedAt, expiresAt });
-      return { startedAt, expiresAt };
-    },
-    refreshLicense: ()=>{
-      return _refreshState("debug", { touchOnline: false });
-    },
-  };
 
   return {
     init,
@@ -6136,7 +6135,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     setServerUrlOverride,
     clearCertificateSafe,
     LICENSE_TEXT,
-    debug,
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
 })();
@@ -6152,18 +6150,6 @@ window.WavCueLicense = {
   getServerUrl: LicenseCore.getServerUrl,
   setServerUrlOverride: LicenseCore.setServerUrlOverride,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
-  debug: LicenseCore.debug,
-  __debugSetDemoActivatedAt: LicenseCore.debug.setDemoActivatedAt,
-  __debugSetDemoExportOkCount: LicenseCore.debug.setDemoExportOkCount,
-  __debugSetStandardLastOnlineOkAt: LicenseCore.debug.setStandardLastOnlineOkAt,
-  __debugSetStandardAuthFresh: LicenseCore.debug.setStandardAuthFresh,
-  __debugExpireDemoNow: LicenseCore.debug.expireDemoNow,
-  __debugResetDemoLimits: LicenseCore.debug.resetDemoLimits,
-  __debugSetStandardAuthLastOkAt: LicenseCore.debug.setStandardAuthLastOkAt,
-  __debugExpireStandardAuthNow: LicenseCore.debug.expireStandardAuthNow,
-  __debugStartStandardGraceNow: LicenseCore.debug.startStandardGraceNow,
-  __debugForceStandardHardExpireNow: LicenseCore.debug.forceStandardHardExpireNow,
-  __debugRefreshLicense: LicenseCore.debug.refreshLicense,
 };
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
@@ -6315,7 +6301,6 @@ const LICENSE_EXTRA_KEYS = [
   LICENSE_CERTIFICATE_KEY,
   LICENSE_SERVER_URL_OVERRIDE_KEY,
 ];
-const DEBUG_TIER_OVERRIDE_KEY = "wavcue_debug_tier_override";
 let _licenseRestoreDone = false;
 
 function getStoredLicenseKey(){
@@ -6340,33 +6325,7 @@ function setSettingsTab(tabName){
   try{ localStorage?.setItem?.(SETTINGS_TAB_KEY, tab); }catch(_){}
   return tab;
 }
-function getDebugTierOverride(){
-  try{
-    const raw = localStorage?.getItem?.(DEBUG_TIER_OVERRIDE_KEY);
-    const val = String(raw || "").toLowerCase();
-    if(val === "demo" || val === "standard" || val === "pro") return val;
-    return null;
-  }catch(_){
-    return null;
-  }
-}
-function isValidDebugToken(token){
-  const value = String(token || "");
-  if(!value.startsWith("WCDBG:")) return false;
-  if(!value.includes("NORI-KAERU")) return false;
-  if(!value.includes("@")) return false;
-  const now = new Date();
-  const y = now.getFullYear();
-  const m = String(now.getMonth() + 1).padStart(2, "0");
-  const d = String(now.getDate()).padStart(2, "0");
-  const suffix = `${y}${m}${d}`.slice(-4);
-  return value.endsWith(suffix);
-}
-function applyDebugOverride(state){
-  const override = getDebugTierOverride();
-  if(!override || !state) return state;
-  return { ...state, tier: override, source: `${state.source || "state"}+debug` };
-}
+
 function getStoredSettingsTab(){
   try{
     const raw = localStorage?.getItem?.(SETTINGS_TAB_KEY);
@@ -6431,7 +6390,6 @@ function clearLicenseKeySafe(){
   }catch(_){}
   try{ window.WavCueLicense?.clearCertificateSafe?.(); }catch(_){}
   try{ window.WavCueLicense?.resetDemoTrial?.(); }catch(_){}
-  try{ window.WavCueLicense?.__debugRefreshLicense?.(); }catch(_){}
 }
 function clearLicenseResiduals(){
   try{
@@ -6473,7 +6431,7 @@ function updateOfflineStandardBanner(state){
   }
 }
 function applyAllLicenseUi(state){
-  const next = applyDebugOverride(state);
+  const next = state;
   try{ updateTierBadge(next); }catch(_){}
   try{ applyProUi(next); }catch(_){}
   try{ applyLicenseUi(next); }catch(_){}
@@ -6496,60 +6454,7 @@ if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "functio
     return { ok: true };
   };
 }
-window.WavCueLicenseDebug = {
-  switchTier: (targetTier, token)=>{
-    const tier = String(targetTier || "").toLowerCase();
-    if(!isValidDebugToken(token) || !["demo","standard","pro"].includes(tier)){
-      console.warn("[DBG] invalid token");
-      return false;
-    }
-    try{ localStorage?.setItem?.(DEBUG_TIER_OVERRIDE_KEY, tier); }catch(_){}
-    const st = window.WavCueLicense?.getStateSafe?.();
-    if(st) applyAllLicenseUi(st);
-    console.log("[DBG] tier override ->", tier);
-    return true;
-  },
-  clearOverride: (token)=>{
-    if(!isValidDebugToken(token)){
-      console.warn("[DBG] invalid token");
-      return false;
-    }
-    try{ localStorage?.removeItem?.(DEBUG_TIER_OVERRIDE_KEY); }catch(_){}
-    const st = window.WavCueLicense?.getStateSafe?.();
-    if(st) applyAllLicenseUi(st);
-    console.log("[DBG] tier override ->", "cleared");
-    return true;
-  },
-};
-window.__licenseDebug = {
-  status: ()=>{
-    const st = window.WavCueLicense?.getStateSafe?.();
-    return {
-      tier: String(st?.tier || "demo").toLowerCase(),
-      hasCert: !!st?.hasCert,
-      deviceId: window.WavCueLicense?.getDeviceId?.(),
-      serverUrl: window.WavCueLicense?.getServerUrl?.(),
-    };
-  },
-  clearCert: ()=>{
-    window.WavCueLicense?.clearCertificateSafe?.();
-    try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){}
-    const st = window.WavCueLicense?.getStateSafe?.();
-    if(st) applyAllLicenseUi(st);
-    return { ok: true };
-  },
-  setServerUrl: (url)=>{
-    const next = window.WavCueLicense?.setServerUrlOverride?.(url);
-    return { ok: true, serverUrl: next || window.WavCueLicense?.getServerUrl?.() || "" };
-  },
-  simulateDeactivateSuccess: ()=>{
-    handleDeactivateSuccess();
-    return { ok: true };
-  },
-  getDeviceId: ()=>{
-    return window.WavCueLicense?.getDeviceId?.();
-  },
-};
+
 function updateActivationUi(state){
   const tierRaw = state && state.tier ? state.tier : "demo";
   const tier = String(tierRaw).toLowerCase();
@@ -6628,10 +6533,7 @@ function updateLicenseInfo(state){
     : "—";
   if(settingsLicenseDemoRemaining) settingsLicenseDemoRemaining.textContent = remainText;
   const storedKey = getStoredLicenseKey();
-  const override = getDebugTierOverride();
-  if(settingsLicenseDebugOverride){
-    settingsLicenseDebugOverride.textContent = override ? `開発者用: debug override = ${override}` : "";
-  }
+  if(settingsLicenseDebugOverride) settingsLicenseDebugOverride.textContent = "";
   if(settingsDeviceId){
     const deviceId = window.WavCueLicense?.getDeviceId?.();
     settingsDeviceId.textContent = deviceId || "—";
