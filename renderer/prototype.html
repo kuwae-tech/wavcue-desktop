@@ -1135,11 +1135,10 @@
     justify-content:space-between;
     gap:10px;
   }
-  .settingsDialog .settingsBlockTitleMain{
+  .settingsDialog .settingsBlockTitleActions{
     display:flex;
     align-items:center;
     gap:8px;
-    min-width:0;
   }
   .settingsDialog .settingsResetBtn{
     padding:5px 10px;
@@ -5105,11 +5104,11 @@ body, #appRoot, .appRoot, .mainLayout{
             </div>
             <div class="settingsBlock">
               <div class="settingsBlockTitleRow">
-                <div class="settingsBlockTitleMain">
+                <div class="settingsBlockTitle">保存ルール</div>
+                <div class="settingsBlockTitleActions">
+                  <span class="settingsBadge" id="settingsRulesBadge">推奨</span>
                   <button class="btn settingsResetBtn" id="settingsResetRecommended" type="button">設定を初期化（推奨に戻す）</button>
-                  <div class="settingsBlockTitle">保存ルール</div>
                 </div>
-                <span class="settingsBadge" id="settingsRulesBadge">推奨</span>
               </div>
               <div class="rulesCard">
                 <div class="rulesGrid">
