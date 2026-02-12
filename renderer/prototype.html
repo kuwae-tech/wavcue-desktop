@@ -109,6 +109,23 @@
   .headerActions .btnIcon{
     margin-right: 0;
   }
+  #licenseVerifyBadge{
+    display:none;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.2px;
+    padding:4px 8px;
+    border-radius:999px;
+    border:1px solid rgba(148,163,184,.35);
+    background:rgba(148,163,184,.14);
+    color:rgba(226,232,240,.92);
+    line-height:1;
+    white-space:nowrap;
+  }
+  #licenseVerifyBadge.show{
+    display:inline-flex;
+    align-items:center;
+  }
   #tierBadge{
     font-size:11px;
     font-weight:600;
@@ -4601,6 +4618,7 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="hdrMid"></div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
+    <span id="licenseVerifyBadge" aria-live="polite" aria-atomic="true">更新中…</span>
     <span id="tierBadge" class="tierBadge--demo">DEMO</span>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
@@ -5379,6 +5397,46 @@ const getStandardOfflineGatingTier = (state)=>{
   return { baseTier, effectiveTier, isOnline };
 };
 
+const licenseVerifyUiState = {
+  pendingCount: 0,
+  showTimer: null,
+  visible: false,
+};
+const setLicenseVerifyBadgeVisible = (visible)=>{
+  licenseVerifyUiState.visible = !!visible;
+  const badge = document.getElementById("licenseVerifyBadge");
+  if(badge) badge.classList.toggle("show", licenseVerifyUiState.visible);
+};
+const beginLicenseVerification = (reason = "unknown")=>{
+  const startedAt = Date.now();
+  licenseVerifyUiState.pendingCount += 1;
+  if(licenseVerifyUiState.pendingCount === 1){
+    if(licenseVerifyUiState.showTimer) clearTimeout(licenseVerifyUiState.showTimer);
+    licenseVerifyUiState.showTimer = setTimeout(()=>{
+      licenseVerifyUiState.showTimer = null;
+      if(licenseVerifyUiState.pendingCount > 0){
+        setLicenseVerifyBadgeVisible(true);
+      }
+    }, 200);
+  }
+  console.log(`[License] verify start (reason=${reason})`);
+  let finished = false;
+  return ()=>{
+    if(finished) return;
+    finished = true;
+    const elapsed = Date.now() - startedAt;
+    licenseVerifyUiState.pendingCount = Math.max(0, licenseVerifyUiState.pendingCount - 1);
+    if(licenseVerifyUiState.pendingCount === 0){
+      if(licenseVerifyUiState.showTimer){
+        clearTimeout(licenseVerifyUiState.showTimer);
+        licenseVerifyUiState.showTimer = null;
+      }
+      setLicenseVerifyBadgeVisible(false);
+    }
+    console.log(`[License] verify end (reason=${reason}, ms=${elapsed})`);
+  };
+};
+
 const LicenseCore = (()=> {
   const listeners = new Set();
   const tierRank = { demo: 0, standard: 1, pro: 2 };
@@ -6049,6 +6107,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   };
 
   const setKeySafe = async (key)=>{
+    const endVerify = beginLicenseVerification("server-activate");
     try{
       const value = String(key || "").trim();
       if(!value) return { ok: false, reason: "empty" };
@@ -6107,6 +6166,8 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     }catch(e){
       console.error("[License] non-fatal", e);
       return { ok: false, reason: "exception" };
+    }finally{
+      endVerify();
     }
   };
 
@@ -6391,12 +6452,16 @@ function openSettingsModalSafe(preferTab){
 async function restoreSavedLicenseKey(){
   if(_licenseRestoreDone) return;
   _licenseRestoreDone = true;
+  const endVerify = beginLicenseVerification("startup-restore");
   try{
     const st = await window.WavCueLicense?.getStateSafe?.();
     if(st){
       applyAllLicenseUi(st);
     }
   }catch(_){}
+  finally{
+    endVerify();
+  }
 }
 function clearLicenseKeySafe(){
   try{
@@ -6787,10 +6852,15 @@ Promise.resolve().then(restoreSavedLicenseKey).catch((e)=>{
 if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> applyAllLicenseUi(st));
 }
-window.addEventListener("online", ()=>{
-  const st = window.WavCueLicense?.getStateSafe?.();
-  if(st) getStandardOfflineGatingTier(st);
-  if(st) applyAllLicenseUi(st);
+window.addEventListener("online", async ()=>{
+  const endVerify = beginLicenseVerification("online-restore");
+  try{
+    const st = await window.WavCueLicense?.getStateSafe?.();
+    if(st) getStandardOfflineGatingTier(st);
+    if(st) applyAllLicenseUi(st);
+  }finally{
+    endVerify();
+  }
 });
 window.addEventListener("offline", ()=>{
   const st = window.WavCueLicense?.getStateSafe?.();
