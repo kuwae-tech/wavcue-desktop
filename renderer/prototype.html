@@ -2129,6 +2129,32 @@
     box-shadow: 0 0 0 2px rgba(126,193,255,.34), 0 0 0 6px rgba(126,193,255,.16) !important;
   }
 
+  /* Toast: disable global debug focus outline (red dashed) only inside toast area */
+  #toastRoot, #toastRoot * ,
+  .toastHost, .toastHost * ,
+  .toast-root, .toast-root * {
+    outline: none !important;
+  }
+
+  /* Keep keyboard focus indication only where it matters */
+  #toastRoot button:focus-visible,
+  .toastHost button:focus-visible,
+  .toast-root button:focus-visible {
+    outline: none !important;
+    /* theme-like focus ring */
+    box-shadow: 0 0 0 2px rgba(120, 170, 255, 0.55), 0 0 0 6px rgba(120, 170, 255, 0.18);
+    border-radius: 10px;
+  }
+
+  /* If toast itself is focusable (tabindex etc.), keep it calm */
+  #toastRoot [tabindex]:focus-visible,
+  .toastHost [tabindex]:focus-visible,
+  .toast-root [tabindex]:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(120, 170, 255, 0.35);
+    border-radius: 12px;
+  }
+
   /* Toast top-layer (always above any dialog) */
   dialog.toastLayer{
     position: fixed;
