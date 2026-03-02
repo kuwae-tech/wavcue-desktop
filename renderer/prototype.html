@@ -2109,6 +2109,24 @@
   .toast.ok{ border-color: rgba(53,208,127,.45); }
   .toast.warn{ border-color: rgba(255,210,74,.45); }
   .toast.err{ border-color: rgba(255,91,110,.45); }
+  .toast.info{
+    border-color: rgba(120,170,255,.62);
+  }
+  .toast.info,
+  .toast.info:focus,
+  .toast.info:focus-visible,
+  .toast.info:focus-within{
+    outline: none !important;
+    box-shadow: none !important;
+    border-style: solid !important;
+    border-color: rgba(120,170,255,.62) !important;
+  }
+  .toast.info *:focus,
+  .toast.info *:focus-visible,
+  .toast.info *:focus-within{
+    outline: none !important;
+    box-shadow: none !important;
+  }
   .toast,
   .toast:focus,
   .toast:focus-within,
@@ -7762,7 +7780,7 @@ function toast(msg, type="ok", timeout=2600){
 
   const ic = document.createElement("div");
   ic.className = "ic";
-  ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : "OK");
+  ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : (type==="info" ? "i" : "OK"));
 
   const m = document.createElement("div");
   m.className = "msg";
@@ -18345,7 +18363,7 @@ try{
       t.className = `toast ${type}`;
       const ic = document.createElement("div");
       ic.className = "ic";
-      ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : "OK");
+      ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : (type==="info" ? "i" : "OK"));
       const m = document.createElement("div");
       m.className = "msg";
       m.textContent = String(message ?? "");
