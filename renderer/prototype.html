@@ -109,6 +109,23 @@
   .headerActions .btnIcon{
     margin-right: 0;
   }
+  #licenseVerifyBadge{
+    display:none;
+    font-size:11px;
+    font-weight:600;
+    letter-spacing:.2px;
+    padding:4px 8px;
+    border-radius:999px;
+    border:1px solid rgba(148,163,184,.35);
+    background:rgba(148,163,184,.14);
+    color:rgba(226,232,240,.92);
+    line-height:1;
+    white-space:nowrap;
+  }
+  #licenseVerifyBadge.show{
+    display:inline-flex;
+    align-items:center;
+  }
   #tierBadge{
     font-size:11px;
     font-weight:600;
@@ -2092,6 +2109,69 @@
   .toast.ok{ border-color: rgba(53,208,127,.45); }
   .toast.warn{ border-color: rgba(255,210,74,.45); }
   .toast.err{ border-color: rgba(255,91,110,.45); }
+  .toast.info{
+    border-color: rgba(120,170,255,.62);
+  }
+  .toast.info,
+  .toast.info:focus,
+  .toast.info:focus-visible,
+  .toast.info:focus-within{
+    outline: none !important;
+    box-shadow: none !important;
+    border-style: solid !important;
+    border-color: rgba(120,170,255,.62) !important;
+  }
+  .toast.info *:focus,
+  .toast.info *:focus-visible,
+  .toast.info *:focus-within{
+    outline: none !important;
+    box-shadow: none !important;
+  }
+  .toast,
+  .toast:focus,
+  .toast:focus-within,
+  .toastHost:focus,
+  .toastHost:focus-within,
+  dialog.toastLayer:focus,
+  dialog.toastLayer:focus-visible{
+    outline: none !important;
+  }
+  .toast button:focus,
+  .toast .btn:focus{
+    outline: none;
+  }
+  .toast button:focus-visible,
+  .toast .btn:focus-visible{
+    outline: none !important;
+    border-color: rgba(126,193,255,.66) !important;
+    box-shadow: 0 0 0 2px rgba(126,193,255,.34), 0 0 0 6px rgba(126,193,255,.16) !important;
+  }
+
+  /* Toast: disable global debug focus outline (red dashed) only inside toast area */
+  #toastRoot, #toastRoot * ,
+  .toastHost, .toastHost * ,
+  .toast-root, .toast-root * {
+    outline: none !important;
+  }
+
+  /* Keep keyboard focus indication only where it matters */
+  #toastRoot button:focus-visible,
+  .toastHost button:focus-visible,
+  .toast-root button:focus-visible {
+    outline: none !important;
+    /* theme-like focus ring */
+    box-shadow: 0 0 0 2px rgba(120, 170, 255, 0.55), 0 0 0 6px rgba(120, 170, 255, 0.18);
+    border-radius: 10px;
+  }
+
+  /* If toast itself is focusable (tabindex etc.), keep it calm */
+  #toastRoot [tabindex]:focus-visible,
+  .toastHost [tabindex]:focus-visible,
+  .toast-root [tabindex]:focus-visible {
+    outline: none !important;
+    box-shadow: 0 0 0 2px rgba(120, 170, 255, 0.35);
+    border-radius: 12px;
+  }
 
   /* Toast top-layer (always above any dialog) */
   dialog.toastLayer{
@@ -4601,6 +4681,7 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="hdrMid"></div>
   <div class="hdrRight">
     <div class="btnRow"><button class="btn" id="btnChunk" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-puzzle" xlink:href="#ico-puzzle"></use></svg>チャンク/ログ</button><button class="btn" disabled="" id="btnCmcd" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-file-text" xlink:href="#ico-file-text"></use></svg>cmcd入力</button><button class="btn" id="btnPdfAttach" title="WAVへファイルを添付（LIST/adtl/file）"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-paperclip" xlink:href="#ico-paperclip"></use></svg>ファイル添付</button><button class="btn" disabled="" id="btnStdCheck" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-clipboard-check" xlink:href="#ico-clipboard-check"></use></svg>規格チェック</button><button class="btn good" disabled="" id="btnExport" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-download" xlink:href="#ico-download"></use></svg>書き出し</button></div>
+    <span id="licenseVerifyBadge" aria-live="polite" aria-atomic="true">更新中…</span>
     <span id="tierBadge" class="tierBadge--demo">DEMO</span>
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
@@ -5379,6 +5460,50 @@ const getStandardOfflineGatingTier = (state)=>{
   return { baseTier, effectiveTier, isOnline };
 };
 
+const licenseVerifyUiState = {
+  pendingCount: 0,
+  showTimer: null,
+  visible: false,
+};
+const setLicenseVerifyBadgeVisible = (visible)=>{
+  const nextVisible = !!visible;
+  if(licenseVerifyUiState.visible !== nextVisible){
+    console.log(`[LicenseUI] busy=${nextVisible ? "true" : "false"}`);
+  }
+  licenseVerifyUiState.visible = nextVisible;
+  const badge = document.getElementById("licenseVerifyBadge");
+  if(badge) badge.classList.toggle("show", licenseVerifyUiState.visible);
+};
+const beginLicenseVerification = (reason = "unknown")=>{
+  const startedAt = Date.now();
+  licenseVerifyUiState.pendingCount += 1;
+  if(licenseVerifyUiState.pendingCount === 1){
+    if(licenseVerifyUiState.showTimer) clearTimeout(licenseVerifyUiState.showTimer);
+    licenseVerifyUiState.showTimer = setTimeout(()=>{
+      licenseVerifyUiState.showTimer = null;
+      if(licenseVerifyUiState.pendingCount > 0){
+        setLicenseVerifyBadgeVisible(true);
+      }
+    }, 200);
+  }
+  console.log(`[License] verify start (reason=${reason})`);
+  let finished = false;
+  return ()=>{
+    if(finished) return;
+    finished = true;
+    const elapsed = Date.now() - startedAt;
+    licenseVerifyUiState.pendingCount = Math.max(0, licenseVerifyUiState.pendingCount - 1);
+    if(licenseVerifyUiState.pendingCount === 0){
+      if(licenseVerifyUiState.showTimer){
+        clearTimeout(licenseVerifyUiState.showTimer);
+        licenseVerifyUiState.showTimer = null;
+      }
+      setLicenseVerifyBadgeVisible(false);
+    }
+    console.log(`[License] verify end (reason=${reason}, ms=${elapsed})`);
+  };
+};
+
 const LicenseCore = (()=> {
   const listeners = new Set();
   const tierRank = { demo: 0, standard: 1, pro: 2 };
@@ -5967,7 +6092,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     const stdBlocked = next.standard?.exportBlockedReason || "none";
     const summary = `${next.tier}|${demoBlocked}|${stdStrict}|${stdInGrace}|${stdHardExpired}|${stdBlocked}`;
     const isChange = summary !== _lastRefreshSummary;
-    const shouldLog = (reason === "debug" || reason === "key")
+    const shouldLog = (reason === "debug" || reason === "key" || reason === "storage-watch")
       || (reason === "tick" && isChange);
     if(shouldLog){
       console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} strict=${stdStrict} grace=${stdInGrace} hard=${stdHardExpired} stdExportBlocked=${stdBlocked}`);
@@ -6049,6 +6174,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   };
 
   const setKeySafe = async (key)=>{
+    const endVerify = beginLicenseVerification("server-activate");
     try{
       const value = String(key || "").trim();
       if(!value) return { ok: false, reason: "empty" };
@@ -6107,6 +6233,8 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     }catch(e){
       console.error("[License] non-fatal", e);
       return { ok: false, reason: "exception" };
+    }finally{
+      endVerify();
     }
   };
 
@@ -6133,6 +6261,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     clearCertificate();
     _refreshState("cert-clear", { touchOnline: false });
   };
+  const refreshFromStorageWatch = ()=> _refreshState("storage-watch", { touchOnline: false });
 
 
   return {
@@ -6150,6 +6279,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     getServerUrl,
     setServerUrlOverride,
     clearCertificateSafe,
+    refreshFromStorageWatch,
     LICENSE_TEXT,
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
@@ -6166,9 +6296,58 @@ window.WavCueLicense = {
   getServerUrl: LicenseCore.getServerUrl,
   setServerUrlOverride: LicenseCore.setServerUrlOverride,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
+  refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
 };
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
+
+const LICENSE_STORAGE_WATCH_KEYS = [
+  "wavcue_license_certificate_v1",
+  "wavcue_license_key",
+];
+const _licenseStorageWatchState = {
+  cert: null,
+  key: null,
+};
+const readLicenseWatchValue = (key)=>{
+  try{
+    const raw = localStorage?.getItem?.(key);
+    return raw == null ? "" : String(raw);
+  }catch(_){
+    return "";
+  }
+};
+const runLicenseStorageWatchRefresh = async ()=>{
+  const endVerify = beginLicenseVerification("storage-watch");
+  try{
+    const st = await Promise.resolve(window.WavCueLicense?.refreshFromStorageWatch?.());
+    if(st) applyAllLicenseUi(st);
+  }catch(e){
+    console.error("[License] non-fatal", e);
+  }finally{
+    endVerify();
+  }
+};
+const startLicenseStorageWatch = ()=>{
+  _licenseStorageWatchState.cert = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[0]);
+  _licenseStorageWatchState.key = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[1]);
+  setInterval(()=>{
+    const nextCert = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[0]);
+    const nextKey = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[1]);
+    if(nextCert !== _licenseStorageWatchState.cert){
+      console.log(`[License][watch] changed key=${LICENSE_STORAGE_WATCH_KEYS[0]} from=${JSON.stringify(_licenseStorageWatchState.cert)} to=${JSON.stringify(nextCert)}`);
+      _licenseStorageWatchState.cert = nextCert;
+      void runLicenseStorageWatchRefresh();
+      return;
+    }
+    if(nextKey !== _licenseStorageWatchState.key){
+      console.log(`[License][watch] changed key=${LICENSE_STORAGE_WATCH_KEYS[1]} from=${JSON.stringify(_licenseStorageWatchState.key)} to=${JSON.stringify(nextKey)}`);
+      _licenseStorageWatchState.key = nextKey;
+      void runLicenseStorageWatchRefresh();
+    }
+  }, 200);
+};
+startLicenseStorageWatch();
 
 const LICENSE_TEXT = LicenseCore.LICENSE_TEXT;
 let _tierBadgeLast = null;
@@ -6391,12 +6570,16 @@ function openSettingsModalSafe(preferTab){
 async function restoreSavedLicenseKey(){
   if(_licenseRestoreDone) return;
   _licenseRestoreDone = true;
+  const endVerify = beginLicenseVerification("startup-restore");
   try{
     const st = await window.WavCueLicense?.getStateSafe?.();
     if(st){
       applyAllLicenseUi(st);
     }
   }catch(_){}
+  finally{
+    endVerify();
+  }
 }
 function clearLicenseKeySafe(){
   try{
@@ -6787,10 +6970,15 @@ Promise.resolve().then(restoreSavedLicenseKey).catch((e)=>{
 if(typeof window.WavCueLicense?.onChange === "function"){
   window.WavCueLicense.onChange((st)=> applyAllLicenseUi(st));
 }
-window.addEventListener("online", ()=>{
-  const st = window.WavCueLicense?.getStateSafe?.();
-  if(st) getStandardOfflineGatingTier(st);
-  if(st) applyAllLicenseUi(st);
+window.addEventListener("online", async ()=>{
+  const endVerify = beginLicenseVerification("online-restore");
+  try{
+    const st = await window.WavCueLicense?.getStateSafe?.();
+    if(st) getStandardOfflineGatingTier(st);
+    if(st) applyAllLicenseUi(st);
+  }finally{
+    endVerify();
+  }
 });
 window.addEventListener("offline", ()=>{
   const st = window.WavCueLicense?.getStateSafe?.();
@@ -6848,6 +7036,56 @@ window._guardExportSingle = guardExport;
 window._guardHistory = guardHistory;
 window._guardPreset = guardPreset;
 window._guardBackup = guardBackup;
+
+window.__wavcueLicenseTest = {
+  installTimestampLogger: ()=>{
+    const logger = console;
+    if(logger.__wavcueTimestampWrapped) return;
+    const wrap = (method)=>{
+      const original = logger[method]?.bind(logger);
+      if(typeof original !== "function") return;
+      logger[`__wavcueOriginal_${method}`] = original;
+      logger[method] = (...args)=> original(new Date().toISOString(), ...args);
+    };
+    wrap("log");
+    wrap("warn");
+    wrap("error");
+    logger.__wavcueTimestampWrapped = true;
+    console.log("[LicenseTest] timestamp logger installed");
+  },
+  makeFakeToken: (tier)=>{
+    const normalizedTier = String(tier || "demo").toLowerCase();
+    const safeTier = (normalizedTier === "pro" || normalizedTier === "standard") ? normalizedTier : "demo";
+    let deviceId = "";
+    try{ deviceId = String(localStorage?.getItem?.("wavcue_device_id_v1") || ""); }catch(_){ deviceId = ""; }
+    if(!deviceId){
+      deviceId = window.WavCueLicense?.getDeviceId?.() || "";
+    }
+    const payload = { v: 1, deviceId: String(deviceId || ""), tier: safeTier };
+    const payloadJson = JSON.stringify(payload);
+    const bytes = (typeof TextEncoder !== "undefined") ? new TextEncoder().encode(payloadJson) : Uint8Array.from(Array.from(payloadJson).map(ch=> ch.charCodeAt(0)));
+    let b64 = "";
+    if(typeof Buffer !== "undefined"){
+      b64 = Buffer.from(bytes).toString("base64");
+    }else{
+      let binary = "";
+      bytes.forEach((b)=>{ binary += String.fromCharCode(b); });
+      b64 = btoa(binary);
+    }
+    const b64url = b64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
+    return `${b64url}.AA`;
+  },
+  setCert: (tier)=>{
+    const token = window.__wavcueLicenseTest.makeFakeToken(tier);
+    try{ localStorage?.setItem?.("wavcue_license_certificate_v1", token); }catch(_){ }
+    void runLicenseStorageWatchRefresh();
+    return token;
+  },
+  clearCert: ()=>{
+    try{ localStorage?.removeItem?.("wavcue_license_certificate_v1"); }catch(_){ }
+    void runLicenseStorageWatchRefresh();
+  },
+};
 
 (() => {
 "use strict";
@@ -7542,7 +7780,7 @@ function toast(msg, type="ok", timeout=2600){
 
   const ic = document.createElement("div");
   ic.className = "ic";
-  ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : "OK");
+  ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : (type==="info" ? "i" : "OK"));
 
   const m = document.createElement("div");
   m.className = "msg";
@@ -18125,7 +18363,7 @@ try{
       t.className = `toast ${type}`;
       const ic = document.createElement("div");
       ic.className = "ic";
-      ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : "OK");
+      ic.textContent = type==="err" ? "!" : (type==="warn" ? "…" : (type==="info" ? "i" : "OK"));
       const m = document.createElement("div");
       m.className = "msg";
       m.textContent = String(message ?? "");
