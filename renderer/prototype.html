@@ -5504,6 +5504,17 @@ const beginLicenseVerification = (reason = "unknown")=>{
   };
 };
 
+const isTestProBuildEnabled = ()=> window.__WAVCUE_TEST_PRO_BUILD === true || window.__WAVCUE_TEST_PRO_BUILD === "1";
+const applyTestProOverride = (state)=>{
+  if(!isTestProBuildEnabled() || !state || typeof state !== "object") return state;
+  return {
+    ...state,
+    tier: "pro",
+    demo: state.demo ? { ...state.demo, isLocked: false, demoBlockedReason: null } : state.demo,
+    standard: state.standard ? { ...state.standard, exportBlockedReason: null } : state.standard,
+  };
+};
+
 const LicenseCore = (()=> {
   const listeners = new Set();
   const tierRank = { demo: 0, standard: 1, pro: 2 };
@@ -6081,10 +6092,10 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const getStateSafeInternal = (options = {})=>{
     try{
       const certState = loadCertificateState({ logBoot: false });
-      return buildState({ ...stateCache, ...certState }, options);
+      return applyTestProOverride(buildState({ ...stateCache, ...certState }, options));
     }catch(e){
       console.error("[License] non-fatal", e);
-      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
+      return applyTestProOverride(buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options));
     }
   };
 

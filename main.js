@@ -125,6 +125,7 @@ const ensureDefaultFolders = async () => {
 };
 
 const isMac = process.platform === 'darwin';
+const isTestProBuild = process.env.WAVCUE_TEST_PRO_BUILD === '1';
 
 const createWindow = () => {
   const initialWidth = 1400;
@@ -158,11 +159,38 @@ const createWindow = () => {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
+      ...(isTestProBuild ? { devTools: false } : {}),
     },
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'prototype.html'));
   mainWindow.setMinimumSize(1300, 680);
+
+  if (isTestProBuild) {
+    mainWindow.webContents.on('before-input-event', (event, input) => {
+      const key = String(input.key || '').toLowerCase();
+      const isToggleDevTools = key === 'f12'
+        || (key === 'i' && input.shift && (isMac ? input.meta : input.control));
+      if (isToggleDevTools) {
+        event.preventDefault();
+      }
+    });
+
+    mainWindow.webContents.on('devtools-opened', () => {
+      mainWindow.webContents.closeDevTools();
+    });
+
+    mainWindow.webContents.on('did-finish-load', () => {
+      void mainWindow.webContents.executeJavaScript(`
+        window.__WAVCUE_TEST_PRO_BUILD = true;
+        Promise.resolve(window.WavCueLicense?.refresh?.('test-pro-build-inject')).then((st) => {
+          if (st && typeof applyAllLicenseUi === 'function') applyAllLicenseUi(st);
+        }).catch(() => {});
+      `, true);
+    });
+
+    Menu.setApplicationMenu(null);
+  }
 
   if (!isMac) {
     mainWindow.setMenuBarVisibility(false);
@@ -170,7 +198,9 @@ const createWindow = () => {
     Menu.setApplicationMenu(null);
   }
 
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  if (!isTestProBuild) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -397,6 +427,9 @@ const ensureWavExtension = (targetPath) => {
 
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
+  if (isTestProBuild) {
+    console.log('[BuildMode] TEST_PRO_BUILD enabled (devtools disabled, tier forced pro)');
+  }
   migrateSettingsSchema();
   await ensureDefaultFolders();
   createWindow();
