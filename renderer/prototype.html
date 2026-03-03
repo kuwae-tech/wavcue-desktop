@@ -5540,7 +5540,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     backup: { minTier: "standard", reason: "standard-required" },
   };
   const stateCache = {
-    tier: "demo",
+    tier: "pro",
     source: "fallback",
     updatedAt: Date.now(),
   };
@@ -6011,7 +6011,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const setCache = (next, source)=>{
     if(!next || !next.tier) return stateCache;
-    stateCache.tier = next.tier;
+    stateCache.tier = "pro";
     stateCache.source = source || stateCache.source;
     stateCache.updatedAt = Date.now();
     listeners.forEach((fn)=>{ try{ fn({ ...stateCache }); }catch(_){ } });
@@ -6021,12 +6021,45 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const init = ()=>{
     try{
       const certState = loadCertificateState({ logBoot: true });
-      setCache({ tier: certState.tier }, "certificate");
+      setCache({ tier: "pro" }, "certificate");
       _refreshState("init", { touchOnline: true });
     }catch(e){
       console.error("[License] non-fatal", e);
     }
     return { ...stateCache };
+  };
+
+  const normalizeToForcedProState = (input)=>{
+    const base = (input && typeof input === "object") ? input : {};
+    const standard = { ...(base.standard || {}) };
+    standard.auth = {
+      ...(standard.auth || {}),
+      isValidNow: true,
+      isInGrace: false,
+      isHardExpired: false,
+      graceStartedAt: null,
+      graceExpiresAt: null,
+      graceRemainingMinutes: 0,
+    };
+    standard.exportBlockedReason = null;
+    const demo = {
+      ...(base.demo || {}),
+      isExpired: false,
+      isExportLimit: false,
+      isLocked: false,
+      demoBlockedReason: null,
+      remainingDays: null,
+      remainingExports: null,
+      expiresAt: null,
+    };
+    return {
+      ...base,
+      tier: "pro",
+      hasCert: true,
+      demoReason: null,
+      demo,
+      standard,
+    };
   };
 
   const buildState = (base, options = {})=>{
@@ -6074,7 +6107,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     }else{
       standard.exportBlockedReason = null;
     }
-    return { ...base, tier, demo, standard };
+    return normalizeToForcedProState({ ...base, tier, demo, standard });
   };
 
 
@@ -6084,14 +6117,14 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       return buildState({ ...stateCache, ...certState }, options);
     }catch(e){
       console.error("[License] non-fatal", e);
-      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
+      return buildState({ tier: "pro", source: "fallback", updatedAt: Date.now() }, options);
     }
   };
 
   let _lastRefreshSummary = "";
   const _refreshState = (reason, options = {})=>{
     const next = getStateSafeInternal({ touchOnline: options.touchOnline });
-    stateCache.tier = next.tier;
+    stateCache.tier = "pro";
     stateCache.source = reason || stateCache.source;
     stateCache.updatedAt = Date.now();
     const payload = { ...stateCache, demo: next.demo, standard: next.standard };
@@ -6296,42 +6329,19 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
 })();
-const forceProState = (state)=>{
-  const base = (state && typeof state === "object") ? state : {};
-  const demo = { ...(base.demo || {}) };
-  demo.isLocked = false;
-  demo.remainingDays = null;
-  demo.remainingExports = null;
-  demo.expiresAt = null;
-  const standard = { ...(base.standard || {}) };
-  standard.auth = { ...(standard.auth || {}), isValidNow: true, isInGrace: false, isHardExpired: false, graceRemainingMinutes: null };
-  return {
-    ...base,
-    tier: "pro",
-    hasCert: true,
-    demoReason: null,
-    demo,
-    standard,
-  };
-};
-
-function forceProGuard(){
-  return { ok: true, tier: "pro", reason: null, state: forceProState(window.WavCueLicense?.getStateSafe?.() || {}) };
-}
-
 window.WavCueLicense = {
   init: LicenseCore.init,
-  getStateSafe: (...args)=> forceProState(LicenseCore.getStateSafe(...args)),
-  guard: (..._args)=> forceProGuard(),
+  getStateSafe: LicenseCore.getStateSafe,
+  guard: LicenseCore.guard,
   setKeySafe: LicenseCore.setKeySafe,
-  onChange: (fn)=> LicenseCore.onChange((st)=> fn(forceProState(st))),
+  onChange: LicenseCore.onChange,
   resetDemoTrial: LicenseCore.resetDemoTrial,
   recordExportOk: LicenseCore.recordExportOk,
   getDeviceId: LicenseCore.getDeviceId,
   getServerUrl: LicenseCore.getServerUrl,
   setServerUrlOverride: LicenseCore.setServerUrlOverride,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
-  refreshFromStorageWatch: ()=> forceProState(LicenseCore.refreshFromStorageWatch()),
+  refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
 };
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
@@ -6691,7 +6701,7 @@ function updateOfflineStandardBanner(state){
   }
 }
 function applyAllLicenseUi(state){
-  const next = forceProState(state);
+  const next = state;
   try{ updateTierBadge(next); }catch(_){}
   try{ applyProUi(next); }catch(_){}
   try{ applyLicenseUi(next); }catch(_){}
@@ -7097,13 +7107,13 @@ window.addEventListener("offline", ()=>{
   window.addEventListener('resize', logDockSizes, { passive: true });
 })();
 
-const guardBulkImport = (_ctx)=> forceProGuard();
-const guardBulkCheck = (_ctx)=> forceProGuard();
-const guardBulkExport = (_ctx)=> forceProGuard();
-const guardExport = (_ctx)=> forceProGuard();
-const guardHistory = (_ctx)=> forceProGuard();
-const guardPreset = (_ctx)=> forceProGuard();
-const guardBackup = (_ctx)=> forceProGuard();
+const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
+const guardBulkCheck = (ctx)=> LicenseCore.guard("bulkCheck", ctx);
+const guardBulkExport = (ctx)=> LicenseCore.guard("bulkExport", ctx);
+const guardExport = (ctx)=> LicenseCore.guard("exportSingle", ctx);
+const guardHistory = (ctx)=> LicenseCore.guard("history", ctx);
+const guardPreset = (ctx)=> LicenseCore.guard("preset", ctx);
+const guardBackup = (ctx)=> LicenseCore.guard("backup", ctx);
 window.guardBulkImport = guardBulkImport;
 window.guardBulkCheck = guardBulkCheck;
 window.guardBulkExport = guardBulkExport;
