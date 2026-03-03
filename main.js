@@ -158,19 +158,29 @@ const createWindow = () => {
       nodeIntegration: false,
       contextIsolation: true,
       preload: path.join(__dirname, 'preload.js'),
+      devTools: false,
     },
   });
 
   mainWindow.loadFile(path.join(__dirname, 'renderer', 'prototype.html'));
   mainWindow.setMinimumSize(1300, 680);
 
-  if (!isMac) {
-    mainWindow.setMenuBarVisibility(false);
-    mainWindow.removeMenu();
-    Menu.setApplicationMenu(null);
-  }
+  mainWindow.setMenuBarVisibility(false);
+  mainWindow.removeMenu();
+  Menu.setApplicationMenu(null);
 
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    const key = String(input.key || '').toLowerCase();
+    const ctrlOrCmd = !!input.control || !!input.meta;
+    const isBlockedCombo =
+      key === 'f12' ||
+      (ctrlOrCmd && !!input.shift && (key === 'i' || key === 'j')) ||
+      (!!input.meta && !!input.alt && (key === 'i' || key === 'j'));
+
+    if (isBlockedCombo) {
+      event.preventDefault();
+    }
+  });
 };
 
 const DAY_MS = 24 * 60 * 60 * 1000;
