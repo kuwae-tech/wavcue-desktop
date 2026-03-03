@@ -5980,7 +5980,13 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       if(options.logBoot){
         console.log("[License] boot tier=DEMO (no/invalid certificate)");
       }
-      return { tier: "demo", certificate: null, hasCert: false, deviceId };
+      return {
+        tier: "demo",
+        certificate: null,
+        hasCert: false,
+        deviceId,
+        demoReason: "missing-certificate",
+      };
     }
     const verified = verifyCertificate(cert, deviceId);
     if(!verified.ok){
@@ -5989,12 +5995,18 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       if(options.logBoot){
         console.log("[License] boot tier=DEMO (no/invalid certificate)");
       }
-      return { tier: "demo", certificate: null, hasCert: false, deviceId };
+      return {
+        tier: "demo",
+        certificate: null,
+        hasCert: false,
+        deviceId,
+        demoReason: verified.reason || "invalid-certificate",
+      };
     }
     if(options.logBoot){
       console.log(`[License] boot tier=${verified.tier.toUpperCase()} (valid certificate)`);
     }
-    return { tier: verified.tier, certificate: verified.certificate, hasCert: true, deviceId };
+    return { tier: verified.tier, certificate: verified.certificate, hasCert: true, deviceId, demoReason: null };
   };
 
   const setCache = (next, source)=>{
@@ -6400,6 +6412,32 @@ const applyProUi = (state)=>{
 
 let _demoStartupNoticeShown = false;
 let _demoExportNoticeShown = false;
+let _lastDemoBannerReasonLogged = null;
+const mapDemoReasonToMessage = (reason)=>{
+  const code = String(reason || "").trim().toLowerCase();
+  if(!code || code === "missing-certificate"){
+    return {
+      detail: "ライセンスを設定すると STANDARD / PRO を利用できます。",
+      isStrong: false,
+    };
+  }
+  if(code === "device-mismatch"){
+    return {
+      detail: "ライセンスを確認できません（端末不一致の可能性があります）。",
+      isStrong: true,
+    };
+  }
+  if(code === "expired"){
+    return {
+      detail: "ライセンスを確認できません（期限切れの可能性があります）。",
+      isStrong: true,
+    };
+  }
+  return {
+    detail: "ライセンスを確認できません（欠損/破損/端末不一致 など）。",
+    isStrong: true,
+  };
+};
 const buildDemoRemainingParts = (remainingDays, remainingExports)=>{
   const parts = [];
   if(Number.isFinite(remainingDays)){
@@ -6808,10 +6846,18 @@ const applyLicenseUi = (state)=>{
       let hasChip = false;
       let hasActions = false;
       let isDangerBanner = false;
+      if(isDemo){
+        const reasonInfo = mapDemoReasonToMessage(state?.demoReason);
+        bannerText = "体験版で起動しています";
+        bannerMeta = reasonInfo.detail;
+        isDemoBanner = true;
+        isDangerBanner = !!reasonInfo.isStrong;
+      }
       if(isDemo && isDemoLocked){
         bannerText = (demoBlockedReason === "demo_export_limit")
           ? LICENSE_TEXT.demoExportLimitBanner
           : LICENSE_TEXT.demoExpiredBanner;
+        bannerMeta = "";
         isDangerBanner = true;
       }else if(tier === "standard" && standardInGrace){
         bannerText = LICENSE_TEXT.standardGraceBanner;
@@ -6846,14 +6892,27 @@ const applyLicenseUi = (state)=>{
           hasChip = true;
         }
         banner.appendChild(body);
-        if(isDemoLocked || isStandardBanner){
+        if(isDemo){
+          const reasonCode = String(state?.demoReason || "missing-certificate");
+          if(_lastDemoBannerReasonLogged !== reasonCode){
+            console.log(`[LicenseUI] demo banner shown (reason=${reasonCode})`);
+            _lastDemoBannerReasonLogged = reasonCode;
+          }
+        }
+        if(isDemo || isDemoLocked || isStandardBanner){
           const actions = document.createElement("span");
           actions.className = "licenseBannerActions";
           const openBtn = document.createElement("button");
           openBtn.className = "btn licenseBannerBtn";
           openBtn.type = "button";
-          openBtn.textContent = "ライセンスキーを入力";
-          openBtn.addEventListener("click", openLicenseEntryFlow);
+          openBtn.textContent = isDemo ? "設定を開く" : "ライセンスキーを入力";
+          openBtn.addEventListener("click", ()=>{
+            if(isDemo){
+              openSettingsModalSafe("license");
+              return;
+            }
+            openLicenseEntryFlow();
+          });
           actions.appendChild(openBtn);
           banner.appendChild(actions);
           hasActions = true;
@@ -6869,6 +6928,7 @@ const applyLicenseUi = (state)=>{
       banner.classList.toggle("licenseBanner--withActions", hasActions);
       banner.classList.toggle("licenseBanner--danger", isDangerBanner);
       banner.classList.toggle("show", !!bannerText || isDemoBanner);
+      if(!isDemo) _lastDemoBannerReasonLogged = null;
     }
     if(isDemo && !_demoStartupNoticeShown){
       _demoStartupNoticeShown = true;
