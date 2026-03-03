@@ -6296,19 +6296,42 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
 })();
+const forceProState = (state)=>{
+  const base = (state && typeof state === "object") ? state : {};
+  const demo = { ...(base.demo || {}) };
+  demo.isLocked = false;
+  demo.remainingDays = null;
+  demo.remainingExports = null;
+  demo.expiresAt = null;
+  const standard = { ...(base.standard || {}) };
+  standard.auth = { ...(standard.auth || {}), isValidNow: true, isInGrace: false, isHardExpired: false, graceRemainingMinutes: null };
+  return {
+    ...base,
+    tier: "pro",
+    hasCert: true,
+    demoReason: null,
+    demo,
+    standard,
+  };
+};
+
+function forceProGuard(){
+  return { ok: true, tier: "pro", reason: null, state: forceProState(window.WavCueLicense?.getStateSafe?.() || {}) };
+}
+
 window.WavCueLicense = {
   init: LicenseCore.init,
-  getStateSafe: LicenseCore.getStateSafe,
-  guard: LicenseCore.guard,
+  getStateSafe: (...args)=> forceProState(LicenseCore.getStateSafe(...args)),
+  guard: (..._args)=> forceProGuard(),
   setKeySafe: LicenseCore.setKeySafe,
-  onChange: LicenseCore.onChange,
+  onChange: (fn)=> LicenseCore.onChange((st)=> fn(forceProState(st))),
   resetDemoTrial: LicenseCore.resetDemoTrial,
   recordExportOk: LicenseCore.recordExportOk,
   getDeviceId: LicenseCore.getDeviceId,
   getServerUrl: LicenseCore.getServerUrl,
   setServerUrlOverride: LicenseCore.setServerUrlOverride,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
-  refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
+  refreshFromStorageWatch: ()=> forceProState(LicenseCore.refreshFromStorageWatch()),
 };
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
@@ -6668,7 +6691,7 @@ function updateOfflineStandardBanner(state){
   }
 }
 function applyAllLicenseUi(state){
-  const next = state;
+  const next = forceProState(state);
   try{ updateTierBadge(next); }catch(_){}
   try{ applyProUi(next); }catch(_){}
   try{ applyLicenseUi(next); }catch(_){}
@@ -7074,13 +7097,13 @@ window.addEventListener("offline", ()=>{
   window.addEventListener('resize', logDockSizes, { passive: true });
 })();
 
-const guardBulkImport = (ctx)=> LicenseCore.guard("bulkImport", ctx);
-const guardBulkCheck = (ctx)=> LicenseCore.guard("bulkCheck", ctx);
-const guardBulkExport = (ctx)=> LicenseCore.guard("bulkExport", ctx);
-const guardExport = (ctx)=> LicenseCore.guard("exportSingle", ctx);
-const guardHistory = (ctx)=> LicenseCore.guard("history", ctx);
-const guardPreset = (ctx)=> LicenseCore.guard("preset", ctx);
-const guardBackup = (ctx)=> LicenseCore.guard("backup", ctx);
+const guardBulkImport = (_ctx)=> forceProGuard();
+const guardBulkCheck = (_ctx)=> forceProGuard();
+const guardBulkExport = (_ctx)=> forceProGuard();
+const guardExport = (_ctx)=> forceProGuard();
+const guardHistory = (_ctx)=> forceProGuard();
+const guardPreset = (_ctx)=> forceProGuard();
+const guardBackup = (_ctx)=> forceProGuard();
 window.guardBulkImport = guardBulkImport;
 window.guardBulkCheck = guardBulkCheck;
 window.guardBulkExport = guardBulkExport;
