@@ -223,14 +223,17 @@ ${logEl.textContent}`;
         const settings = await window.wavcue.getSettings();
         const paths = settings.paths || {};
         const container = document.getElementById('paths');
-        container.innerHTML = [
-          `Root: ${paths.root || 'Not set'}`,
-          `Exports: ${paths.exports || 'Not set'}`,
-          `Backups: ${paths.backups || 'Not set'}`,
-          `Reports: ${paths.reports || 'Not set'}`,
-        ]
-          .map((line) => `<span>${line}</span>`)
-          .join('');
+        container.textContent = '';
+        [
+          ['Root', paths.root],
+          ['Exports', paths.exports],
+          ['Backups', paths.backups],
+          ['Reports', paths.reports],
+        ].forEach(([label, value]) => {
+          const line = document.createElement('span');
+          line.textContent = `${label}: ${value || 'Not set'}`;
+          container.appendChild(line);
+        });
         updateCleanupResult(settings.cleanupLastResult);
       };
 
