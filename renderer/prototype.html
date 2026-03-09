@@ -13369,11 +13369,24 @@ $("settingsCleanupNow")?.addEventListener("click", async ()=>{
   openCleanupConfirm();
 });
 
-window.wavcue?.onCleanupProgress?.((payload)=>{
-  if(payload?.message && settingsCleanupProgress){
-    settingsCleanupProgress.textContent = payload.message;
+let removeCleanupProgressListener = null;
+if(typeof window.wavcue?.onCleanupProgress === "function"){
+  removeCleanupProgressListener = window.wavcue.onCleanupProgress((payload)=>{
+    if(payload?.message && settingsCleanupProgress){
+      settingsCleanupProgress.textContent = payload.message;
+    }
+  });
+}
+
+const disposeCleanupProgressListener = ()=>{
+  if(typeof removeCleanupProgressListener === "function"){
+    removeCleanupProgressListener();
+    removeCleanupProgressListener = null;
   }
-});
+};
+
+window.addEventListener("beforeunload", disposeCleanupProgressListener);
+window.addEventListener("pagehide", disposeCleanupProgressListener);
 
 settingsCleanupConfirmRun?.addEventListener("click", async ()=>{
   if(!window.wavcue?.runCompleteCleanup) return;
