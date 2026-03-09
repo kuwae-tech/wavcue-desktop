@@ -5747,7 +5747,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       : "";
     return envUrl;
   };
-  const setServerUrlOverride = ()=> "";
   const readCertificate = ()=>{
     let raw = readText(LS_CERTIFICATE);
     if(!raw){
@@ -6279,7 +6278,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     peekState,
     getDeviceId,
     getServerUrl,
-    setServerUrlOverride,
     clearCertificateSafe,
     refreshFromStorageWatch,
     LICENSE_TEXT,
@@ -6296,7 +6294,6 @@ window.WavCueLicense = {
   recordExportOk: LicenseCore.recordExportOk,
   getDeviceId: LicenseCore.getDeviceId,
   getServerUrl: LicenseCore.getServerUrl,
-  setServerUrlOverride: LicenseCore.setServerUrlOverride,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
   refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
 };
