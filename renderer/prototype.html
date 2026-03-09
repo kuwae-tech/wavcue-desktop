@@ -14027,10 +14027,15 @@ function renderExportQc(qcResult){
     row.style.padding = "8px 10px";
     row.style.borderRadius = "10px";
     row.style.background = "rgba(255,255,255,0.04)";
-    row.innerHTML = `
-      <div style="font-weight:600">${label}</div>
-      <div style="font-size:12px;opacity:.9">${ok ? "OK" : "NG"}</div>
-    `;
+    const nameEl = document.createElement("div");
+    nameEl.style.fontWeight = "600";
+    nameEl.textContent = String(label);
+    const stateEl = document.createElement("div");
+    stateEl.style.fontSize = "12px";
+    stateEl.style.opacity = ".9";
+    stateEl.textContent = ok ? "OK" : "NG";
+    row.appendChild(nameEl);
+    row.appendChild(stateEl);
     if(!ok){
       row.style.outline = "1px solid rgba(255,80,80,0.35)";
     }
@@ -14053,7 +14058,18 @@ function openExportQcNgDialog(qcResult){
     row.style.borderRadius = "10px";
     row.style.background = "rgba(255,80,80,0.10)";
     row.style.outline = "1px solid rgba(255,80,80,0.30)";
-    row.innerHTML = `<div style="font-weight:700">${label}</div>${reason ? `<div style="opacity:.9;font-size:12px;margin-top:2px">${reason}</div>` : ""}`;
+    const labelEl = document.createElement("div");
+    labelEl.style.fontWeight = "700";
+    labelEl.textContent = String(label);
+    row.appendChild(labelEl);
+    if(reason){
+      const reasonEl = document.createElement("div");
+      reasonEl.style.opacity = ".9";
+      reasonEl.style.fontSize = "12px";
+      reasonEl.style.marginTop = "2px";
+      reasonEl.textContent = String(reason);
+      row.appendChild(reasonEl);
+    }
     list.appendChild(row);
   });
 
