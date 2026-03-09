@@ -125,6 +125,34 @@ const ensureDefaultFolders = async () => {
 };
 
 const isMac = process.platform === 'darwin';
+const isProduction = app.isPackaged;
+
+const SETTINGS_WRITE_ALLOWLIST = new Set([
+  'schemaVersion',
+  'autoCleanup',
+  'autoCleanupOnExport',
+  'autoCleanupOnQuit',
+  'autoCleanupOnStartup',
+  'autoBackupEnabled',
+  'licenseKey',
+  'licenseTier',
+  'retentionDays',
+  'backupQuotaGB',
+  'minKeepCount',
+  'deleteMethod',
+  'cleanupLastResult',
+]);
+
+const filterSettingsPatch = (patch) => {
+  if (!patch || typeof patch !== 'object' || Array.isArray(patch)) {
+    return { ok: false, message: 'Invalid settings patch.' };
+  }
+  const deniedKeys = Object.keys(patch).filter((key) => !SETTINGS_WRITE_ALLOWLIST.has(key));
+  if (deniedKeys.length > 0) {
+    return { ok: false, message: `Unsupported settings keys: ${deniedKeys.join(', ')}` };
+  }
+  return { ok: true, patch };
+};
 
 const createWindow = () => {
   const initialWidth = 1400;
@@ -170,8 +198,23 @@ const createWindow = () => {
     Menu.setApplicationMenu(null);
   }
 
-  mainWindow.webContents.openDevTools({ mode: 'detach' });
+  if (!isProduction) {
+    mainWindow.webContents.openDevTools({ mode: 'detach' });
+  }
 };
+
+app.on('web-contents-created', (_event, contents) => {
+  contents.session.webRequest.onHeadersReceived((details, callback) => {
+    callback({
+      responseHeaders: {
+        ...details.responseHeaders,
+        'Content-Security-Policy': [
+          "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; media-src 'self' data: blob:; object-src 'none';",
+        ],
+      },
+    });
+  });
+});
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -443,7 +486,13 @@ ipcMain.handle('window:is-maximized', (event) => {
 });
 
 ipcMain.handle('settings:get', () => getSettings());
-ipcMain.handle('settings:set', (_event, patch) => setSettings(patch || {}));
+ipcMain.handle('settings:set', (_event, patch) => {
+  const filtered = filterSettingsPatch(patch || {});
+  if (!filtered.ok) {
+    return filtered;
+  }
+  return { ok: true, settings: setSettings(filtered.patch) };
+});
 ipcMain.handle('license:get-state', () => {
   const settings = getSettings() || {};
   const tier = settings.licenseTier || 'demo';
@@ -458,12 +507,6 @@ ipcMain.handle('license:set-key', (_event, rawKey) => {
     if (!key) {
       ok = false;
       reason = 'empty';
-    } else if (key === 'WAVCUE_PRO_TEST') {
-      tier = 'pro';
-    } else if (key === 'WAVCUE_STD_TEST') {
-      tier = 'standard';
-    } else if (key === 'WAVCUE_DEMO') {
-      tier = 'demo';
     } else {
       ok = false;
       reason = 'invalid';
@@ -690,7 +733,16 @@ ipcMain.handle('export:writeFileBase64', async (_event, { folderPath, fileName, 
     if (!folderPath || !fileName || !dataBase64) {
       return { ok: false, error: 'Missing export parameters.' };
     }
-    const resolvedPath = ensureWavExtension(path.join(folderPath, fileName));
+    const baseDir = path.resolve(String(folderPath));
+    const candidateName = String(fileName);
+    if (candidateName !== path.basename(candidateName)) {
+      return { ok: false, error: 'Invalid file name.' };
+    }
+    const resolvedPath = ensureWavExtension(path.resolve(baseDir, candidateName));
+    const relative = path.relative(baseDir, resolvedPath);
+    if (relative.startsWith('..') || path.isAbsolute(relative)) {
+      return { ok: false, error: 'Export path must stay inside selected folder.' };
+    }
     const buf = Buffer.from(dataBase64, 'base64');
     fsSync.writeFileSync(resolvedPath, buf, { flag: 'wx' });
     return { ok: true, filePath: resolvedPath };
