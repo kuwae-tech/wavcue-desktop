@@ -266,15 +266,34 @@ ${logEl.textContent}`;
         updateCleanupResult(result.summary);
       });
 
-      window.wavcue.onCleanupProgress((payload) => {
-        if (payload?.message) {
-          document.getElementById('cleanup-progress').textContent = payload.message;
-        }
-      });
+      let removeCleanupProgressListener = null;
+      if (typeof window.wavcue.onCleanupProgress === 'function') {
+        removeCleanupProgressListener = window.wavcue.onCleanupProgress((payload) => {
+          if (payload?.message) {
+            document.getElementById('cleanup-progress').textContent = payload.message;
+          }
+        });
+      }
 
-      window.wavcue.ensureDefaultFolders().then(() => {
-        updatePaths();
-      });
+      const disposeCleanupProgressListener = () => {
+        if (typeof removeCleanupProgressListener === 'function') {
+          removeCleanupProgressListener();
+          removeCleanupProgressListener = null;
+        }
+      };
+
+      window.addEventListener('beforeunload', disposeCleanupProgressListener);
+      window.addEventListener('pagehide', disposeCleanupProgressListener);
+
+      window.wavcue
+        .ensureDefaultFolders()
+        .then(() => {
+          updatePaths();
+        })
+        .catch((error) => {
+          log(`Failed to initialize default folders: ${error?.message || 'unknown error'}`);
+          console.warn('Failed to initialize default folders.', error);
+        });
     </script>
   </body>
 </html>

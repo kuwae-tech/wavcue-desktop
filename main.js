@@ -134,8 +134,6 @@ const SETTINGS_WRITE_ALLOWLIST = new Set([
   'autoCleanupOnQuit',
   'autoCleanupOnStartup',
   'autoBackupEnabled',
-  'licenseKey',
-  'licenseTier',
   'retentionDays',
   'backupQuotaGB',
   'minKeepCount',
