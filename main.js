@@ -23,8 +23,7 @@ const store = new Store({
       autoCleanupOnQuit: false,
       autoCleanupOnStartup: false,
       autoBackupEnabled: true,
-      licenseKey: '',
-      licenseTier: 'demo',
+      entitlementPro: false,
       retentionDays: 30,
       backupQuotaGB: 5,
       minKeepCount: 20,
@@ -491,40 +490,17 @@ ipcMain.handle('settings:set', (_event, patch) => {
   }
   return { ok: true, settings: setSettings(filtered.patch) };
 });
-// Store版分岐メモ: 以下の license IPC 群は旧キー認証前提。
-// 次ブランチで課金導線へ置換する際の整理対象として残す。
-ipcMain.handle('license:get-state', () => {
+const getEntitlementState = () => {
   const settings = getSettings() || {};
-  const tier = settings.licenseTier || 'demo';
-  return { tier };
-});
-ipcMain.handle('license:set-key', (_event, rawKey) => {
-  try {
-    const key = String(rawKey || '').trim();
-    let tier = 'demo';
-    let ok = true;
-    let reason;
-    if (!key) {
-      ok = false;
-      reason = 'empty';
-    } else {
-      ok = false;
-      reason = 'invalid';
-    }
-    setSettings({ licenseKey: key, licenseTier: tier });
-    return { ok, tier, reason };
-  } catch (error) {
-    return { ok: false, tier: 'demo', reason: 'exception' };
-  }
-});
-ipcMain.handle('license:clear', () => {
-  try {
-    setSettings({ licenseKey: '', licenseTier: 'demo' });
-    return { ok: true, tier: 'demo' };
-  } catch (error) {
-    return { ok: false, tier: 'demo', reason: 'exception' };
-  }
-});
+  const proUnlocked = settings.entitlementPro === true;
+  return {
+    tier: proUnlocked ? 'pro' : 'demo',
+    proUnlocked,
+    source: 'local-placeholder',
+  };
+};
+
+ipcMain.handle('entitlement:get-state', () => getEntitlementState());
 ipcMain.handle('settings:ensure-default-folders', () => ensureDefaultFolders());
 ipcMain.handle('settings:open-folder', async (_event, kind) => {
   if (kind === 'reports') {

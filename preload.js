@@ -107,20 +107,6 @@ if (typeof window !== 'undefined') {
   window.addEventListener('DOMContentLoaded', injectWindowsDragStyles, { once: true });
 }
 
-const licenseSetKey = async (key) => {
-  try {
-    const res = await ipcRenderer.invoke('license:set-key', key);
-    const raw = String(key || '').trim();
-    const masked = raw
-      ? `${raw.slice(0, 4)}…(${raw.length})`
-      : '(empty)';
-    console.log(`[LicenseBridge] set key=${masked} tier=${res?.tier || 'demo'}`);
-    return res || { ok: false, tier: 'demo', reason: 'no-response' };
-  } catch (error) {
-    console.log('[LicenseBridge] set key=(error) tier=demo');
-    return { ok: false, tier: 'demo', reason: 'exception' };
-  }
-};
 
 contextBridge.exposeInMainWorld('wavcue', {
   getSettings: () => ipcRenderer.invoke('settings:get'),
@@ -130,24 +116,16 @@ contextBridge.exposeInMainWorld('wavcue', {
   runCleanupNow: () => ipcRenderer.invoke('settings:run-cleanup-now'),
   runCompleteCleanup: () => ipcRenderer.invoke('settings:run-complete-cleanup'),
   getBackupStatus: () => ipcRenderer.invoke('settings:get-backup-status'),
-  // Store版分岐メモ: 旧ライセンス呼び出し名との互換エイリアス。
-  // 次ブランチで activate/setLicense の整理対象。
-  setLicenseKey: licenseSetKey,
-  activateLicense: licenseSetKey,
-  setLicense: licenseSetKey,
-  getLicenseState: async () => {
+  getEntitlementState: async () => {
     try {
-      return await ipcRenderer.invoke('license:get-state');
+      return await ipcRenderer.invoke('entitlement:get-state');
     } catch (error) {
-      return { tier: 'demo' };
+      return { tier: 'demo', proUnlocked: false, source: 'fallback' };
     }
   },
-  clearLicenseKey: async () => {
-    try {
-      return await ipcRenderer.invoke('license:clear');
-    } catch (error) {
-      return { ok: false, tier: 'demo', reason: 'exception' };
-    }
+  isProUnlocked: async () => {
+    const state = await ipcRenderer.invoke('entitlement:get-state').catch(() => ({ tier: 'demo' }));
+    return String(state?.tier || 'demo').toLowerCase() === 'pro';
   },
   pickExportFolder: () => ipcRenderer.invoke('export:pickFolder'),
   writeFileBase64: (payload) => ipcRenderer.invoke('export:writeFileBase64', payload),
