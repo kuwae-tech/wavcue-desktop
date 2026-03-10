@@ -4713,10 +4713,10 @@ body, #appRoot, .appRoot, .mainLayout{
     <div class="activationOverlayText" id="activationOverlayText">
       体験版をご利用いただけます。<br/>
       1週間・書き出し20回までお試しできます。<br/><br/>
-      続行するか、ライセンスキーを入力して有効化してください。
+      続行するか、設定画面から利用状態をご確認ください。
     </div>
     <div class="activationOverlayInput">
-      <input class="txt" id="activationOverlayKey" placeholder="ライセンスキーを入力" type="text"/>
+      <input class="txt" id="activationOverlayKey" placeholder="キーを入力" type="text"/>
     </div>
     <div class="activationOverlayError" id="activationOverlayError"></div>
     <div class="activationOverlayActions">
@@ -4727,8 +4727,8 @@ body, #appRoot, .appRoot, .mainLayout{
 </div>
 <dialog id="standardGraceDialog" class="standardGraceDialog" data-lock-close="1" aria-labelledby="standardGraceTitle" aria-describedby="standardGraceMessage">
   <div class="stdGraceBody">
-    <div class="stdGraceTitle" id="standardGraceTitle">Standard認証のご案内</div>
-    <div class="stdGraceMsg" id="standardGraceMessage">Standard認証が切れました。1時間後に書き出しのみ停止します。ネット接続を確認して再認証してください。</div>
+    <div class="stdGraceTitle" id="standardGraceTitle">利用状態のご案内</div>
+    <div class="stdGraceMsg" id="standardGraceMessage">利用状態を確認できませんでした。1時間後に書き出しのみ停止します。ネット接続をご確認ください。</div>
   </div>
   <div class="stdGraceActions">
     <button class="btn primary" id="standardGraceOk" type="button">OK</button>
@@ -5160,14 +5160,14 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="modalHead">
     <div class="title">
       <b>設定</b>
-      <span class="muted">バックアップ / ライセンス</span>
+      <span class="muted">バックアップ / 利用設定</span>
     </div>
   </div>
   <div class="modalBody">
     <div class="settingsTabs">
       <div class="tabBar" role="tablist" aria-label="設定タブ">
         <button class="tabBtn active" data-settings-tab="backup" role="tab" aria-selected="true" type="button">バックアップ</button>
-        <button class="tabBtn" data-settings-tab="license" role="tab" aria-selected="false" type="button">ライセンス/アクティベート</button>
+        <button class="tabBtn" data-settings-tab="license" role="tab" aria-selected="false" type="button">利用設定</button>
       </div>
     </div>
     <div class="settingsTabPanels">
@@ -5264,18 +5264,18 @@ body, #appRoot, .appRoot, .mainLayout{
       <div class="settingsTabPanel" data-settings-tabpanel="license" role="tabpanel">
         <div class="settingsGrid">
           <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
-            <h3>ライセンス/アクティベート</h3>
+            <h3>利用設定</h3>
             <div class="settingsBlock">
-              <div class="settingsBlockTitle">ライセンスキー</div>
+              <div class="settingsBlockTitle">キー入力</div>
               <div class="settingsLicenseRow">
-                <input class="txt" id="settingsLicenseKey" placeholder="ライセンスキーを入力" type="text"/>
+                <input class="txt" id="settingsLicenseKey" placeholder="キーを入力" type="text"/>
                 <button class="btn good" id="settingsLicenseActivate" type="button">有効化</button>
               </div>
               <div class="settingsStatus" id="settingsLicenseStatus"></div>
               <div class="settingsError" id="settingsLicenseError"></div>
             </div>
             <div class="settingsBlock">
-              <div class="settingsBlockTitle">移行（端末変更）</div>
+              <div class="settingsBlockTitle">端末移行</div>
               <div class="settingsLicenseRow">
                 <button class="btn" id="settingsLicenseTransfer" type="button">移行</button>
                 <span class="muted" id="settingsLicenseTransferRemainingInline">残り: —</span>
@@ -5344,14 +5344,14 @@ body, #appRoot, .appRoot, .mainLayout{
 <dialog class="confirmDialog" id="licenseClearConfirm">
   <div class="modalHead">
     <div class="title">
-      <b>ライセンスを解除しますか？</b>
+      <b>利用設定を解除しますか？</b>
     </div>
   </div>
   <div class="modalBody">
     <div class="confirmBody">
       <ul class="confirmList">
-        <li>ライセンスキーが削除され、Demoへ戻ります</li>
-        <li>解除後は再度キーを入力して有効化できます</li>
+        <li>入力済みキーが削除され、Demoへ戻ります</li>
+        <li>解除後は再度キーを入力して利用状態を更新できます</li>
       </ul>
       <div class="confirmActions">
         <button class="btn" id="licenseClearCancel" type="button">キャンセル</button>
@@ -5369,7 +5369,7 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="modalBody">
     <div class="confirmBody">
       <ul class="confirmList">
-        <li>この端末での認証を解除し、別の端末で同じライセンスキーを有効化できるようにします</li>
+        <li>この端末での利用状態を解除し、別の端末で同じキーを利用できるようにします</li>
         <li>解除後、この端末はDEMOに戻ります</li>
       </ul>
       <div class="confirmActions">
@@ -5527,23 +5527,23 @@ const LicenseCore = (()=> {
 MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 -----END PUBLIC KEY-----`;
   const LICENSE_TEXT = Object.freeze({
-    exportStandardRequired: "書き出しはStandard以上で利用できます。",
+    exportStandardRequired: "書き出しはPROで利用できます。",
     exportAuthExpired: "認証が確認できないため書き出しのみ停止しています。",
     bulkImportPro: "一括読み込みはProで利用できます。",
     bulkCheckPro: "一括チェックはProで利用できます。",
     bulkExportPro: "一括書き出しはProで利用できます。",
     historyPro: "履歴はProで利用できます。",
-    presetDemo: "プリセットはStandard以上で利用できます。",
+    presetDemo: "プリセットはPROで利用できます。",
     backupDemo: "Demoではバックアップ機能は利用できません。",
     demoNotice: "体験版です。1週間・書き出し20回までお試しできます。",
-    demoExpiredBanner: "体験版の利用期間が終了しました。ライセンスをご購入ください",
-    demoExportLimitBanner: "体験版の書き出し回数制限に達しました。ライセンスをご購入ください",
-    demoExpiredToast: "体験版の利用期間が終了しました。ライセンスをご購入ください",
-    demoExportLimitToast: "体験版の書き出し回数制限に達しました。ライセンスをご購入ください",
-    standardAuthToast: "Standard認証が切れました。書き出しのみ停止します。",
-    standardGraceModal: "Standard認証が切れました。1時間後に書き出しのみ停止します。\nネット接続を確認して再認証してください。",
-    standardGraceBanner: "認証が切れています（猶予中）。ネット接続を確認して再認証してください。",
-    standardAuthBanner: "認証が切れています（書き出しのみ停止）。ネット接続を確認して再認証してください。",
+    demoExpiredBanner: "DEMO利用期間が終了しました。制限付き表示で利用できます。",
+    demoExportLimitBanner: "DEMOの書き出し回数上限に達しました。",
+    demoExpiredToast: "DEMO利用期間が終了しました。",
+    demoExportLimitToast: "DEMOの書き出し回数上限に達しました。",
+    standardAuthToast: "利用状態を確認できないため、書き出しのみ停止します。",
+    standardGraceModal: "利用状態を確認できませんでした。1時間後に書き出しのみ停止します。\nネット接続をご確認ください。",
+    standardGraceBanner: "利用状態を確認中です（猶予中）。ネット接続をご確認ください。",
+    standardAuthBanner: "利用状態を確認できないため、書き出しのみ停止しています。",
     standardOfflineToast: "オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。",
   });
   const policy = {
@@ -6424,7 +6424,7 @@ const mapDemoReasonToMessage = (reason)=>{
   const code = String(reason || "").trim().toLowerCase();
   if(!code || code === "missing-certificate"){
     return {
-      detail: "ライセンスを設定すると STANDARD / PRO を利用できます。",
+      detail: "利用設定を行うと PRO 機能を利用できます。",
       isStrong: false,
     };
   }
@@ -6910,7 +6910,7 @@ const applyLicenseUi = (state)=>{
           const openBtn = document.createElement("button");
           openBtn.className = "btn licenseBannerBtn";
           openBtn.type = "button";
-          openBtn.textContent = isDemo ? "設定を開く" : "ライセンスキーを入力";
+          openBtn.textContent = "設定を開く";
           openBtn.addEventListener("click", ()=>{
             if(isDemo){
               openSettingsModalSafe("license");
@@ -13251,7 +13251,7 @@ licenseTransferConfirmOk?.addEventListener("click", async ()=>{
   }
   const licenseKey = getStoredLicenseKey();
   if(!licenseKey){
-    if(window.safeToast) window.safeToast("ライセンスキーが未入力です。", "warn", 2600);
+    if(window.safeToast) window.safeToast("キーが未入力です。", "warn", 2600);
     return;
   }
   const deviceId = window.WavCueLicense?.getDeviceId?.();
@@ -13290,7 +13290,7 @@ settingsTabButtons.forEach((btn)=>{
 });
 
 const resolveActivationErrorMessage = (reason)=>{
-  if(reason === "empty") return "ライセンスキーを入力してください。";
+  if(reason === "empty") return "キーを入力してください。";
   if(reason === "server-unset") return "ライセンスサーバーが未設定です。";
   if(reason === "network-error") return "通信に失敗しました。ネットワークをご確認ください。";
   if(reason === "cert-invalid") return "証明書の検証に失敗しました。";
