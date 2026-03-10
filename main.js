@@ -127,6 +127,10 @@ const ensureDefaultFolders = async () => {
 const isMac = process.platform === 'darwin';
 const isProduction = app.isPackaged;
 
+// CHECK ONLY
+// REVERT BEFORE MERGE
+const TEMP_ENABLE_DEVTOOLS_FOR_CHECK = true;
+
 const SETTINGS_WRITE_ALLOWLIST = new Set([
   'schemaVersion',
   'autoCleanup',
@@ -196,7 +200,7 @@ const createWindow = () => {
     Menu.setApplicationMenu(null);
   }
 
-  if (!isProduction) {
+  if (!isProduction || TEMP_ENABLE_DEVTOOLS_FOR_CHECK) {
     mainWindow.webContents.openDevTools({ mode: 'detach' });
   }
 };
