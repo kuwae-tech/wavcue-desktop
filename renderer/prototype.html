@@ -5524,6 +5524,7 @@ const beginLicenseVerification = (reason = "unknown")=>{
 
 const LicenseCore = (()=> {
   const listeners = new Set();
+  const CHECK_ONLY_FORCE_PRO = true; // CHECK ONLY / DO NOT MERGE
   const tierRank = { demo: 0, standard: 1, pro: 2 };
   const LICENSE_CERT_PUBKEY_PEM = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
@@ -5985,6 +5986,18 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     return { ok: true, tier: validated.tier, certificate: cert };
   };
   const loadCertificateState = (options = {})=>{
+    if(CHECK_ONLY_FORCE_PRO){
+      if(options.logBoot){
+        console.log("[License] boot tier=PRO (check-only force)");
+      }
+      return {
+        tier: "pro",
+        certificate: null,
+        hasCert: false,
+        deviceId: ensureDeviceId(),
+        demoReason: null,
+      };
+    }
     const deviceId = ensureDeviceId();
     const cert = readCertificate();
     if(!cert){
