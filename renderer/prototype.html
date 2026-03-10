@@ -4706,7 +4706,7 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="offlineStandardBannerText">オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。</div>
   <div class="offlineStandardBannerMeta" id="offlineStandardBannerMeta"></div>
 </div>
-<div id="licenseBanner" role="status" aria-live="polite"></div>
+<div id="licenseBanner" role="status" aria-live="polite">DEMO版です。制限付きで利用できます。</div>
 <div class="activationOverlay" id="activationOverlay" role="dialog" aria-modal="true" aria-labelledby="activationOverlayTitle" aria-describedby="activationOverlayText">
   <div class="activationOverlayCard">
     <div class="activationOverlayTitle" id="activationOverlayTitle">WavCue 体験版のご案内</div>
@@ -5264,58 +5264,22 @@ body, #appRoot, .appRoot, .mainLayout{
       <div class="settingsTabPanel" data-settings-tabpanel="license" role="tabpanel">
         <div class="settingsGrid">
           <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
-            <h3>ライセンス/アクティベート</h3>
+            <h3>PRO版について</h3>
             <div class="settingsBlock">
-              <div class="settingsBlockTitle">ライセンスキー</div>
-              <div class="settingsLicenseRow">
-                <input class="txt" id="settingsLicenseKey" placeholder="ライセンスキーを入力" type="text"/>
-                <button class="btn good" id="settingsLicenseActivate" type="button">有効化</button>
-              </div>
-              <div class="settingsStatus" id="settingsLicenseStatus"></div>
-              <div class="settingsError" id="settingsLicenseError"></div>
+              <div class="muted">現在このアプリはDEMO版として利用できます（制限あり）。</div>
+              <div class="muted" style="margin-top:8px">購入・復元などの手続きは、今後のストア版での対応を予定しています。</div>
             </div>
             <div class="settingsBlock">
-              <div class="settingsBlockTitle">移行（端末変更）</div>
-              <div class="settingsLicenseRow">
-                <button class="btn" id="settingsLicenseTransfer" type="button">移行</button>
-                <span class="muted" id="settingsLicenseTransferRemainingInline">残り: —</span>
+              <div class="settingsBlockTitle">端末ID</div>
+              <div class="settingsInfoRow">
+                <span class="settingsInfoValue settingsDeviceIdValue">
+                  <span class="settingsDeviceIdText" id="settingsDeviceId" title="端末ID">—</span>
+                  <button class="btn" id="settingsDeviceIdCopy" type="button">コピー</button>
+                </span>
               </div>
             </div>
-            <div class="settingsBlock">
-              <div class="licenseStatusGrid">
-                <div class="licenseStatusMain">
-                  <div class="settingsBlockTitle">機能制限</div>
-                  <ul class="muted settingsLimitList" id="settingsLicenseLimits"></ul>
-                </div>
-                <div class="licenseStatusSide">
-                  <div class="settingsBlockTitle">現在の状態</div>
-                  <div class="settingsInfoList">
-                    <div class="settingsInfoRow">
-                      <span class="muted">現在のプラン</span>
-                      <span class="settingsInfoValue" id="settingsLicensePlan">—</span>
-                    </div>
-                    <div class="settingsInfoRow">
-                      <span class="muted">DEMO残り</span>
-                      <span class="settingsInfoValue" id="settingsLicenseDemoRemaining">—</span>
-                    </div>
-                    <div class="settingsInfoRow" id="settingsLicenseTransferRemainingRow" style="display:none">
-                      <span class="muted">移行残り</span>
-                      <span class="settingsInfoValue" id="settingsLicenseTransferRemaining">—</span>
-                    </div>
-                    <div class="settingsInfoRow">
-                      <span class="muted">端末ID</span>
-                      <span class="settingsInfoValue settingsDeviceIdValue">
-                        <span class="settingsDeviceIdText" id="settingsDeviceId" title="端末ID">—</span>
-                        <button class="btn" id="settingsDeviceIdCopy" type="button">コピー</button>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="muted" id="settingsLicenseDebugOverride" style="font-size:11px;margin-top:6px"></div>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
     </div>
@@ -6573,10 +6537,9 @@ function getStoredSettingsTab(){
   }
 }
 function focusSettingsLicenseInput(){
-  const input = document.getElementById("settingsLicenseKey");
-  if(input && !input.disabled){
-    input.focus();
-    input.select?.();
+  const copyBtn = document.getElementById("settingsDeviceIdCopy");
+  if(copyBtn && !copyBtn.disabled){
+    copyBtn.focus();
   }
 }
 function openSettingsModalSafe(preferTab){
@@ -6715,23 +6678,6 @@ function updateActivationUi(state){
   }
   if(overlayActivate) overlayActivate.disabled = isActivated;
   if(overlayError && isActivated) overlayError.textContent = "";
-  const settingsInput = document.getElementById("settingsLicenseKey");
-  const settingsStatus = document.getElementById("settingsLicenseStatus");
-  const settingsError = document.getElementById("settingsLicenseError");
-  const settingsActivate = document.getElementById("settingsLicenseActivate");
-  if(settingsInput){
-    settingsInput.value = maskedKey || "";
-    settingsInput.disabled = isActivated;
-  }
-  if(settingsActivate) settingsActivate.disabled = isActivated;
-  if(settingsStatus){
-    settingsStatus.textContent = isActivated ? `有効化済み（${tier.toUpperCase()}）` : "";
-  }
-  if(settingsError && isActivated) settingsError.textContent = "";
-  if(settingsLicenseTransfer){
-    const hasKey = !!storedKey;
-    settingsLicenseTransfer.disabled = !hasServerUrl || !hasKey;
-  }
 }
 function isDemoPromptDone(){
   try{ return localStorage?.getItem?.(DEMO_PROMPT_KEY) === "1"; }catch(_){ return false; }
@@ -6752,73 +6698,12 @@ function openActivationOverlay(){
   }
   return true;
 }
-function openLicenseEntryFlow(){
-  try{
-    const st = window.WavCueLicense?.getStateSafe?.();
-    const tier = String(st?.tier || "demo").toLowerCase();
-    if(tier === "demo" && !isDemoPromptDone()){
-      if(openActivationOverlay()) return;
-    }
-  }catch(_){}
-  openSettingsModalSafe("license");
-}
 function updateLicenseInfo(state){
   const tierRaw = state && state.tier ? state.tier : "demo";
   const tier = String(tierRaw).toLowerCase();
-  const tierLabel = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
-  if(settingsLicensePlan) settingsLicensePlan.textContent = tierLabel;
-  const demoInfo = state?.demo || {};
-  const remainingDays = Number.isFinite(demoInfo.remainingDays) ? demoInfo.remainingDays : null;
-  const remainingExports = Number.isFinite(demoInfo.remainingExports) ? demoInfo.remainingExports : null;
-  const remainText = (remainingDays != null || remainingExports != null)
-    ? `${remainingDays != null ? `${remainingDays}日` : "—"} / ${remainingExports != null ? `${remainingExports}回` : "—"}`
-    : "—";
-  if(settingsLicenseDemoRemaining) settingsLicenseDemoRemaining.textContent = remainText;
-  const storedKey = getStoredLicenseKey();
-  if(settingsLicenseDebugOverride) settingsLicenseDebugOverride.textContent = "";
   if(settingsDeviceId){
     const deviceId = window.WavCueLicense?.getDeviceId?.();
     settingsDeviceId.textContent = deviceId || "—";
-  }
-  if(settingsLicenseTransferRemainingInline){
-    const remaining = state?.transfer?.remainingTransfers;
-    if(Number.isFinite(remaining)){
-      settingsLicenseTransferRemainingInline.textContent = `残り: ${remaining}回`;
-    }else{
-      settingsLicenseTransferRemainingInline.textContent = "残り: —";
-    }
-  }
-  if(settingsLicenseTransferRemainingRow){
-    const remaining = state?.transfer?.remainingTransfers;
-    const hasRemaining = Number.isFinite(remaining);
-    settingsLicenseTransferRemainingRow.style.display = hasRemaining ? "flex" : "none";
-    if(hasRemaining && settingsLicenseTransferRemaining){
-      settingsLicenseTransferRemaining.textContent = `${remaining}回`;
-    }
-  }
-  if(settingsLicenseLimits){
-    const lines = [];
-    if(tier === "demo"){
-      const daysTxt = Number.isFinite(remainingDays) ? `${remainingDays}日` : "—";
-      const exportTxt = Number.isFinite(remainingExports) ? `${remainingExports}回` : "—";
-      lines.push(`有効期限: 残り${daysTxt}`);
-      lines.push(`書き出し回数制限: 残り${exportTxt}`);
-      lines.push("プリセット編集 不可");
-      lines.push("一括読み込み / 一括チェック / 一括書き出し 不可");
-    }else if(tier === "standard"){
-      lines.push("一括読み込み / 一括チェック / 一括書き出し 不可");
-    }else{
-      lines.push("制限なし");
-    }
-    settingsLicenseLimits.innerHTML = "";
-    lines.forEach((line)=>{
-      const li = document.createElement("li");
-      li.textContent = line;
-      settingsLicenseLimits.appendChild(li);
-    });
-  }
-  if(tier !== "demo" && storedKey){
-    // keep lock state in status area only
   }
 }
 const applyLicenseUi = (state)=>{
@@ -6843,96 +6728,29 @@ const applyLicenseUi = (state)=>{
     const standardExportAllowed = tier !== "standard" || !standardHardExpired;
     const banner = document.getElementById("licenseBanner");
     if(banner){
-      let bannerText = "";
-      let bannerMeta = "";
-      let isStandardBanner = false;
-      let isGraceBanner = false;
-      let isDemoBanner = false;
-      let hasChip = false;
-      let hasActions = false;
-      let isDangerBanner = false;
-      if(isDemo){
-        const reasonInfo = mapDemoReasonToMessage(state?.demoReason);
-        bannerText = "体験版で起動しています";
-        bannerMeta = reasonInfo.detail;
-        isDemoBanner = true;
-        isDangerBanner = !!reasonInfo.isStrong;
-      }
-      if(isDemo && isDemoLocked){
-        bannerText = (demoBlockedReason === "demo_export_limit")
-          ? LICENSE_TEXT.demoExportLimitBanner
-          : LICENSE_TEXT.demoExpiredBanner;
-        bannerMeta = "";
-        isDangerBanner = true;
-      }else if(tier === "standard" && standardInGrace){
-        bannerText = LICENSE_TEXT.standardGraceBanner;
-        if(Number.isFinite(standardAuth.graceRemainingMinutes) && standardAuth.graceRemainingMinutes > 0){
-          bannerMeta = `あと${standardAuth.graceRemainingMinutes}分`;
-        }
-        isStandardBanner = true;
-        isGraceBanner = true;
-      }else if(tier === "standard" && standardHardExpired){
-        bannerText = LICENSE_TEXT.standardAuthBanner;
-        isStandardBanner = true;
-      }
       while(banner.firstChild) banner.removeChild(banner.firstChild);
-      if(bannerText){
+      const showBanner = isDemo || showDemoRemaining;
+      if(showBanner){
         const body = document.createElement("span");
         body.className = "licenseBannerBody";
-        if(isDangerBanner) body.classList.add("licenseBannerBody--danger");
-        if(isStandardBanner) body.classList.add("licenseBannerBody--standard");
-        if(isGraceBanner) body.classList.add("licenseBannerBody--grace");
         const textSpan = document.createElement("span");
         textSpan.className = "licenseBannerText";
-        textSpan.textContent = bannerText;
+        textSpan.textContent = "DEMO版です。制限付きで利用できます。";
         body.appendChild(textSpan);
-        if(bannerMeta){
-          const metaSpan = document.createElement("span");
-          metaSpan.className = "licenseBannerMeta";
-          metaSpan.textContent = bannerMeta;
-          body.appendChild(metaSpan);
-        }
         if(showDemoRemaining){
           body.appendChild(renderDemoRemainingChip(demoParts));
-          hasChip = true;
         }
         banner.appendChild(body);
-        if(isDemo){
-          const reasonCode = String(state?.demoReason || "missing-certificate");
-          if(_lastDemoBannerReasonLogged !== reasonCode){
-            console.log(`[LicenseUI] demo banner shown (reason=${reasonCode})`);
-            _lastDemoBannerReasonLogged = reasonCode;
-          }
-        }
-        if(isDemo || isDemoLocked || isStandardBanner){
-          const actions = document.createElement("span");
-          actions.className = "licenseBannerActions";
-          const openBtn = document.createElement("button");
-          openBtn.className = "btn licenseBannerBtn";
-          openBtn.type = "button";
-          openBtn.textContent = isDemo ? "設定を開く" : "ライセンスキーを入力";
-          openBtn.addEventListener("click", ()=>{
-            if(isDemo){
-              openSettingsModalSafe("license");
-              return;
-            }
-            openLicenseEntryFlow();
-          });
-          actions.appendChild(openBtn);
-          banner.appendChild(actions);
-          hasActions = true;
-        }
-      }else if(showDemoRemaining){
-        banner.appendChild(renderDemoRemainingNode(demoParts));
-        isDemoBanner = true;
       }
-      banner.classList.toggle("licenseBanner--standard", isStandardBanner);
-      banner.classList.toggle("licenseBanner--grace", isGraceBanner);
-      banner.classList.toggle("licenseBanner--demo", isDemoBanner);
-      banner.classList.toggle("licenseBanner--withChip", hasChip);
-      banner.classList.toggle("licenseBanner--withActions", hasActions);
-      banner.classList.toggle("licenseBanner--danger", isDangerBanner);
-      banner.classList.toggle("show", !!bannerText || isDemoBanner);
+      banner.classList.toggle("licenseBanner--demo", showBanner);
+      banner.classList.toggle("show", showBanner);
+      [
+        "licenseBanner--standard",
+        "licenseBanner--grace",
+        "licenseBanner--withChip",
+        "licenseBanner--withActions",
+        "licenseBanner--danger",
+      ].forEach((cls)=> banner.classList.remove(cls));
       if(!isDemo) _lastDemoBannerReasonLogged = null;
     }
     if(isDemo && !_demoStartupNoticeShown){
@@ -12998,20 +12816,8 @@ const settingsDeleteMethod = $("settingsDeleteMethod");
 const settingsAutoCleanup = $("settingsAutoCleanup");
 const settingsResetRecommended = $("settingsResetRecommended");
 const settingsRulesBadge = $("settingsRulesBadge");
-const settingsLicenseKey = $("settingsLicenseKey");
-const settingsLicenseActivate = $("settingsLicenseActivate");
-const settingsLicenseTransfer = $("settingsLicenseTransfer");
-const settingsLicenseStatus = $("settingsLicenseStatus");
-const settingsLicenseError = $("settingsLicenseError");
-const settingsLicensePlan = $("settingsLicensePlan");
-const settingsLicenseDemoRemaining = $("settingsLicenseDemoRemaining");
-const settingsLicenseTransferRemainingRow = $("settingsLicenseTransferRemainingRow");
-const settingsLicenseTransferRemaining = $("settingsLicenseTransferRemaining");
-const settingsLicenseTransferRemainingInline = $("settingsLicenseTransferRemainingInline");
 const settingsDeviceId = $("settingsDeviceId");
 const settingsDeviceIdCopy = $("settingsDeviceIdCopy");
-const settingsLicenseDebugOverride = $("settingsLicenseDebugOverride");
-const settingsLicenseLimits = $("settingsLicenseLimits");
 const licenseClearConfirm = $("licenseClearConfirm");
 const licenseClearCancel = $("licenseClearCancel");
 const licenseClearConfirmOk = $("licenseClearConfirmOk");
@@ -13297,10 +13103,9 @@ const resolveActivationErrorMessage = (reason)=>{
   if(reason === "activation-failed") return "有効化に失敗しました。キーを確認してください。";
   return "有効化に失敗しました。";
 };
-const runActivationFlow = async (source)=>{
-  const isOverlay = source === "overlay";
-  const keyInput = isOverlay ? activationOverlayKey : settingsLicenseKey;
-  const errorEl = isOverlay ? activationOverlayError : settingsLicenseError;
+const runActivationFlow = async ()=>{
+  const keyInput = activationOverlayKey;
+  const errorEl = activationOverlayError;
   const rawKey = String(keyInput?.value || "").trim();
   if(errorEl) errorEl.textContent = "";
   if(navigator.onLine === false){
@@ -13334,23 +13139,10 @@ const runActivationFlow = async (source)=>{
   }
 };
 
-activationOverlayActivate?.addEventListener("click", ()=> runActivationFlow("overlay"));
-settingsLicenseActivate?.addEventListener("click", ()=> runActivationFlow("settings"));
+activationOverlayActivate?.addEventListener("click", ()=> runActivationFlow());
 activationOverlayContinue?.addEventListener("click", ()=>{
   try{ localStorage?.setItem?.(DEMO_PROMPT_KEY, "1"); }catch(_){}
   activationOverlay?.classList.remove("show");
-});
-settingsLicenseTransfer?.addEventListener("click", ()=>{
-  const serverUrl = normalizeServerUrl(window.WavCueLicense?.getServerUrl?.() || "");
-  if(!serverUrl){
-    if(window.safeToast) window.safeToast("ライセンスサーバーが未設定のため移行できません。", "warn", 2600);
-    return;
-  }
-  if(navigator.onLine === false){
-    if(window.safeToast) window.safeToast("インターネット未接続のため移行できません。接続後に再度お試しください。", "warn", 3200);
-    return;
-  }
-  openLicenseTransferConfirm();
 });
 settingsDeviceIdCopy?.addEventListener("click", async ()=>{
   const deviceId = window.WavCueLicense?.getDeviceId?.();
