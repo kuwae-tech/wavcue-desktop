@@ -2585,6 +2585,7 @@ dialog.bulkNgDialog{
   line-height:1.2;
   color-scheme: dark;
 }
+
 .btnSel option{ background: var(--panel2); color: var(--text); }
 .btnSel:hover{ background:rgba(255,255,255,.10); }
 .btnSel:focus{ outline:none; box-shadow:0 0 0 3px rgba(255,255,255,.12); }
@@ -4345,7 +4346,7 @@ body, #appRoot, .appRoot, .mainLayout{
   /* フィルター等が “右に寄りすぎて見切れる” のを防ぐ（wrapのmin-width問題を潰す） */
   .proOnlyWrap{
     min-width: 0 !important;
-    max-width: 220px !important;
+    max-width: 252px !important;
   }
   .proOnlyWrap .btn,
   .proOnlyWrap select{
@@ -4437,9 +4438,9 @@ body, #appRoot, .appRoot, .mainLayout{
     padding: 0 !important;
     margin: 0 !important;
     flex: 0 0 auto !important;
-    width: clamp(160px, 18vw, 220px) !important;
+    width: clamp(180px, 20vw, 252px) !important;
     min-width: 160px !important;
-    max-width: 220px !important;
+    max-width: 252px !important;
     background: none !important;
     box-shadow: none !important;
     backdrop-filter: none !important;
@@ -4551,9 +4552,9 @@ body, #appRoot, .appRoot, .mainLayout{
     background: transparent !important;
     border: 0 !important;
     box-shadow: none !important;
-    width: clamp(160px, 18vw, 220px) !important;
-    min-width: 160px !important;
-    max-width: 220px !important;
+    width: clamp(180px, 20vw, 252px) !important;
+    min-width: 180px !important;
+    max-width: 252px !important;
   }
 
   /* selectを“ボタン”として統一（高さ/角丸/パディング） */
@@ -4566,13 +4567,13 @@ body, #appRoot, .appRoot, .mainLayout{
     max-width: 100% !important;
     height: 32px !important;
     line-height: 1.2 !important;
-    padding: 9px 40px 9px 10px !important; /* 右に矢印分 */
+    padding: 9px 44px 9px 10px !important; /* 右に矢印分 */
     border-radius: 12px !important;
     border: 1px solid rgba(255,255,255,0.10) !important;
     background-color: rgba(18,20,24,.85) !important;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23f0f2f6' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round' opacity='0.65'/%3E%3C/svg%3E") !important;
     background-repeat: no-repeat !important;
-    background-position: right 12px center !important;
+    background-position: right 14px center !important;
     background-size: 10px !important;
     color: rgba(240,242,246,.92) !important;
     border-color: rgba(255,255,255,.10) !important;
@@ -4589,6 +4590,23 @@ body, #appRoot, .appRoot, .mainLayout{
   #proFilterStatus option{
     background: #101216;
     color: #f0f2f6;
+  }
+
+  .selectArrowUnified{
+    -webkit-appearance: none !important;
+    appearance: none !important;
+    -moz-appearance: none !important;
+    height: 32px !important;
+    line-height: 1.2 !important;
+    padding: 9px 44px 9px 10px !important;
+    border-radius: 12px !important;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23f0f2f6' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round' opacity='0.65'/%3E%3C/svg%3E") !important;
+    background-repeat: no-repeat !important;
+    background-position: right 14px center !important;
+    background-size: 10px !important;
+    color-scheme: dark;
+    text-align: left !important;
+    box-sizing: border-box !important;
   }
 
   /* フィルターもhoverで欠けない（translate禁止 + shadowのみ） */
@@ -4744,7 +4762,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
     <div class="proOnlyWrap proFilterWrap" id="proFilterWrap">
       <span class="proBtnGroup">
-        <select id="proFilterStatus" class="btn proSelect proFilterSelect" disabled>
+        <select id="proFilterStatus" class="btn proSelect proFilterSelect selectArrowUnified" disabled>
           <option value="all">全て</option>
           <option value="unverified">未確認</option>
           <option value="ok">規格OK</option>
@@ -4810,7 +4828,7 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
   </dialog>
 </div></div></div></div></div><aside class="panel right cueSide" id="cueSide"><div class="sectionHead"><div class="title"><b>CUEメニュー</b><span>CUE一覧 / 追加 / 移動 / 削除</span></div></div><div class="sidePad"><div class="card"><div class="rowBetween"><label>CUE追加（再生ヘッド位置）</label><span class="pill mono" id="cueCount">0</span></div><div class="row cueButtonsRow cueTopControls cuePairTop" style="margin-top:8px;align-items:center"><div class="pairRow"><button class="btn" disabled="" id="btnAddPair" type="button">＋ STANDBY→END 追加</button><div class="linkMini" title="ON: STANDBY/END を同じ間隔で連動移動 / OFF: 個別に移動"><label class="switch"><input checked="" id="chkLinkPair" type="checkbox"/><span class="slider"></span></label><span class="linkMiniLabel">連動移動</span></div></div></div><div class="row cueButtonsRow cuePairBottom" style="margin-top:6px;align-items:center"><span class="linkMiniLabel">秒数（STANDBY→END間隔）</span><input id="pairSeconds" style="width:84px" type="text" value="20"/></div><div class="row cueButtonsRow" style="margin-top:8px;gap:8px;align-items:center">
-<select class="btnSel" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
+<select class="btnSel selectArrowUnified" disabled="" id="selBcLabel" style="flex:1;min-width:220px">
 <option disabled="" selected="" value="">BC$キューを選択…</option>
 <optgroup label="基本">
 <option value="BC$START">BC$START（マーク）</option>
@@ -5006,7 +5024,7 @@ body, #appRoot, .appRoot, .mainLayout{
 </div>
 <div class="scTopRow">
 <span class="muted scPresetLbl" style="font-size:12px">プリセット</span>
-<select aria-label="局別プリセット（編集・保存可）" class="btnSel" data-no-dirty="1" id="sc_preset"></select>
+<select aria-label="局別プリセット（編集・保存可）" class="btnSel selectArrowUnified" data-no-dirty="1" id="sc_preset"></select>
 <button class="btn" id="sc_run" style="padding:8px 12px;border-radius:999px" type="button">チェック</button>
 </div>
 </div>
@@ -5028,7 +5046,7 @@ body, #appRoot, .appRoot, .mainLayout{
 <div class="scPresetGrid" style="display:grid;grid-template-columns:160px 1fr;gap:8px 10px;margin-top:10px">
 <div class="muted">プリセット</div>
 <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-<select aria-label="既存プリセットを選択して編集" class="scPmPickSel" id="sc_pm_pick" style="min-width:280px;max-width:100%">
+<select aria-label="既存プリセットを選択して編集" class="scPmPickSel selectArrowUnified" id="sc_pm_pick" style="min-width:280px;max-width:100%">
 <option disabled="" hidden="" selected="" value="">プリセットを選択して編集</option>
 <option hidden="" value="__new__">新規作成</option>
 </select>
@@ -5061,7 +5079,7 @@ body, #appRoot, .appRoot, .mainLayout{
 </div>
 <div class="muted">サンプルレート</div>
 <div>
-<select class="btnSel" id="sc_pm_srsel" style="width:240px">
+<select class="btnSel selectArrowUnified" id="sc_pm_srsel" style="width:240px">
 <option value="">制限なし</option>
 <option value="44100">44100</option>
 <option value="48000">48000</option>
@@ -5070,7 +5088,7 @@ body, #appRoot, .appRoot, .mainLayout{
 </div>
 <div class="muted">bit深度</div>
 <div>
-<select class="btnSel" id="sc_pm_bitssel" style="width:240px">
+<select class="btnSel selectArrowUnified" id="sc_pm_bitssel" style="width:240px">
 <option value="">制限なし</option>
 <option value="16">16</option>
 <option value="24">24</option>
@@ -5079,7 +5097,7 @@ body, #appRoot, .appRoot, .mainLayout{
 </div>
 <div class="muted">チャンネル</div>
 <div>
-<select class="btnSel" id="sc_pm_chsel" style="width:240px">
+<select class="btnSel selectArrowUnified" id="sc_pm_chsel" style="width:240px">
 <option value="">制限なし</option>
 <option value="2">ステレオ</option>
 <option value="1">モノラル</option>
