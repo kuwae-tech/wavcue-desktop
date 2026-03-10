@@ -5144,14 +5144,14 @@ body, #appRoot, .appRoot, .mainLayout{
   <div class="modalHead">
     <div class="title">
       <b>設定</b>
-      <span class="muted">バックアップ / ライセンス</span>
+      <span class="muted">バックアップ / 購入・アップグレード</span>
     </div>
   </div>
   <div class="modalBody">
     <div class="settingsTabs">
       <div class="tabBar" role="tablist" aria-label="設定タブ">
         <button class="tabBtn active" data-settings-tab="backup" role="tab" aria-selected="true" type="button">バックアップ</button>
-        <button class="tabBtn" data-settings-tab="license" role="tab" aria-selected="false" type="button">ライセンス/アクティベート</button>
+        <button class="tabBtn" data-settings-tab="license" role="tab" aria-selected="false" type="button">購入・アップグレード</button>
       </div>
     </div>
     <div class="settingsTabPanels">
@@ -5248,58 +5248,18 @@ body, #appRoot, .appRoot, .mainLayout{
       <div class="settingsTabPanel" data-settings-tabpanel="license" role="tabpanel">
         <div class="settingsGrid">
           <section class="settingsCard settingsCard--license" style="grid-column:1/-1">
-            <h3>ライセンス/アクティベート</h3>
+            <h3>購入・アップグレード</h3>
             <div class="settingsBlock">
-              <div class="settingsBlockTitle">ライセンスキー</div>
-              <div class="settingsLicenseRow">
-                <input class="txt" id="settingsLicenseKey" placeholder="ライセンスキーを入力" type="text"/>
-                <button class="btn good" id="settingsLicenseActivate" type="button">有効化</button>
+              <div class="settingsBlockTitle">Microsoft Store（Standard向けProアドオン）</div>
+              <div class="muted" style="margin-bottom:10px;line-height:1.6;">Store版ではライセンスキー/証明書入力は利用しません。Standardライセンスで起動後、必要に応じてProアドオンを購入してください。</div>
+              <div class="row" style="gap:8px;flex-wrap:wrap">
+                <button class="btn good" id="settingsPurchasePro" type="button">Proを購入</button>
+                <span class="muted" id="settingsPurchaseStatus">Proアドオン状態: 未所持（スタブ）</span>
               </div>
-              <div class="settingsStatus" id="settingsLicenseStatus"></div>
-              <div class="settingsError" id="settingsLicenseError"></div>
+              <div class="muted" style="font-size:11px;margin-top:8px">※ 現在はUIスタブです。StoreContext実装は次ステップで追加予定です。</div>
             </div>
-            <div class="settingsBlock">
-              <div class="settingsBlockTitle">移行（端末変更）</div>
-              <div class="settingsLicenseRow">
-                <button class="btn" id="settingsLicenseTransfer" type="button">移行</button>
-                <span class="muted" id="settingsLicenseTransferRemainingInline">残り: —</span>
-              </div>
-            </div>
-            <div class="settingsBlock">
-              <div class="licenseStatusGrid">
-                <div class="licenseStatusMain">
-                  <div class="settingsBlockTitle">機能制限</div>
-                  <ul class="muted settingsLimitList" id="settingsLicenseLimits"></ul>
-                </div>
-                <div class="licenseStatusSide">
-                  <div class="settingsBlockTitle">現在の状態</div>
-                  <div class="settingsInfoList">
-                    <div class="settingsInfoRow">
-                      <span class="muted">現在のプラン</span>
-                      <span class="settingsInfoValue" id="settingsLicensePlan">—</span>
-                    </div>
-                    <div class="settingsInfoRow">
-                      <span class="muted">DEMO残り</span>
-                      <span class="settingsInfoValue" id="settingsLicenseDemoRemaining">—</span>
-                    </div>
-                    <div class="settingsInfoRow" id="settingsLicenseTransferRemainingRow" style="display:none">
-                      <span class="muted">移行残り</span>
-                      <span class="settingsInfoValue" id="settingsLicenseTransferRemaining">—</span>
-                    </div>
-                    <div class="settingsInfoRow">
-                      <span class="muted">端末ID</span>
-                      <span class="settingsInfoValue settingsDeviceIdValue">
-                        <span class="settingsDeviceIdText" id="settingsDeviceId" title="端末ID">—</span>
-                        <button class="btn" id="settingsDeviceIdCopy" type="button">コピー</button>
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div class="muted" id="settingsLicenseDebugOverride" style="font-size:11px;margin-top:6px"></div>
-            </div>
-          </div>
-        </section>
+          </section>
+        </div>
       </div>
     </div>
     </div>
@@ -6562,6 +6522,21 @@ function focusSettingsLicenseInput(){
     input.focus();
     input.select?.();
   }
+}
+
+function isProOwned(){
+  return false;
+}
+
+async function purchasePro(){
+  console.log("[StoreStub] purchasePro called");
+  alert("Store版スタブ: Pro購入フローは未実装です。");
+}
+
+function updateStorePurchaseUi(){
+  const status = document.getElementById("settingsPurchaseStatus");
+  if(!status) return;
+  status.textContent = `Proアドオン状態: ${isProOwned() ? "所持" : "未所持"}（スタブ）`;
 }
 function openSettingsModalSafe(preferTab){
   const targets = [
@@ -12996,6 +12971,8 @@ const settingsDeviceId = $("settingsDeviceId");
 const settingsDeviceIdCopy = $("settingsDeviceIdCopy");
 const settingsLicenseDebugOverride = $("settingsLicenseDebugOverride");
 const settingsLicenseLimits = $("settingsLicenseLimits");
+const settingsPurchasePro = $("settingsPurchasePro");
+const settingsPurchaseStatus = $("settingsPurchaseStatus");
 const licenseClearConfirm = $("licenseClearConfirm");
 const licenseClearCancel = $("licenseClearCancel");
 const licenseClearConfirmOk = $("licenseClearConfirmOk");
@@ -13336,6 +13313,15 @@ settingsLicenseTransfer?.addEventListener("click", ()=>{
   }
   openLicenseTransferConfirm();
 });
+settingsPurchasePro?.addEventListener("click", async ()=>{
+  try{
+    await purchasePro();
+  }catch(_){
+    if(window.safeToast) window.safeToast("購入処理の呼び出しに失敗しました（スタブ）。", "warn", 2600);
+  }
+  updateStorePurchaseUi();
+});
+updateStorePurchaseUi();
 settingsDeviceIdCopy?.addEventListener("click", async ()=>{
   const deviceId = window.WavCueLicense?.getDeviceId?.();
   if(!deviceId) return;
