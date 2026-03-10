@@ -491,6 +491,8 @@ ipcMain.handle('settings:set', (_event, patch) => {
   }
   return { ok: true, settings: setSettings(filtered.patch) };
 });
+// Store版分岐メモ: 以下の license IPC 群は旧キー認証前提。
+// 次ブランチで課金導線へ置換する際の整理対象として残す。
 ipcMain.handle('license:get-state', () => {
   const settings = getSettings() || {};
   const tier = settings.licenseTier || 'demo';

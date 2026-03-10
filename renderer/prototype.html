@@ -5578,7 +5578,9 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       if(!localStorage?.setItem) return;
       if(value == null) localStorage.removeItem(key);
       else localStorage.setItem(key, String(Math.trunc(value)));
-    }catch(_){}
+    }catch(error){
+      console.warn("[LICENSE] localStorage write failed", { key }, error);
+    }
   };
   const readDemoActivatedAt = ()=> readNumber(LS_DEMO_ACTIVATED_AT);
   const ensureDemoActivatedAt = (now)=>{
@@ -5837,7 +5839,9 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       try{
         const buf = Buffer.from(padded, "base64");
         if(buf?.length) return Uint8Array.from(buf);
-      }catch(_){ }
+      }catch(error){
+        console.warn("[LICENSE] decode base64url via Buffer failed", error);
+      }
     }
     if(typeof atob === "function"){
       try{
@@ -8057,7 +8061,9 @@ if (typeof window.diagState !== "function") {
         if (!obj || typeof obj !== "object") return;
         const keys = Object.keys(obj);
         console.log("[MIGRATE][KEYS]", label || "", {keyCount: keys.length, keys: keys.slice(0, 60)});
-      }catch(e){}
+       }catch(e){
+        console.warn("[MIGRATE][KEYS] summarize failed", label || "", e);
+      }
     };
   }
 
@@ -8083,7 +8089,9 @@ if (typeof window.diagState !== "function") {
               hits.push({path: p, key: k, type: Array.isArray(v) ? "array" : typeof v});
               if (hits.length >= limit) return;
             }
-          }catch(_){}
+          }catch(error){
+            console.warn("[MIGRATE] deepFindByKey matcher failed", { path: p, key: k }, error);
+          }
 
           if (v && typeof v === "object"){
             walk(v, p, depth + 1);
@@ -19422,7 +19430,9 @@ try{
           hasCmcd: _cmcdHasValues(rec.cmcd),
           pdfCount: rec.attachments?.length || 0,
         });
-      }catch(_){ }
+      }catch(error){
+        console.warn("[ACTIVE] restore state summary log failed", { fileId: rec?.id }, error);
+      }
       if(typeof window.requestFullRefresh === "function"){
         window.requestFullRefresh("active:restore:cmcd");
         window.requestFullRefresh("active:restore:pdf");
@@ -19618,14 +19628,20 @@ try{
       if(dlg.parentElement !== document.body) document.body.appendChild(dlg);
       renderHistoryList();
       renderHistoryDetail();
-      try{ dlg.showModal(); }catch(_){ dlg.setAttribute("open", ""); }
+      try{ dlg.showModal(); }catch(error){
+        console.warn("[History] showModal failed, fallback to open attr", error);
+        dlg.setAttribute("open", "");
+      }
       requestAnimationFrame(()=>{
         const r = dlg.getBoundingClientRect();
         const entriesCount = historyEntries().length;
         console.log(`[History] open size=${Math.round(r.width)},${Math.round(r.height)} entries=${entriesCount}`);
       });
     }else{
-      try{ dlg.close(); }catch(_){ dlg.removeAttribute("open"); }
+      try{ dlg.close(); }catch(error){
+        console.warn("[History] close failed, fallback to open attr removal", error);
+        dlg.removeAttribute("open");
+      }
     }
   }
   function logJob(s, level){
@@ -19716,7 +19732,8 @@ try{
       const cleanup = (result)=>{
         try{
           dlg.close();
-        }catch(_){
+        }catch(error){
+          console.warn("[BULK] cleanup close failed", error);
           dlg.removeAttribute("open");
         }
         dlg.removeEventListener("click", onBackdrop);
@@ -19737,11 +19754,16 @@ try{
       proceedBtn?.addEventListener("click", onProceedBtn);
       try{
         if(dlg.open) dlg.close();
-      }catch(_){}
+      }catch(error){
+        console.warn("[BULK] close dialog before open failed", error);
+      }
       try{
         dlg.showModal();
-      }catch(_){
-        try{ dlg.show(); }catch(__){}
+      }catch(error){
+        console.warn("[BULK] showModal failed, fallback to show", error);
+        try{ dlg.show(); }catch(fallbackError){
+          console.warn("[BULK] show fallback failed", fallbackError);
+        }
       }
     });
   }
@@ -20216,7 +20238,9 @@ try{
       if(pop && pop.parentElement !== document.body) document.body.appendChild(pop);
       const toastRoot = document.getElementById("toastRoot");
       if(toastRoot && toastRoot.parentElement !== document.body) document.body.appendChild(toastRoot);
-    }catch(_){}
+    }catch(error){
+      console.warn("[Pro] bind dialog roots failed", error);
+    }
     window.__wavcueProAddFiles = addFiles;
 
     $('proFilterStatus')?.addEventListener('change', (e)=>{

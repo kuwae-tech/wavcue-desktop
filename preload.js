@@ -130,6 +130,8 @@ contextBridge.exposeInMainWorld('wavcue', {
   runCleanupNow: () => ipcRenderer.invoke('settings:run-cleanup-now'),
   runCompleteCleanup: () => ipcRenderer.invoke('settings:run-complete-cleanup'),
   getBackupStatus: () => ipcRenderer.invoke('settings:get-backup-status'),
+  // Store版分岐メモ: 旧ライセンス呼び出し名との互換エイリアス。
+  // 次ブランチで activate/setLicense の整理対象。
   setLicenseKey: licenseSetKey,
   activateLicense: licenseSetKey,
   setLicense: licenseSetKey,
