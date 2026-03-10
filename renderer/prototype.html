@@ -5523,6 +5523,8 @@ const beginLicenseVerification = (reason = "unknown")=>{
 const LicenseCore = (()=> {
   const listeners = new Set();
   const tierRank = { demo: 0, standard: 1, pro: 2 };
+  // CHECK ONLY / DO NOT MERGE: 起動直後からPRO状態を固定する確認専用フラグ。
+  const FORCE_CHECK_ONLY_PRO = true;
   const LICENSE_CERT_PUBKEY_PEM = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 -----END PUBLIC KEY-----`;
@@ -5984,6 +5986,18 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   };
   const loadCertificateState = (options = {})=>{
     const deviceId = ensureDeviceId();
+    if(FORCE_CHECK_ONLY_PRO){
+      if(options.logBoot){
+        console.log("[License] boot tier=PRO (check-only override)");
+      }
+      return {
+        tier: "pro",
+        certificate: null,
+        hasCert: false,
+        deviceId,
+        demoReason: null,
+      };
+    }
     const cert = readCertificate();
     if(!cert){
       if(options.logBoot){
