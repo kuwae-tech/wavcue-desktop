@@ -153,6 +153,8 @@ contextBridge.exposeInMainWorld('wavcue', {
   writeFileBase64: (payload) => ipcRenderer.invoke('export:writeFileBase64', payload),
   saveExportFile: (payload) => ipcRenderer.invoke('export:saveFile', payload),
   saveBackupReport: (payload) => ipcRenderer.invoke('export:save-backup-report', payload),
+  writePdfTemp: (base64, filename) => ipcRenderer.invoke('pdf:write-temp', { base64, filename }),
+  clearPdfTemp: (filePath) => ipcRenderer.invoke('pdf:clear-temp', { filePath }),
   winMinimize: () => ipcRenderer.send('window:minimize'),
   winToggleMaximize: () => ipcRenderer.send('window:toggle-maximize'),
   winClose: () => ipcRenderer.send('window:close'),

@@ -6900,7 +6900,7 @@ const state = {
   attachments: [],      // [{id,name,bytes,kind,mime,cueId,_storeId}]
   attachSel: 0,
   pdfAttach: null,        // legacy alias: selected attachment (auto-maintained)
-  pdfViewUrl: null,
+  pdfTempFilePath: null,
   cueRenderLog: { fileId: null, cueCount: null },
   activeFileId: null,
   ui: { isLoadingWav: false },
@@ -17061,7 +17061,7 @@ function pdfNormalizeNameCp932(name, maxBytes){
   return outName;
 }
 
-function pdfOpenViewerForObject(obj, meta){
+async function pdfOpenViewerForObject(obj, meta){
   try{
     const dlg = document.getElementById("pdfViewDialog");
     const frame = document.getElementById("pdfViewerFrame");
@@ -17080,18 +17080,23 @@ function pdfOpenViewerForObject(obj, meta){
       (typeof _fileKindFromMime === "function" ? _fileKindFromMime(obj.mime) : "") ||
       "FILE";
 
-    // reset old object URL
-    if(state.pdfViewUrl){
-      try{ URL.revokeObjectURL(state.pdfViewUrl); }catch(_){}
-      state.pdfViewUrl = null;
+    if(state.pdfTempFilePath && window?.wavcue?.clearPdfTemp){
+      try{ await window.wavcue.clearPdfTemp(state.pdfTempFilePath); }catch(_){ }
+      state.pdfTempFilePath = null;
     }
 
     if(kind === "PDF"){
       if(textBox){ textBox.style.display = "none"; textBox.value = ""; }
       frame.style.display = "block";
-      const url = URL.createObjectURL(new Blob([bytes], {type: obj.mime || "application/pdf"}));
-      state.pdfViewUrl = url;
-      frame.src = url;
+      const base64 = _u8ToB64(bytes);
+      const res = await window?.wavcue?.writePdfTemp?.(base64, obj?.name || "attached.pdf");
+      if(!res?.ok || !res?.fileUrl){
+        frame.src = "about:blank";
+        log("WARN: PDFビューアの準備に失敗しました。");
+        return;
+      }
+      state.pdfTempFilePath = res.filePath || null;
+      frame.src = res.fileUrl;
     }else{
       frame.src = "about:blank";
       frame.style.display = "none";
@@ -17166,8 +17171,10 @@ function pdfCloseViewer(){
   const dlg = document.getElementById("pdfViewDialog");
   const frame = document.getElementById("pdfViewerFrame");
   if(frame) frame.src = "about:blank";
-  if(state.pdfViewUrl){ try{ URL.revokeObjectURL(state.pdfViewUrl);}catch(_){}
-    state.pdfViewUrl=null;
+  const prevTempFilePath = state.pdfTempFilePath;
+  state.pdfTempFilePath = null;
+  if(prevTempFilePath && window?.wavcue?.clearPdfTemp){
+    window.wavcue.clearPdfTemp(prevTempFilePath).catch(()=>{});
   }
   try{ dlg?.close(); }catch(_){ if(dlg) dlg.open=false; }
 }

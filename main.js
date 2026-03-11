@@ -1,5 +1,6 @@
 const { app, BrowserWindow, Menu, dialog, shell, ipcMain } = require('electron');
 const path = require('path');
+const { pathToFileURL } = require('url');
 const fs = require('fs/promises');
 const fsSync = require('fs');
 const Store = require('electron-store');
@@ -440,6 +441,29 @@ const ensureWavExtension = (targetPath) => {
   return `${targetPath.slice(0, -ext.length)}.wav`;
 };
 
+const tempPdfFiles = new Set();
+
+const buildTempPdfFileName = (rawName) => {
+  const safeBase = shortenSegment(sanitizeFileSegment(path.parse(String(rawName || 'attached.pdf')).name), 80);
+  const stamp = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${safeBase || 'attached'}-${stamp}.pdf`;
+};
+
+const clearTempPdfFile = async (filePath) => {
+  if (!filePath) {
+    return;
+  }
+  try {
+    await fs.unlink(filePath);
+  } catch (error) {
+    if (error?.code !== 'ENOENT') {
+      console.warn('[PDF] failed to clear temp file', error);
+    }
+  } finally {
+    tempPdfFiles.delete(filePath);
+  }
+};
+
 app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   migrateSettingsSchema();
@@ -457,6 +481,17 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') {
     app.quit();
   }
+});
+
+app.on('will-quit', () => {
+  for (const filePath of tempPdfFiles) {
+    try {
+      fsSync.unlinkSync(filePath);
+    } catch (_error) {
+      // non-fatal cleanup
+    }
+  }
+  tempPdfFiles.clear();
 });
 
 ipcMain.on('window:minimize', (event) => {
@@ -859,4 +894,25 @@ ipcMain.handle('export:save-backup-report', async (_event, payload) => {
   } catch (error) {
     return { ok: false, error: String(error?.message || error) };
   }
+});
+
+ipcMain.handle('pdf:write-temp', async (_event, { base64, filename }) => {
+  try {
+    if (!base64) {
+      return { ok: false, error: 'Missing PDF base64.' };
+    }
+    const tempDir = app.getPath('temp');
+    const filePath = path.join(tempDir, buildTempPdfFileName(filename));
+    const data = Buffer.from(String(base64), 'base64');
+    await fs.writeFile(filePath, data);
+    tempPdfFiles.add(filePath);
+    return { ok: true, fileUrl: pathToFileURL(filePath).toString(), filePath };
+  } catch (error) {
+    return { ok: false, error: String(error?.message || error) };
+  }
+});
+
+ipcMain.handle('pdf:clear-temp', async (_event, { filePath }) => {
+  await clearTempPdfFile(filePath);
+  return { ok: true };
 });
