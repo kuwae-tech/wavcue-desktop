@@ -17089,11 +17089,25 @@ function pdfOpenViewerForObject(obj, meta){
     if(kind === "PDF"){
       if(textBox){ textBox.style.display = "none"; textBox.value = ""; }
       frame.style.display = "block";
-      const url = URL.createObjectURL(new Blob([bytes], {type: obj.mime || "application/pdf"}));
-      state.pdfViewUrl = url;
-      frame.src = url;
+      const pdfMime = obj.mime || "application/pdf";
+      let b64 = "";
+      if(typeof Buffer !== "undefined"){
+        b64 = Buffer.from(bytes).toString("base64");
+      }else{
+        const chunk = 0x8000;
+        let raw = "";
+        for(let i=0;i<bytes.length;i+=chunk){
+          raw += String.fromCharCode.apply(null, bytes.subarray(i, Math.min(i + chunk, bytes.length)));
+        }
+        b64 = btoa(raw);
+      }
+      const dataUrl = `data:${pdfMime};base64,${b64}`;
+      frame.removeAttribute("src");
+      frame.srcdoc = `<!doctype html><html><head><meta charset="utf-8"><style>html,body{margin:0;height:100%;background:#3a3a3a}object,embed{display:block;width:100%;height:100%;border:0}</style></head><body><object data="${dataUrl}" type="${pdfMime}"><embed src="${dataUrl}" type="${pdfMime}"/><div style="padding:16px;color:#fff;font:13px/1.5 sans-serif">PDFを表示できません。ダウンロードして外部ビューアで確認してください。</div></object></body></html>`;
+      state.pdfViewUrl = null;
     }else{
-      frame.src = "about:blank";
+      frame.removeAttribute("src");
+      frame.srcdoc = "";
       frame.style.display = "none";
       if(textBox){
         textBox.style.display = "block";
@@ -17165,7 +17179,10 @@ function pdfCloseViewer(){
 
   const dlg = document.getElementById("pdfViewDialog");
   const frame = document.getElementById("pdfViewerFrame");
-  if(frame) frame.src = "about:blank";
+  if(frame){
+    frame.removeAttribute("src");
+    frame.srcdoc = "";
+  }
   if(state.pdfViewUrl){ try{ URL.revokeObjectURL(state.pdfViewUrl);}catch(_){}
     state.pdfViewUrl=null;
   }
