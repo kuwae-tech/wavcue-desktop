@@ -760,17 +760,29 @@ ipcMain.handle('export:writeFileBase64', async (_event, { folderPath, fileName, 
 
 ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) => {
   try {
+    const defaultExt = path.extname(String(defaultName || '')).toLowerCase();
+    const attachmentFiltersByExt = {
+      '.pdf': { name: 'PDF', extensions: ['pdf'] },
+      '.csv': { name: 'CSV', extensions: ['csv'] },
+      '.xml': { name: 'XML', extensions: ['xml'] },
+      '.txt': { name: 'TXT', extensions: ['txt'] },
+    };
+    const attachmentFilter = attachmentFiltersByExt[defaultExt] || null;
+    const isAttachmentSave = Boolean(attachmentFilter);
+
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: '書き出し先を選択',
       defaultPath: defaultName,
       buttonLabel: '保存',
-      filters: [{ name: 'WAV', extensions: ['wav'] }],
+      filters: isAttachmentSave
+        ? [attachmentFilter, { name: 'すべてのファイル', extensions: ['*'] }]
+        : [{ name: 'WAV', extensions: ['wav'] }],
     });
     if (canceled || !filePath) {
       return { ok: false, canceled: true };
     }
 
-    const resolvedPath = ensureWavExtension(filePath);
+    const resolvedPath = isAttachmentSave ? filePath : ensureWavExtension(filePath);
     const buf = Buffer.from(dataBase64, 'base64');
     fsSync.writeFileSync(resolvedPath, buf);
     return { ok: true, filePath: resolvedPath };
