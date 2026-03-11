@@ -5398,7 +5398,7 @@ const beginLicenseVerification = (reason = "unknown")=>{
       }
     }, 200);
   }
-  console.log(`[License] verify start (reason=${reason})`);
+  console.log("[License] verification started");
   let finished = false;
   return ()=>{
     if(finished) return;
@@ -5412,7 +5412,7 @@ const beginLicenseVerification = (reason = "unknown")=>{
       }
       setLicenseVerifyBadgeVisible(false);
     }
-    console.log(`[License] verify end (reason=${reason}, ms=${elapsed})`);
+    console.log("[License] verification finished");
   };
 };
 
@@ -5883,7 +5883,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     const cert = readCertificate();
     if(!cert){
       if(options.logBoot){
-        console.log("[License] boot tier=DEMO (no/invalid certificate)");
+        console.log("[License] boot fallback applied");
       }
       return {
         tier: "demo",
@@ -5895,10 +5895,10 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     }
     const verified = verifyCertificate(cert, deviceId);
     if(!verified.ok){
-      console.log(`[License] cert verify failed: ${verified.reason}`);
+      console.log("[License] cert verification failed");
       clearCertificate();
       if(options.logBoot){
-        console.log("[License] boot tier=DEMO (no/invalid certificate)");
+        console.log("[License] boot fallback applied");
       }
       return {
         tier: "demo",
@@ -5909,7 +5909,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       };
     }
     if(options.logBoot){
-      console.log(`[License] boot tier=${verified.tier.toUpperCase()} (valid certificate)`);
+      console.log("[License] boot certificate loaded");
     }
     return { tier: verified.tier, certificate: verified.certificate, hasCert: true, deviceId, demoReason: null };
   };
@@ -5919,7 +5919,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     stateCache.tier = next.tier;
     stateCache.source = source || stateCache.source;
     stateCache.updatedAt = Date.now();
-    listeners.forEach((fn)=>{ try{ fn({ ...stateCache }); }catch(_){ } });
+    listeners.forEach((fn)=>{ try{ fn({ ...stateCache }); }catch(_){ console.warn("[License] non-fatal"); } });
     return { ...stateCache };
   };
 
@@ -6000,7 +6000,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     stateCache.source = reason || stateCache.source;
     stateCache.updatedAt = Date.now();
     const payload = { ...stateCache, demo: next.demo, standard: next.standard };
-    listeners.forEach((fn)=>{ try{ fn(payload); }catch(_){ } });
+    listeners.forEach((fn)=>{ try{ fn(payload); }catch(_){ console.warn("[License] non-fatal"); } });
 
     const demoBlocked = next.demo?.demoBlockedReason || "none";
     const stdStrict = next.standard?.auth?.isValidNow !== false;
@@ -6012,7 +6012,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     const shouldLog = (reason === "debug" || reason === "key" || reason === "storage-watch")
       || (reason === "tick" && isChange);
     if(shouldLog){
-      console.log(`[License] refresh reason=${reason || "unknown"} tier=${next.tier} strict=${stdStrict} grace=${stdInGrace} hard=${stdHardExpired} stdExportBlocked=${stdBlocked}`);
+      console.log("[License] state refreshed");
     }
     if(next.tier === "standard"){
       if(_lastStdHardExpired === false && stdHardExpired === true){
@@ -6082,7 +6082,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       }
       const res = { ok, tier, reason };
       const reasonTxt = reason ? ` reason=${reason}` : "";
-      console.log(`[License] tier=${tier} action=${action} ok=${ok ? 1 : 0}${reasonTxt}`);
+      console.log(`[License] guard checked action=${action} ok=${ok ? 1 : 0}${reason ? " reason-set" : ""}`);
       return res;
     }catch(e){
       console.error("[License] non-fatal", e);
@@ -6137,15 +6137,15 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       }
       const verified = verifyCertificate(cert, ensureDeviceId());
       if(!verified.ok){
-        console.log(`[License] cert verify failed: ${verified.reason}`);
+        console.log("[License] cert verification failed");
         return { ok: false, reason: "cert-invalid" };
       }
       writeCertificate(verified.certificate);
-      try{ localStorage?.setItem?.(LS_KEY_LAST, value); }catch(_){}
+      try{ localStorage?.setItem?.(LS_KEY_LAST, value); }catch(_){ console.warn("[License] non-fatal"); }
       setCache({ tier: verified.tier }, "certificate");
       if(verified.tier === "standard") touchStandardLastOnlineOkAt(Date.now());
       _refreshState("activation", { touchOnline: true });
-      console.log(`[License] activate ok -> saved certificate -> tier=${verified.tier.toUpperCase()}`);
+      console.log("[License] activate succeeded");
       return { ok: true, tier: verified.tier };
     }catch(e){
       console.error("[License] non-fatal", e);
@@ -6214,7 +6214,7 @@ window.WavCueLicense = {
   refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
 };
 LicenseCore.init();
-setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ } }, 30000);
+setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ console.warn("[License] non-fatal"); } }, 30000);
 
 const LICENSE_STORAGE_WATCH_KEYS = [
   "wavcue_license_certificate_v1",
@@ -6250,13 +6250,13 @@ const startLicenseStorageWatch = ()=>{
     const nextCert = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[0]);
     const nextKey = readLicenseWatchValue(LICENSE_STORAGE_WATCH_KEYS[1]);
     if(nextCert !== _licenseStorageWatchState.cert){
-      console.log(`[License][watch] changed key=${LICENSE_STORAGE_WATCH_KEYS[0]} from=${JSON.stringify(_licenseStorageWatchState.cert)} to=${JSON.stringify(nextCert)}`);
+      console.log("[License][watch] storage change detected");
       _licenseStorageWatchState.cert = nextCert;
       void runLicenseStorageWatchRefresh();
       return;
     }
     if(nextKey !== _licenseStorageWatchState.key){
-      console.log(`[License][watch] changed key=${LICENSE_STORAGE_WATCH_KEYS[1]} from=${JSON.stringify(_licenseStorageWatchState.key)} to=${JSON.stringify(nextKey)}`);
+      console.log("[License][watch] storage change detected");
       _licenseStorageWatchState.key = nextKey;
       void runLicenseStorageWatchRefresh();
     }
@@ -6279,7 +6279,7 @@ const updateTierBadge = (state)=>{
     const cls = tier === "pro" ? "tierBadge--pro" : tier === "standard" ? "tierBadge--standard" : "tierBadge--demo";
     badge.classList.add(cls);
     if(tier !== _tierBadgeLast){
-      console.log(`[TierBadge] tier=${tier}`);
+      console.log("[TierBadge] updated");
       _tierBadgeLast = tier;
     }
   }catch(e){
@@ -6305,7 +6305,7 @@ const applyProUi = (state)=>{
       if(wrap) wrap.classList.toggle("proOnlyDisabled", !isPro);
     });
     if(tier !== _proUiTierLast){
-      console.log(`[ProUI] tier=${tier} bulkButtons=${isPro ? "enabled" : "disabled"}`);
+      console.log("[ProUI] updated");
       _proUiTierLast = tier;
     }
   }catch(e){
@@ -6512,7 +6512,9 @@ async function restoreSavedLicenseKey(){
     if(st){
       applyAllLicenseUi(st);
     }
-  }catch(_){}
+  }catch(_){
+    console.warn("[License] non-fatal");
+  }
   finally{
     endVerify();
   }
@@ -6522,17 +6524,17 @@ function clearLicenseKeySafe(){
     LICENSE_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
     localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
     LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
-  }catch(_){}
-  try{ window.WavCueLicense?.clearCertificateSafe?.(); }catch(_){}
-  try{ window.WavCueLicense?.resetDemoTrial?.(); }catch(_){}
+  }catch(_){ console.warn("[License] non-fatal"); }
+  try{ window.WavCueLicense?.clearCertificateSafe?.(); }catch(_){ console.warn("[License] non-fatal"); }
+  try{ window.WavCueLicense?.resetDemoTrial?.(); }catch(_){ console.warn("[License] non-fatal"); }
 }
 function clearLicenseResiduals(){
   try{
     LICENSE_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
     localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
     LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
-  }catch(_){}
-  try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){}
+  }catch(_){ console.warn("[License] non-fatal"); }
+  try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){ console.warn("[License] non-fatal"); }
 }
 let _lastOfflineNoticeShown = null;
 const formatShortDate = (stamp)=>{
@@ -6560,28 +6562,28 @@ function updateOfflineStandardBanner(state){
   }
   if(_lastOfflineNoticeShown !== shouldShow){
     if(shouldShow){
-      console.log("[License][net] offline STANDARD -> show offline banner + lock preset msg");
+      console.log("[License][net] offline banner shown");
     }
     _lastOfflineNoticeShown = shouldShow;
   }
 }
 function applyAllLicenseUi(state){
   const next = state;
-  try{ updateTierBadge(next); }catch(_){}
-  try{ applyProUi(next); }catch(_){}
-  try{ applyLicenseUi(next); }catch(_){}
-  try{ updateLicenseInfo(next); }catch(_){}
-  try{ updateOfflineStandardBanner(next); }catch(_){}
+  try{ updateTierBadge(next); }catch(_){ console.warn("[License] non-fatal"); }
+  try{ applyProUi(next); }catch(_){ console.warn("[License] non-fatal"); }
+  try{ applyLicenseUi(next); }catch(_){ console.warn("[License] non-fatal"); }
+  try{ updateLicenseInfo(next); }catch(_){ console.warn("[License] non-fatal"); }
+  try{ updateOfflineStandardBanner(next); }catch(_){ console.warn("[License] non-fatal"); }
 }
 function handleDeactivateSuccess(){
   window.WavCueLicense?.clearCertificateSafe?.();
-  try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){}
+  try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){ console.warn("[License] non-fatal"); }
   const st = window.WavCueLicense?.getStateSafe?.();
   if(st) applyAllLicenseUi(st);
   if(window.safeToast){
     window.safeToast("この端末のPRO利用情報をリセットしました。", "ok", 3200);
   }
-  console.log("[License] deactivate success -> cleared certificate -> tier=DEMO");
+  console.log("[License] deactivate succeeded");
 }
 if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "function"){
   window.WavCueLicense.clearKeySafe = async ()=>{
@@ -6682,7 +6684,7 @@ const applyLicenseUi = (state)=>{
         if(isDemo){
           const reasonCode = String(state?.demoReason || "missing-certificate");
           if(_lastDemoBannerReasonLogged !== reasonCode){
-            console.log(`[LicenseUI] demo banner shown (reason=${reasonCode})`);
+            console.log("[LicenseUI] banner updated");
             _lastDemoBannerReasonLogged = reasonCode;
           }
         }
@@ -12985,7 +12987,7 @@ licenseClearConfirmOk?.addEventListener("click", async ()=>{
     if(st) applyAllLicenseUi(st);
     const tier = String(st?.tier || "demo").toLowerCase();
     const keyPresent = !!getStoredLicenseKey();
-    console.log(`[License] deactivated: tier=${tier} keyPresent=${keyPresent ? 1 : 0}`);
+    console.log("[License] deactivated");
     closeLicenseClearConfirm();
     if(tier !== "demo"){
       try{
@@ -13034,13 +13036,13 @@ licenseTransferConfirmOk?.addEventListener("click", async ()=>{
     if(!response.ok || !json?.ok){
       const code = json?.code || response.status || "error";
       const message = json?.message || response.statusText || "deactivate failed";
-      console.log(`[License] deactivate failed: ${code}/${message}`);
+      console.log("[License] deactivate failed");
       if(window.safeToast) window.safeToast(message || "処理に失敗しました。", "warn", 3200);
       return;
     }
     handleDeactivateSuccess();
   }catch(e){
-    console.log(`[License] deactivate failed: ${e?.message || "network-error"}`);
+    console.log("[License] deactivate failed");
     if(window.safeToast) window.safeToast("通信に失敗しました。ネットワークをご確認ください。", "warn", 3200);
   }
 });
