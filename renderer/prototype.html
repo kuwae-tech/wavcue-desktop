@@ -6129,7 +6129,77 @@ window.WavCueLicense = {
   getServerUrl: LicenseCore.getServerUrl,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
   refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
+  refreshTick: LicenseCore.refreshTick,
 };
+
+// CHECK ONLY
+// DO NOT MERGE
+// REVERT BEFORE MERGE
+const CHECK_ONLY_FORCE_PRO_ON_BOOT = true;
+if(CHECK_ONLY_FORCE_PRO_ON_BOOT && window.WavCueLicense){
+  console.info("[CHECK] FORCE PRO enabled");
+
+  const normalizeCheckOnlyForceProState = (state)=>{
+    const src = (state && typeof state === "object") ? state : {};
+    const next = { ...src, tier: "pro" };
+
+    if(Object.prototype.hasOwnProperty.call(src, "baseTier") || src.baseTier != null) next.baseTier = "pro";
+    if(Object.prototype.hasOwnProperty.call(src, "effectiveTier") || src.effectiveTier != null) next.effectiveTier = "pro";
+
+    next.isLocked = false;
+    next.demoBlockedReason = null;
+    next.remainingExports = src.remainingExports ?? null;
+    next.remainingDays = src.remainingDays ?? null;
+
+    const standard = (src.standard && typeof src.standard === "object") ? src.standard : {};
+    const auth = (standard.auth && typeof standard.auth === "object") ? standard.auth : {};
+    next.standard = {
+      ...standard,
+      auth: {
+        ...auth,
+        isGrace: false,
+        isExpired: false,
+        grace: false,
+        expired: false,
+      },
+    };
+
+    return next;
+  };
+
+  const mapMaybeState = (value)=>{
+    if(value && typeof value.then === "function"){
+      return value.then((st)=> normalizeCheckOnlyForceProState(st));
+    }
+    return normalizeCheckOnlyForceProState(value);
+  };
+
+  const originalLicense = window.WavCueLicense;
+  const wrappedLicense = {
+    ...originalLicense,
+    getStateSafe: (...args)=> mapMaybeState(originalLicense.getStateSafe?.(...args)),
+    peekState: (...args)=> mapMaybeState(originalLicense.peekState?.(...args)),
+    refreshFromStorageWatch: (...args)=> mapMaybeState(originalLicense.refreshFromStorageWatch?.(...args)),
+    refreshTick: (...args)=> mapMaybeState(originalLicense.refreshTick?.(...args)),
+    guard: (...args)=>{
+      const gate = originalLicense.guard?.(...args);
+      const normalizeGate = (srcGate)=>{
+        const src = (srcGate && typeof srcGate === "object") ? srcGate : {};
+        return { ...src, ok: true, tier: "pro", reason: null };
+      };
+      if(gate && typeof gate.then === "function") return gate.then((v)=> normalizeGate(v));
+      return normalizeGate(gate);
+    },
+    onChange: (fn)=>{
+      if(typeof originalLicense.onChange !== "function") return ()=>{};
+      return originalLicense.onChange((st)=>{
+        if(typeof fn === "function") fn(normalizeCheckOnlyForceProState(st));
+      });
+    },
+  };
+  window.WavCueLicense = wrappedLicense;
+}
+
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ console.warn("[License] non-fatal"); } }, 30000);
 
