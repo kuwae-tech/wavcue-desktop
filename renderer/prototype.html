@@ -143,11 +143,6 @@
     border-color:rgba(148,163,184,.4);
     color:rgba(226,232,240,.92);
   }
-  #tierBadge.tierBadge--standard{
-    background:rgba(59,130,246,.18);
-    border-color:rgba(59,130,246,.45);
-    color:rgba(191,219,254,.95);
-  }
   #tierBadge.tierBadge--pro{
     background:rgba(34,197,94,.18);
     border-color:rgba(34,197,94,.45);
@@ -163,11 +158,6 @@
     color:rgba(254,202,202,.95);
     font-size:13px;
     font-weight:600;
-  }
-  #licenseBanner.licenseBanner--standard{
-    border-color:rgba(251,191,36,.45);
-    background:rgba(251,191,36,.14);
-    color:rgba(254,243,199,.98);
   }
   #licenseBanner.licenseBanner--demo{
     border-color:rgba(148,163,184,.4);
@@ -233,23 +223,6 @@
     border-color:transparent;
     padding:0;
   }
-  #offlineStandardBanner{
-    display:none;
-    margin:8px 16px 0;
-    padding:8px 12px;
-    border-radius:10px;
-    border:1px solid rgba(251,191,36,.35);
-    background:rgba(15,23,42,.4);
-    color:rgba(226,232,240,.92);
-    font-size:12px;
-    font-weight:600;
-    line-height:1.5;
-  }
-  #offlineStandardBanner .offlineStandardBannerMeta{
-    font-size:11px;
-    font-weight:600;
-    color:rgba(226,232,240,.86);
-  }
   #licenseBanner .licenseBannerBody{
     display:inline-flex;
     align-items:center;
@@ -264,7 +237,6 @@
     background:rgba(248,113,113,.12);
     color:rgba(254,202,202,.95);
   }
-  #licenseBanner.licenseBanner--withActions .licenseBannerBody.licenseBannerBody--standard,
   #licenseBanner.licenseBanner--withActions .licenseBannerBody.licenseBannerBody--grace{
     border-color:rgba(251,191,36,.45);
     background:rgba(251,191,36,.14);
@@ -901,35 +873,6 @@
     width:min(980px, calc(100% - 24px));
   }
   dialog::backdrop{background:rgba(2,6,23,.60);backdrop-filter: blur(6px)}
-  dialog.standardGraceDialog{
-    width:min(520px, calc(100% - 32px));
-    border-radius:16px;
-    border:1px solid rgba(148,163,184,.35);
-    background:rgba(15,23,42,.98);
-    padding:0;
-  }
-  dialog.standardGraceDialog .stdGraceBody{
-    padding:20px 22px 12px;
-    display:flex;
-    flex-direction:column;
-    gap:12px;
-  }
-  dialog.standardGraceDialog .stdGraceTitle{
-    font-size:14px;
-    font-weight:700;
-  }
-  dialog.standardGraceDialog .stdGraceMsg{
-    font-size:13px;
-    line-height:1.6;
-    color:rgba(226,232,240,.92);
-    white-space: pre-line;
-  }
-  dialog.standardGraceDialog .stdGraceActions{
-    display:flex;
-    justify-content:flex-end;
-    gap:10px;
-    padding:0 22px 20px;
-  }
   .modalHead{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line);position:relative}
   .dlgHead{position:relative}
   .dialogShell .modalHead,
@@ -4651,20 +4594,7 @@ body, #appRoot, .appRoot, .mainLayout{
         <div class="headerActions"><button aria-label="設定" class="btn" id="btnSettings" title="設定" type="button"><svg aria-hidden="true" class="btnIcon" focusable="false"><use href="#ico-gear" xlink:href="#ico-gear"></use></svg></button></div>
   </div>
 </header>
-<div id="offlineStandardBanner" role="status" aria-live="polite">
-  <div class="offlineStandardBannerText">オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。</div>
-  <div class="offlineStandardBannerMeta" id="offlineStandardBannerMeta"></div>
-</div>
 <div id="licenseBanner" role="status" aria-live="polite"></div>
-<dialog id="standardGraceDialog" class="standardGraceDialog" data-lock-close="1" aria-labelledby="standardGraceTitle" aria-describedby="standardGraceMessage">
-  <div class="stdGraceBody">
-    <div class="stdGraceTitle" id="standardGraceTitle">PRO機能のご案内</div>
-    <div class="stdGraceMsg" id="standardGraceMessage">PRO利用情報を確認できません。1時間後に書き出しのみ停止します。ネット接続を確認してください。</div>
-  </div>
-  <div class="stdGraceActions">
-    <button class="btn primary" id="standardGraceOk" type="button">OK</button>
-  </div>
-</dialog>
 <div class="main"><div class="left panel workCol"><div class="workTop"><div class="sectionHead"><div class="title"><b></b><span></span></div><div class="row"><span class="pill mono" id="timeHud">00:00.000</span><span class="pill mono" id="zoomHud">x1.00 / v1.00</span></div></div><div class="waveWrap"><div class="waveBox" id="waveBox"><canvas id="wave"></canvas><canvas id="cueCanvas"></canvas></div><div aria-label="transport" class="transport"><button class="tbtn" disabled="" id="btnPlay" type="button"><span class="ticon">▶︎</span> 再生</button><button class="tbtn" disabled="" id="btnPause" type="button"><span class="ticon ticonStop"></span> 停止</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnZoomIn" type="button">＋ 横</button><button class="tbtn" disabled="" id="btnZoomOut" type="button">－ 横</button><div class="tsep"></div><button class="tbtn" disabled="" id="btnVZoomIn" type="button">＋ 縦</button><button class="tbtn" disabled="" id="btnVZoomOut" type="button">－ 縦</button><div class="thint mono">Space: 再生/停止　T/R: 横ズーム　Shift+T/R: 縦ズーム</div></div></div></div><div class="workBottom analyzers analyzersRow" id="analyzersRow"><div class="bottomRow"><div class="meterBox"><canvas id="meterCanvas"></canvas></div><div class="imagerBox"><canvas id="imagerCanvas"></canvas></div><div class="fileListBox"><div id="proFileDock" class="proFileDock">
   <div class="proFileDockTop proFileDockRow">
     <div class="proOnlyWrap" id="proBtnBulkImportWrap">
@@ -6021,19 +5951,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
         }
       }
       _lastStdHardExpired = stdHardExpired;
-      if(stdInGrace){
-        const startedAt = next.standard?.auth?.graceStartedAt;
-        const shownFor = readStandardGraceModalShownFor();
-        if(Number.isFinite(startedAt) && shownFor !== startedAt){
-          const dlg = document.getElementById("standardGraceDialog");
-          if(dlg){
-            if(!dlg.open){
-              try{ dlg.showModal(); }catch(_){ dlg.open = true; }
-            }
-            markStandardGraceModalShownFor(startedAt);
-          }
-        }
-      }
     }else{
       _lastStdHardExpired = null;
     }
@@ -6275,8 +6192,8 @@ const updateTierBadge = (state)=>{
     const tier = String(tierRaw).toLowerCase();
     const label = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
     badge.textContent = label;
-    badge.classList.remove("tierBadge--demo", "tierBadge--standard", "tierBadge--pro");
-    const cls = tier === "pro" ? "tierBadge--pro" : tier === "standard" ? "tierBadge--standard" : "tierBadge--demo";
+    badge.classList.remove("tierBadge--demo", "tierBadge--pro");
+    const cls = tier === "pro" ? "tierBadge--pro" : "tierBadge--demo";
     badge.classList.add(cls);
     if(tier !== _tierBadgeLast){
       console.log("[TierBadge] updated");
@@ -6467,11 +6384,6 @@ function getStoredSettingsTab(){
     return "backup";
   }
 }
-function focusSettingsLicenseInput(){
-  if(settingsDeviceIdCopy && !settingsDeviceIdCopy.disabled){
-    settingsDeviceIdCopy.focus();
-  }
-}
 function openSettingsModalSafe(preferTab){
   const targets = [
     window.openSettingsModal,
@@ -6486,9 +6398,9 @@ function openSettingsModalSafe(preferTab){
       const res = fn();
       opened = true;
       if(res && typeof res.then === "function"){
-        res.then(()=>{ if(preferTab) setSettingsTab(preferTab); focusSettingsLicenseInput(); }).catch(()=>{});
+        res.then(()=>{ if(preferTab) setSettingsTab(preferTab); }).catch(()=>{});
       }else if(preferTab){
-        setTimeout(()=>{ setSettingsTab(preferTab); focusSettingsLicenseInput(); }, 0);
+        setTimeout(()=>{ setSettingsTab(preferTab); }, 0);
       }
       break;
     }catch(_){}
@@ -6498,7 +6410,7 @@ function openSettingsModalSafe(preferTab){
     if(gear){
       gear.click();
       if(preferTab){
-        setTimeout(()=>{ setSettingsTab(preferTab); focusSettingsLicenseInput(); }, 0);
+        setTimeout(()=>{ setSettingsTab(preferTab); }, 0);
       }
     }
   }
@@ -6536,44 +6448,12 @@ function clearLicenseResiduals(){
   }catch(_){ console.warn("[License] non-fatal"); }
   try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){ console.warn("[License] non-fatal"); }
 }
-let _lastOfflineNoticeShown = null;
-const formatShortDate = (stamp)=>{
-  if(!Number.isFinite(stamp)) return "—";
-  const dt = new Date(stamp);
-  if(Number.isNaN(dt.getTime())) return "—";
-  return dt.toISOString().slice(0, 10);
-};
-function updateOfflineStandardBanner(state){
-  const banner = document.getElementById("offlineStandardBanner");
-  if(!banner) return;
-  const meta = document.getElementById("offlineStandardBannerMeta");
-  const { baseTier, isOnline } = getStandardOfflineGatingTier(state);
-  const shouldShow = baseTier === "standard" && !isOnline;
-  banner.style.display = shouldShow ? "block" : "none";
-  if(meta){
-    const demoInfo = state?.demo || {};
-    const remainingExports = Number.isFinite(demoInfo.remainingExports) ? demoInfo.remainingExports : null;
-    const expiresAt = Number.isFinite(demoInfo.expiresAt) ? demoInfo.expiresAt : null;
-    const exportText = remainingExports != null ? `${remainingExports}回` : "—";
-    const expiryText = formatShortDate(expiresAt);
-    meta.textContent = shouldShow
-      ? `残り書き出し回数: ${exportText} / 利用期限: ${expiryText}`
-      : "";
-  }
-  if(_lastOfflineNoticeShown !== shouldShow){
-    if(shouldShow){
-      console.log("[License][net] offline banner shown");
-    }
-    _lastOfflineNoticeShown = shouldShow;
-  }
-}
 function applyAllLicenseUi(state){
   const next = state;
   try{ updateTierBadge(next); }catch(_){ console.warn("[License] non-fatal"); }
   try{ applyProUi(next); }catch(_){ console.warn("[License] non-fatal"); }
   try{ applyLicenseUi(next); }catch(_){ console.warn("[License] non-fatal"); }
   try{ updateLicenseInfo(next); }catch(_){ console.warn("[License] non-fatal"); }
-  try{ updateOfflineStandardBanner(next); }catch(_){ console.warn("[License] non-fatal"); }
 }
 function handleDeactivateSuccess(){
   window.WavCueLicense?.clearCertificateSafe?.();
@@ -6664,7 +6544,6 @@ const applyLicenseUi = (state)=>{
         const body = document.createElement("span");
         body.className = "licenseBannerBody";
         if(isDangerBanner) body.classList.add("licenseBannerBody--danger");
-        if(isStandardBanner) body.classList.add("licenseBannerBody--standard");
         if(isGraceBanner) body.classList.add("licenseBannerBody--grace");
         const textSpan = document.createElement("span");
         textSpan.className = "licenseBannerText";
@@ -6710,7 +6589,6 @@ const applyLicenseUi = (state)=>{
         banner.appendChild(renderDemoRemainingNode(demoParts));
         isDemoBanner = true;
       }
-      banner.classList.toggle("licenseBanner--standard", isStandardBanner);
       banner.classList.toggle("licenseBanner--grace", isGraceBanner);
       banner.classList.toggle("licenseBanner--demo", isDemoBanner);
       banner.classList.toggle("licenseBanner--withChip", hasChip);
@@ -7114,21 +6992,8 @@ function _wireDialogShell(dlg){
 function _initDialogShells(){
   document.querySelectorAll("dialog").forEach(_wireDialogShell);
 }
-function _initStandardGraceDialog(){
-  const dlg = $("standardGraceDialog");
-  const okBtn = $("standardGraceOk");
-  const msg = $("standardGraceMessage");
-  if(!dlg || !okBtn) return;
-  if(msg && typeof LICENSE_TEXT?.standardGraceModal === "string"){
-    msg.textContent = LICENSE_TEXT.standardGraceModal;
-  }
-  okBtn.addEventListener("click", ()=>{
-    try{ dlg.close(); }catch(_){ dlg.open = false; }
-  });
-}
 function _initUiDialogs(){
   _initDialogShells();
-  _initStandardGraceDialog();
 }
 if(document.readyState === "loading"){
   document.addEventListener("DOMContentLoaded", _initUiDialogs);
@@ -12936,7 +12801,6 @@ const openSettingsDialog = async ()=>{
   requestAnimationFrame(()=>{
     lockSettingsTabHeight();
     setSettingsTab(storedTab);
-    if(storedTab === "license") focusSettingsLicenseInput();
   });
 };
 
@@ -13051,7 +12915,6 @@ settingsTabButtons.forEach((btn)=>{
   btn.addEventListener("click", ()=>{
     const tab = btn.dataset.settingsTab;
     setSettingsTab(tab);
-    if(tab === "license") focusSettingsLicenseInput();
   });
 });
 
