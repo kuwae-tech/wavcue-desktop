@@ -6684,7 +6684,7 @@ const applyLicenseUi = (state)=>{
         if(isDemo){
           const reasonCode = String(state?.demoReason || "missing-certificate");
           if(_lastDemoBannerReasonLogged !== reasonCode){
-            console.log("[LicenseUI] demo banner shown");
+            console.log("[LicenseUI] banner updated");
             _lastDemoBannerReasonLogged = reasonCode;
           }
         }
