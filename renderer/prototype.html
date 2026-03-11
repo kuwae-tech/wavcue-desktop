@@ -6305,7 +6305,7 @@ const applyProUi = (state)=>{
       if(wrap) wrap.classList.toggle("proOnlyDisabled", !isPro);
     });
     if(tier !== _proUiTierLast){
-      console.log(`[ProUI] tier=${tier} bulkButtons=${isPro ? "enabled" : "disabled"}`);
+      console.log("[ProUI] updated");
       _proUiTierLast = tier;
     }
   }catch(e){
@@ -6684,7 +6684,7 @@ const applyLicenseUi = (state)=>{
         if(isDemo){
           const reasonCode = String(state?.demoReason || "missing-certificate");
           if(_lastDemoBannerReasonLogged !== reasonCode){
-            console.log(`[LicenseUI] demo banner shown (reason=${reasonCode})`);
+            console.log("[LicenseUI] demo banner shown");
             _lastDemoBannerReasonLogged = reasonCode;
           }
         }
