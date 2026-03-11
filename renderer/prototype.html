@@ -5346,6 +5346,10 @@ const beginLicenseVerification = (reason = "unknown")=>{
   };
 };
 
+// CHECK ONLY / DO NOT MERGE:
+// PRO機能チェック専用フック。未マージ前提で、実機能の最終判定を強制的にPRO化する。
+window.__WAVCUE_FORCE_PRO_FOR_CHECK__ = true;
+
 const LicenseCore = (()=> {
   const listeners = new Set();
   const tierRank = { demo: 0, standard: 1, pro: 2 };
@@ -5913,10 +5917,19 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   };
 
 
+  let _forceProCheckLogged = false;
   const getStateSafeInternal = (options = {})=>{
     try{
       const certState = loadCertificateState({ logBoot: false });
-      return buildState({ ...stateCache, ...certState }, options);
+      let next = buildState({ ...stateCache, ...certState }, options);
+      if(window.__WAVCUE_FORCE_PRO_FOR_CHECK__ === true){
+        next = buildState({ ...next, tier: "pro", source: "check-only-force-pro" }, options);
+        if(!_forceProCheckLogged){
+          console.log("[CHECK ONLY] FORCE PRO ENABLED");
+          _forceProCheckLogged = true;
+        }
+      }
+      return next;
     }catch(e){
       console.error("[License] non-fatal", e);
       return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
