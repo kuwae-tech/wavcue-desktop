@@ -211,7 +211,7 @@ app.on('web-contents-created', (_event, contents) => {
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
-          "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; media-src 'self' data: blob:; object-src 'none';",
+          "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; media-src 'self' data: blob:; frame-src 'self' data: blob:; object-src 'self' data: blob:;",
         ],
       },
     });
