@@ -205,19 +205,6 @@ const createWindow = () => {
   }
 };
 
-app.on('web-contents-created', (_event, contents) => {
-  contents.session.webRequest.onHeadersReceived((details, callback) => {
-    callback({
-      responseHeaders: {
-        ...details.responseHeaders,
-        'Content-Security-Policy': [
-          "default-src 'self' data: blob:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' https:; media-src 'self' data: blob:; object-src 'none';",
-        ],
-      },
-    });
-  });
-});
-
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const isValidDate = (value) => Number.isFinite(value?.getTime?.());
