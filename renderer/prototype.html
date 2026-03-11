@@ -19049,7 +19049,7 @@ try{
         });
         console.log("[ACTIVE]", "restore", {
           fileId: rec.id,
-          hasCmcd: _cmcdHasValues(rec.cmcd),
+          hasCmcd: !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)),
           pdfCount: rec.attachments?.length || 0,
         });
       }catch(error){
