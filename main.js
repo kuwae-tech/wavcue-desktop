@@ -761,22 +761,21 @@ ipcMain.handle('export:writeFileBase64', async (_event, { folderPath, fileName, 
 ipcMain.handle('export:saveFile', async (_event, { defaultName, dataBase64 }) => {
   try {
     const defaultExt = path.extname(String(defaultName || '')).toLowerCase();
-    const attachmentExtSet = new Set(['.pdf', '.csv', '.xml', '.txt']);
-    const isAttachmentSave = attachmentExtSet.has(defaultExt);
+    const attachmentFiltersByExt = {
+      '.pdf': { name: 'PDF', extensions: ['pdf'] },
+      '.csv': { name: 'CSV', extensions: ['csv'] },
+      '.xml': { name: 'XML', extensions: ['xml'] },
+      '.txt': { name: 'TXT', extensions: ['txt'] },
+    };
+    const attachmentFilter = attachmentFiltersByExt[defaultExt] || null;
+    const isAttachmentSave = Boolean(attachmentFilter);
 
     const { canceled, filePath } = await dialog.showSaveDialog({
       title: '書き出し先を選択',
       defaultPath: defaultName,
       buttonLabel: '保存',
       filters: isAttachmentSave
-        ? [
-            { name: 'WAV', extensions: ['wav'] },
-            { name: 'PDF', extensions: ['pdf'] },
-            { name: 'CSV', extensions: ['csv'] },
-            { name: 'XML', extensions: ['xml'] },
-            { name: 'TXT', extensions: ['txt'] },
-            { name: 'すべてのファイル', extensions: ['*'] },
-          ]
+        ? [attachmentFilter, { name: 'すべてのファイル', extensions: ['*'] }]
         : [{ name: 'WAV', extensions: ['wav'] }],
     });
     if (canceled || !filePath) {
