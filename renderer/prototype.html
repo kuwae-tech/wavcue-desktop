@@ -4658,8 +4658,8 @@ body, #appRoot, .appRoot, .mainLayout{
 <div id="licenseBanner" role="status" aria-live="polite"></div>
 <dialog id="standardGraceDialog" class="standardGraceDialog" data-lock-close="1" aria-labelledby="standardGraceTitle" aria-describedby="standardGraceMessage">
   <div class="stdGraceBody">
-    <div class="stdGraceTitle" id="standardGraceTitle">Standard認証のご案内</div>
-    <div class="stdGraceMsg" id="standardGraceMessage">Standard認証が切れました。1時間後に書き出しのみ停止します。ネット接続を確認して再認証してください。</div>
+    <div class="stdGraceTitle" id="standardGraceTitle">PRO機能のご案内</div>
+    <div class="stdGraceMsg" id="standardGraceMessage">PRO利用情報を確認できません。1時間後に書き出しのみ停止します。ネット接続を確認してください。</div>
   </div>
   <div class="stdGraceActions">
     <button class="btn primary" id="standardGraceOk" type="button">OK</button>
@@ -5199,7 +5199,7 @@ body, #appRoot, .appRoot, .mainLayout{
             <div class="settingsBlock">
               <div class="settingsBlockTitle">ご案内</div>
               <p class="muted">このアプリはDEMO版として利用できます。</p>
-              <p class="muted">購入・復元は今後のストア版で対応予定です。</p>
+              <p class="muted">PROはストアアドオンで解放予定です。</p>
               <div class="settingsInfoList" style="margin-top:12px">
                 <div class="settingsInfoRow">
                   <span class="muted">端末ID</span>
@@ -5240,14 +5240,14 @@ body, #appRoot, .appRoot, .mainLayout{
 <dialog class="confirmDialog" id="licenseClearConfirm">
   <div class="modalHead">
     <div class="title">
-      <b>ライセンスを解除しますか？</b>
+      <b>この端末のPRO利用情報をリセットしますか？</b>
     </div>
   </div>
   <div class="modalBody">
     <div class="confirmBody">
       <ul class="confirmList">
-        <li>ライセンスキーが削除され、Demoへ戻ります</li>
-        <li>解除後は再度キーを入力して有効化できます</li>
+        <li>この端末のPRO利用情報がクリアされ、DEMO表示に戻ります</li>
+        <li>PROはストアアドオンから再開できます</li>
       </ul>
       <div class="confirmActions">
         <button class="btn" id="licenseClearCancel" type="button">キャンセル</button>
@@ -5259,13 +5259,13 @@ body, #appRoot, .appRoot, .mainLayout{
 <dialog class="confirmDialog" id="licenseTransferConfirm">
   <div class="modalHead">
     <div class="title">
-      <b>移行を実行しますか？</b>
+      <b>この端末のPRO利用情報を解除しますか？</b>
     </div>
   </div>
   <div class="modalBody">
     <div class="confirmBody">
       <ul class="confirmList">
-        <li>この端末での認証を解除し、別の端末で同じライセンスキーを有効化できるようにします</li>
+        <li>この端末のPRO利用情報を解除します</li>
         <li>解除後、この端末はDEMOに戻ります</li>
       </ul>
       <div class="confirmActions">
@@ -5423,23 +5423,23 @@ const LicenseCore = (()=> {
 MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 -----END PUBLIC KEY-----`;
   const LICENSE_TEXT = Object.freeze({
-    exportStandardRequired: "書き出しはStandard以上で利用できます。",
-    exportAuthExpired: "認証が確認できないため書き出しのみ停止しています。",
+    exportStandardRequired: "書き出しはPROアドオンで利用できます。",
+    exportAuthExpired: "PRO利用情報を確認できないため書き出しのみ停止しています。",
     bulkImportPro: "一括読み込みはProで利用できます。",
     bulkCheckPro: "一括チェックはProで利用できます。",
     bulkExportPro: "一括書き出しはProで利用できます。",
     historyPro: "履歴はProで利用できます。",
-    presetDemo: "プリセットはStandard以上で利用できます。",
+    presetDemo: "プリセットはPROアドオンで利用できます。",
     backupDemo: "Demoではバックアップ機能は利用できません。",
     demoNotice: "体験版です。1週間・書き出し20回までお試しできます。",
     demoExpiredBanner: "DEMO版の利用期間が終了しました。PRO版は今後のストア版で対応予定です。",
     demoExportLimitBanner: "DEMO版の書き出し回数制限に達しました。PRO版は今後のストア版で対応予定です。",
-    demoExpiredToast: "体験版の利用期間が終了しました。ライセンスをご購入ください",
-    demoExportLimitToast: "体験版の書き出し回数制限に達しました。ライセンスをご購入ください",
-    standardAuthToast: "Standard認証が切れました。書き出しのみ停止します。",
-    standardGraceModal: "Standard認証が切れました。1時間後に書き出しのみ停止します。\nネット接続を確認して再認証してください。",
-    standardGraceBanner: "認証が切れています（猶予中）。ネット接続を確認して再認証してください。",
-    standardAuthBanner: "認証が切れています（書き出しのみ停止）。ネット接続を確認して再認証してください。",
+    demoExpiredToast: "体験版の利用期間が終了しました。PROアドオンをご利用ください",
+    demoExportLimitToast: "体験版の書き出し回数制限に達しました。PROアドオンをご利用ください",
+    standardAuthToast: "PRO利用情報を確認できないため書き出しのみ停止します。",
+    standardGraceModal: "PRO利用情報を確認できません。1時間後に書き出しのみ停止します。\nネット接続を確認してください。",
+    standardGraceBanner: "PRO利用情報を確認できません（猶予中）。ネット接続を確認してください。",
+    standardAuthBanner: "PRO利用情報を確認できません（書き出しのみ停止）。ネット接続を確認してください。",
     standardOfflineToast: "オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。",
   });
   const policy = {
@@ -6326,18 +6326,18 @@ const mapDemoReasonToMessage = (reason)=>{
   }
   if(code === "device-mismatch"){
     return {
-      detail: "認証情報を確認できません（端末不一致の可能性があります）。",
+      detail: "PRO利用情報を確認できません（端末不一致の可能性があります）。",
       isStrong: true,
     };
   }
   if(code === "expired"){
     return {
-      detail: "認証情報を確認できません（期限切れの可能性があります）。",
+      detail: "PRO利用情報を確認できません（期限切れの可能性があります）。",
       isStrong: true,
     };
   }
   return {
-    detail: "ライセンスを確認できません（欠損/破損/端末不一致 など）。",
+    detail: "PRO利用情報を確認できません（欠損/破損/端末不一致 など）。",
     isStrong: true,
   };
 };
@@ -6579,7 +6579,7 @@ function handleDeactivateSuccess(){
   const st = window.WavCueLicense?.getStateSafe?.();
   if(st) applyAllLicenseUi(st);
   if(window.safeToast){
-    window.safeToast("解除しました。別端末で同じキーを入力して有効化してください", "ok", 3200);
+    window.safeToast("この端末のPRO利用情報をリセットしました。", "ok", 3200);
   }
   console.log("[License] deactivate success -> cleared certificate -> tier=DEMO");
 }
@@ -13006,16 +13006,16 @@ licenseTransferConfirmOk?.addEventListener("click", async ()=>{
   closeLicenseTransferConfirm();
   const serverUrl = normalizeServerUrl(window.WavCueLicense?.getServerUrl?.() || "");
   if(!serverUrl){
-    if(window.safeToast) window.safeToast("ライセンスサーバーが未設定のため移行できません。", "warn", 2600);
+    if(window.safeToast) window.safeToast("サーバー設定が未完了のため処理できません。", "warn", 2600);
     return;
   }
   if(navigator.onLine === false){
-    if(window.safeToast) window.safeToast("インターネット未接続のため移行できません。接続後に再度お試しください。", "warn", 3200);
+    if(window.safeToast) window.safeToast("インターネット未接続のため処理できません。接続後に再度お試しください。", "warn", 3200);
     return;
   }
   const licenseKey = getStoredLicenseKey();
   if(!licenseKey){
-    if(window.safeToast) window.safeToast("ライセンスキーが未入力です。", "warn", 2600);
+    if(window.safeToast) window.safeToast("必要な情報が未入力です。", "warn", 2600);
     return;
   }
   const deviceId = window.WavCueLicense?.getDeviceId?.();
@@ -13035,7 +13035,7 @@ licenseTransferConfirmOk?.addEventListener("click", async ()=>{
       const code = json?.code || response.status || "error";
       const message = json?.message || response.statusText || "deactivate failed";
       console.log(`[License] deactivate failed: ${code}/${message}`);
-      if(window.safeToast) window.safeToast(message || "移行に失敗しました。", "warn", 3200);
+      if(window.safeToast) window.safeToast(message || "処理に失敗しました。", "warn", 3200);
       return;
     }
     handleDeactivateSuccess();
