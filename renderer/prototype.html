@@ -11913,7 +11913,7 @@ function getProg(){
 async function buildExportWavBytes(opts){
   const targetFileId = opts?.fileId;
   if(targetFileId && typeof setActiveFile === "function" && state.activeFileId !== targetFileId){
-    await setActiveFile(targetFileId, { force:true });
+    await setActiveFile(targetFileId, { force:true, bulkExport: window.__WAVCUE_BULK_RUNNING__ === true });
   }
   if(!state.buffer || !state.srcFmtPayload || !state.srcDataPayload){
     throw _exportMakeError("書き出し前提データがありません", true);
@@ -18920,6 +18920,43 @@ try{
       return [];
     }
   }
+  const proHydrateBulkExportState = async (rec)=>{
+    if(!rec) return false;
+    const srcAb = rec?.srcAb || rec?._stateSnap?.srcAb || null;
+    if(!srcAb) return false;
+    try{
+      state.fileName = rec.name || state.fileName;
+      state.file = rec.file || state.file;
+      proApplyStateSnapshot(rec);
+      if(!audioCacheApply(rec)){
+        const ctx = await ensureAudioCtx();
+        const buf = await new Promise((resolve,reject)=> ctx.decodeAudioData(srcAb.slice(0), resolve, reject));
+        state.buffer = buf;
+        state.origBuffer = buf;
+        state.sr = buf.sampleRate;
+        state.peaks = await buildPeaksAsync(buf, 6000, null, null);
+        try{ audioCacheRemember(rec, state.buffer, state.peaks); }catch(err){ console.warn("[BULK] audio cache remember failed", rec.name, err); }
+      }
+      state.procApplied = false;
+      state.procDataPayload = null;
+      state.procInfo = null;
+      state.scLast = null;
+      state.qcHasRun = false;
+      state.zoom = 1;
+      state.vZoom = 1;
+      state.scrollPx = 0;
+      state.playheadSec = 0;
+      state.playStartSec = 0;
+      project.lastLoadedId = rec.id;
+      proForceRedraw("bulk-export-hydrate");
+      proApplyEditsToApp(rec, "bulk-export-hydrate");
+      return true;
+    }catch(err){
+      console.warn("[BULK] hydrate fallback failed", rec?.name, err);
+      return false;
+    }
+  };
+
   async function setActiveFile(id, opts){
     try{
       const rec = project.files.find(f=>f.id===id);
@@ -18963,6 +19000,7 @@ try{
       }
 
       const allowDecode = (opts?.allowDecode !== false);
+      const isBulkExportSwitch = opts?.bulkExport === true;
       const cacheHit = audioCacheApply(rec);
       if(cacheHit){
         state.fileName = rec.name;
@@ -18982,6 +19020,11 @@ try{
         project.lastLoadedId = id;
         proForceRedraw("cache-hit");
         proApplyEditsToApp(rec, "cache-hit");
+      }else if(isBulkExportSwitch){
+        const hydrated = await proHydrateBulkExportState(rec);
+        if(!hydrated){
+          throw new Error("BULK_EXPORT_SOURCE_UNAVAILABLE");
+        }
       }else if(!allowDecode){
         console.log("[Pro] setActiveFile skip decode (no cache)", { id, name: rec.name });
         return;
@@ -19095,6 +19138,7 @@ try{
     }catch(err){
       console.error("[Pro] setActiveFile error", err);
       if (typeof window.diagErr === "function") window.diagErr("[ACTIVE]", "error", err);
+      if(opts?.bulkExport === true) throw err;
     }finally{
       render();
       if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch");
@@ -19402,6 +19446,7 @@ try{
       }
     });
   }
+  window.__WAVCUE_BULK_RUNNING__ = false;
   async function runJob(type, idsOverride){
     const gate = (type === "export")
       ? guardBulkExport({ source: "bulk", mode: type })
@@ -19498,6 +19543,7 @@ try{
 
     let qcUpdatedRows = 0;
     try{
+      if(type === "export") window.__WAVCUE_BULK_RUNNING__ = true;
       let index = 0;
       for(const id of targets){
         if(job.cancel) break;
@@ -19506,7 +19552,7 @@ try{
         try{
           index += 1;
           logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
-          await setActiveFile(id, {force:true});
+          await setActiveFile(id, { force:true, bulkExport: type === "export" });
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
           bulkOverlay.update(job.done, job.total, f.name);
           if(type==='qc'){
@@ -19656,11 +19702,13 @@ try{
       }
       if(restoreFileId && project.files.some(f=>f.id===restoreFileId) && state.activeFileId !== restoreFileId){
         try{
-          await setActiveFile(restoreFileId, { force:true });
+          await setActiveFile(restoreFileId, { force:true, bulkExport: type === "export" });
         }catch(err){
           console.warn("[BULK] restore active file failed", err);
         }
       }
+    }finally{
+      if(type === "export") window.__WAVCUE_BULK_RUNNING__ = false;
     }
   }
   function idsSelectedOrActive(){
