@@ -5284,18 +5284,20 @@ body, #appRoot, .appRoot, .mainLayout{
 ================================ */
 let _lastOfflineDegrade = null;
 // CHECK ONLY / NOT FOR MERGE:
-// 起動直後から最終ライセンス判定をPROへ固定するための開発フック。
+// 起動直後のtier確定より前に、最終ライセンス判定をPROへ固定する開発フック。
 const CHECK_ONLY_FORCE_PRO_ON_BOOT = true;
 let _checkOnlyForceProLogged = false;
-const getStandardOfflineGatingTier = (state)=>{
-  let baseTier = String(state?.tier || "demo").toLowerCase();
-  if(CHECK_ONLY_FORCE_PRO_ON_BOOT){
-    baseTier = "pro";
-    if(!_checkOnlyForceProLogged){
-      console.log("[CHECK ONLY] FORCE PRO ENABLED");
-      _checkOnlyForceProLogged = true;
-    }
+const resolveCheckOnlyTier = (tierRaw)=>{
+  const fallbackTier = String(tierRaw || "demo").toLowerCase();
+  if(!CHECK_ONLY_FORCE_PRO_ON_BOOT) return fallbackTier;
+  if(!_checkOnlyForceProLogged){
+    console.log("[CHECK ONLY] FORCE PRO ENABLED");
+    _checkOnlyForceProLogged = true;
   }
+  return "pro";
+};
+const getStandardOfflineGatingTier = (state)=>{
+  const baseTier = resolveCheckOnlyTier(state?.tier);
   const isOnline = navigator.onLine !== false;
   if(baseTier !== "standard"){
     _lastOfflineDegrade = null;
@@ -5393,7 +5395,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     backup: { minTier: "standard", reason: "standard-required" },
   };
   const stateCache = {
-    tier: "demo",
+    tier: resolveCheckOnlyTier("demo"),
     source: "fallback",
     updatedAt: Date.now(),
   };
@@ -5827,7 +5829,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
         console.log("[License] boot fallback applied");
       }
       return {
-        tier: "demo",
+        tier: resolveCheckOnlyTier("demo"),
         certificate: null,
         hasCert: false,
         deviceId,
@@ -5842,7 +5844,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
         console.log("[License] boot fallback applied");
       }
       return {
-        tier: "demo",
+        tier: resolveCheckOnlyTier("demo"),
         certificate: null,
         hasCert: false,
         deviceId,
@@ -5852,7 +5854,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     if(options.logBoot){
       console.log("[License] boot certificate loaded");
     }
-    return { tier: verified.tier, certificate: verified.certificate, hasCert: true, deviceId, demoReason: null };
+    return { tier: resolveCheckOnlyTier(verified.tier), certificate: verified.certificate, hasCert: true, deviceId, demoReason: null };
   };
 
   const setCache = (next, source)=>{
@@ -5877,7 +5879,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const buildState = (base, options = {})=>{
     const now = Date.now();
-    const tier = (base && base.tier) ? base.tier : "demo";
+    const tier = resolveCheckOnlyTier((base && base.tier) ? base.tier : "demo");
     if(options.touchOnline && tier === "standard"){
       touchStandardLastOnlineOkAt(now);
     }
@@ -5930,7 +5932,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       return buildState({ ...stateCache, ...certState }, options);
     }catch(e){
       console.error("[License] non-fatal", e);
-      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
+      return buildState({ tier: resolveCheckOnlyTier("demo"), source: "fallback", updatedAt: Date.now() }, options);
     }
   };
 
