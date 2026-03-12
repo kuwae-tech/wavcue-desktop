@@ -5283,24 +5283,8 @@ body, #appRoot, .appRoot, .mainLayout{
    License Core (single safe API)
 ================================ */
 let _lastOfflineDegrade = null;
-// CHECK ONLY / NOT FOR MERGE:
-// 起動直後から guard/UI の最終 tier 判定元を強制的に PRO に寄せる検証フック。
-const CHECK_ONLY_FORCE_PRO_TIER = true;
-let _checkOnlyForceProLogged = false;
-const getCheckOnlyForcedTier = ()=>{
-  if(!CHECK_ONLY_FORCE_PRO_TIER) return null;
-  if(!_checkOnlyForceProLogged){
-    _checkOnlyForceProLogged = true;
-    console.log("[CHECK ONLY] FORCE PRO ENABLED");
-  }
-  return "pro";
-};
-const applyCheckOnlyForcedTier = (tier)=>{
-  const forced = getCheckOnlyForcedTier();
-  return forced || String(tier || "demo").toLowerCase();
-};
 const getStandardOfflineGatingTier = (state)=>{
-  const baseTier = applyCheckOnlyForcedTier(state?.tier);
+  const baseTier = String(state?.tier || "demo").toLowerCase();
   const isOnline = navigator.onLine !== false;
   if(baseTier !== "standard"){
     _lastOfflineDegrade = null;
@@ -5862,7 +5846,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const setCache = (next, source)=>{
     if(!next || !next.tier) return stateCache;
-    stateCache.tier = applyCheckOnlyForcedTier(next.tier);
+    stateCache.tier = next.tier;
     stateCache.source = source || stateCache.source;
     stateCache.updatedAt = Date.now();
     listeners.forEach((fn)=>{ try{ fn({ ...stateCache }); }catch(_){ console.warn("[License] non-fatal"); } });
@@ -5882,7 +5866,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const buildState = (base, options = {})=>{
     const now = Date.now();
-    const tier = applyCheckOnlyForcedTier((base && base.tier) ? base.tier : "demo");
+    const tier = (base && base.tier) ? base.tier : "demo";
     if(options.touchOnline && tier === "standard"){
       touchStandardLastOnlineOkAt(now);
     }
@@ -5942,7 +5926,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   let _lastRefreshSummary = "";
   const _refreshState = (reason, options = {})=>{
     const next = getStateSafeInternal({ touchOnline: options.touchOnline });
-    stateCache.tier = applyCheckOnlyForcedTier(next.tier);
+    stateCache.tier = next.tier;
     stateCache.source = reason || stateCache.source;
     stateCache.updatedAt = Date.now();
     const payload = { ...stateCache, demo: next.demo, standard: next.standard };
