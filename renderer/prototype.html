@@ -19055,7 +19055,8 @@ try{
       }catch(error){
         console.warn("[ACTIVE] restore state summary log failed", { fileId: rec?.id }, error);
       }
-      if(typeof window.requestFullRefresh === "function"){
+      const skipBulkUiRefresh = !!state._bulkJobRunning;
+      if(!skipBulkUiRefresh && typeof window.requestFullRefresh === "function"){
         window.requestFullRefresh("active:restore:cmcd");
         window.requestFullRefresh("active:restore:pdf");
       }
@@ -19084,7 +19085,7 @@ try{
       if (typeof window.diagErr === "function") window.diagErr("[ACTIVE]", "error", err);
     }finally{
       render();
-      if(typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch");
+      if(!state._bulkJobRunning && typeof window.requestFullRefresh === "function") window.requestFullRefresh("active:switch");
       console.log("[Pro] setActiveFile done", id);
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "done", window.diagState({ fileId: id }));
     }
@@ -19485,6 +19486,7 @@ try{
 
     let qcUpdatedRows = 0;
     try{
+      state._bulkJobRunning = true;
       let index = 0;
       for(const id of targets){
         if(job.cancel) break;
@@ -19581,6 +19583,7 @@ try{
         }
       }
     }finally{
+      state._bulkJobRunning = false;
       logJob(`完了: ${job.done}/${job.total} / failed=${job.failed.length}`);
       if(type==='qc'){
         console.log(`[QC][bulk] done updatedRows=${qcUpdatedRows}`);
