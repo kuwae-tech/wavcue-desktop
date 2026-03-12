@@ -5328,20 +5328,6 @@ const beginLicenseVerification = (reason = "unknown")=>{
 
 const LicenseCore = (()=> {
   const listeners = new Set();
-  const CHECK_ONLY_FORCE_PRO = true;
-  let _checkOnlyForceProLogged = false;
-  const emitCheckOnlyForceProLog = ()=>{
-    if(!CHECK_ONLY_FORCE_PRO || _checkOnlyForceProLogged) return;
-    console.warn("[CHECK ONLY] FORCE PRO ENABLED");
-    _checkOnlyForceProLogged = true;
-  };
-  const resolveOperationalTier = (rawTier)=>{
-    if(CHECK_ONLY_FORCE_PRO){
-      emitCheckOnlyForceProLog();
-      return "pro";
-    }
-    return String(rawTier || "demo").toLowerCase() === "pro" ? "pro" : "demo";
-  };
   const tierRank = { demo: 0, standard: 1, pro: 2 };
   const LICENSE_CERT_PUBKEY_PEM = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
@@ -5371,7 +5357,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     backup: { minTier: "pro", reason: "standard-required" },
   };
   const stateCache = {
-    tier: resolveOperationalTier("demo"),
+    tier: "demo",
     source: "fallback",
     updatedAt: Date.now(),
   };
@@ -5791,7 +5777,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const setCache = (next, source)=>{
     if(!next || !next.tier) return stateCache;
-    stateCache.tier = resolveOperationalTier(next.tier);
+    stateCache.tier = next.tier;
     stateCache.source = source || stateCache.source;
     stateCache.updatedAt = Date.now();
     listeners.forEach((fn)=>{ try{ fn({ ...stateCache }); }catch(_){ console.warn("[License] non-fatal"); } });
@@ -5799,7 +5785,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   };
 
   const init = ()=>{
-    emitCheckOnlyForceProLog();
     try{
       const certState = loadCertificateState({ logBoot: true });
       setCache({ tier: certState.tier }, "certificate");
@@ -5812,7 +5797,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const buildState = (base, options = {})=>{
     const now = Date.now();
-    const tier = resolveOperationalTier((base && base.tier) ? base.tier : "demo");
+    const tier = (base && base.tier) ? base.tier : "demo";
     const demo = getDemoInfo(now, tier === "demo");
     const standard = getStandardInfo(now);
     standard.exportBlockedReason = null;
@@ -5869,7 +5854,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const guard = (action, ctx)=>{
     try{
       const st = getStateSafeInternal({ touchOnline: false });
-      const tier = resolveOperationalTier(st?.tier);
+      const tier = String(st?.tier || "demo").toLowerCase() === "pro" ? "pro" : "demo";
       const rule = policy[action] || { minTier: "demo" };
       let ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
       let reason = ok ? undefined : (rule.reason || "restricted");
