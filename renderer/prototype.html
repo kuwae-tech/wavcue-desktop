@@ -5282,26 +5282,6 @@ body, #appRoot, .appRoot, .mainLayout{
 /* ===============================
    License Core (single safe API)
 ================================ */
-let _lastOfflineDegrade = null;
-const getStandardOfflineGatingTier = (state)=>{
-  const baseTier = String(state?.tier || "demo").toLowerCase();
-  const isOnline = navigator.onLine !== false;
-  if(baseTier !== "standard"){
-    _lastOfflineDegrade = null;
-    return { baseTier, effectiveTier: baseTier, isOnline };
-  }
-  const effectiveTier = (baseTier === "standard" && !isOnline) ? "demo" : baseTier;
-  const degraded = baseTier === "standard" && effectiveTier === "demo";
-  if(_lastOfflineDegrade !== degraded){
-    const message = degraded
-      ? "[License][net] offline -> apply demo-like gating for STANDARD, keep display STANDARD"
-      : "[License][net] online -> restore STANDARD gating";
-    console.log(message);
-    _lastOfflineDegrade = degraded;
-  }
-  return { baseTier, effectiveTier, isOnline };
-};
-
 const licenseVerifyUiState = {
   pendingCount: 0,
   showTimer: null,
@@ -5366,11 +5346,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     demoExportLimitBanner: "DEMO版の書き出し回数制限に達しました。PRO版は今後のストア版で対応予定です。",
     demoExpiredToast: "体験版の利用期間が終了しました。PROアドオンをご利用ください",
     demoExportLimitToast: "体験版の書き出し回数制限に達しました。PROアドオンをご利用ください",
-    standardAuthToast: "PRO利用情報を確認できないため書き出しのみ停止します。",
-    standardGraceModal: "PRO利用情報を確認できません。1時間後に書き出しのみ停止します。\nネット接続を確認してください。",
-    standardGraceBanner: "PRO利用情報を確認できません（猶予中）。ネット接続を確認してください。",
-    standardAuthBanner: "PRO利用情報を確認できません（書き出しのみ停止）。ネット接続を確認してください。",
-    standardOfflineToast: "オフラインのため一時的に機能が制限されています（DEMO相当）。通信が回復すると自動で復帰します。",
   });
   const policy = {
     bulkImport: { minTier: "pro", reason: "pro-only" },
@@ -5378,19 +5353,16 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     bulkExport: { minTier: "pro", reason: "pro-only" },
     history: { minTier: "pro", reason: "pro-only" },
     exportSingle: { minTier: "demo", reason: "standard-required" },
-    preset: { minTier: "standard", reason: "standard-required" },
-    backup: { minTier: "standard", reason: "standard-required" },
+    preset: { minTier: "pro", reason: "standard-required" },
+    backup: { minTier: "pro", reason: "standard-required" },
   };
   const stateCache = {
     tier: "demo",
     source: "fallback",
     updatedAt: Date.now(),
   };
-  let _lastStdHardExpired = null;
   const DEMO_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
   const DEMO_EXPORT_MAX = 20;
-  const STANDARD_AUTH_FRESH_MS = 60 * 60 * 1000;
-  const STANDARD_AUTH_GRACE_MS = 60 * 60 * 1000;
   const LS_STATE_KEYS = [
     "wavcue_license_state",
     "wavcue_license",
@@ -5402,10 +5374,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const LS_DEVICE_ID = "wavcue_device_id_v1";
   const LS_DEMO_ACTIVATED_AT = "wavcue_demo_activated_at";
   const LS_DEMO_EXPORT_OK_COUNT = "wavcue_demo_export_ok_count";
-  const LS_STANDARD_LAST_ONLINE_OK_AT = "wavcue_standard_last_online_ok_at";
-  const LS_STANDARD_GRACE_STARTED_AT = "wavcue_std_grace_started_at";
-  const LS_STANDARD_GRACE_EXPIRES_AT = "wavcue_std_grace_expires_at";
-  const LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT = "wavcue_std_grace_modal_shown_for_started_at";
 
   const readNumber = (key)=>{
     try{
@@ -5442,27 +5410,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     const next = setDemoExportOkCount(readDemoExportOkCount() + 1);
     return next;
   };
-  const readStandardLastOnlineOkAt = ()=> readNumber(LS_STANDARD_LAST_ONLINE_OK_AT);
-  const touchStandardLastOnlineOkAt = (now)=>{
-    const stamp = Number.isFinite(now) ? now : Date.now();
-    writeNumber(LS_STANDARD_LAST_ONLINE_OK_AT, stamp);
-    return stamp;
-  };
-  const readStandardGraceStartedAt = ()=> readNumber(LS_STANDARD_GRACE_STARTED_AT);
-  const readStandardGraceExpiresAt = ()=> readNumber(LS_STANDARD_GRACE_EXPIRES_AT);
-  const readStandardGraceModalShownFor = ()=> readNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT);
-  const writeStandardGraceState = (startedAt, expiresAt)=>{
-    writeNumber(LS_STANDARD_GRACE_STARTED_AT, startedAt);
-    writeNumber(LS_STANDARD_GRACE_EXPIRES_AT, expiresAt);
-  };
-  const clearStandardGraceState = ()=>{
-    writeNumber(LS_STANDARD_GRACE_STARTED_AT, null);
-    writeNumber(LS_STANDARD_GRACE_EXPIRES_AT, null);
-    writeNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT, null);
-  };
-  const markStandardGraceModalShownFor = (startedAt)=>{
-    writeNumber(LS_STANDARD_GRACE_MODAL_SHOWN_FOR_STARTED_AT, startedAt);
-  };
   const getDemoInfo = (now, ensureActivation)=>{
     const stamp = Number.isFinite(now) ? now : Date.now();
     const activatedAt = ensureActivation ? ensureDemoActivatedAt(stamp) : readDemoActivatedAt();
@@ -5489,23 +5436,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       demoBlockedReason,
     };
   };
-  const getStandardInfo = (now)=>{
-    const stamp = Number.isFinite(now) ? now : Date.now();
-    const lastOnlineOkAt = readStandardLastOnlineOkAt();
-    const elapsed = lastOnlineOkAt ? Math.max(0, stamp - lastOnlineOkAt) : STANDARD_AUTH_FRESH_MS + 1;
-    const remainingMs = Math.max(0, STANDARD_AUTH_FRESH_MS - elapsed);
-    const remainingMinutes = Math.max(0, Math.ceil(remainingMs / (60 * 1000)));
-    const expiresAt = lastOnlineOkAt ? (lastOnlineOkAt + STANDARD_AUTH_FRESH_MS) : null;
-    const isValidNow = remainingMs > 0;
-    return {
-      auth: {
-        lastOkAt: lastOnlineOkAt,
-        expiresAt,
-        isValidNow,
-        remainingMinutes,
-      },
-    };
-  };
+  const getStandardInfo = ()=> ({ auth: { isValidNow: true } });
 
   const normalizeTier = (raw)=>{
     const t = String(raw || "").toLowerCase();
@@ -5867,48 +5798,9 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const buildState = (base, options = {})=>{
     const now = Date.now();
     const tier = (base && base.tier) ? base.tier : "demo";
-    if(options.touchOnline && tier === "standard"){
-      touchStandardLastOnlineOkAt(now);
-    }
     const demo = getDemoInfo(now, tier === "demo");
     const standard = getStandardInfo(now);
-    const strictAuth = standard?.auth?.isValidNow !== false;
-    let graceStartedAt = readStandardGraceStartedAt();
-    let graceExpiresAt = readStandardGraceExpiresAt();
-    if(tier === "standard"){
-      if(strictAuth){
-        if(graceStartedAt != null || graceExpiresAt != null || readStandardGraceModalShownFor() != null){
-          clearStandardGraceState();
-        }
-        graceStartedAt = null;
-        graceExpiresAt = null;
-      }else{
-        const hasGrace = Number.isFinite(graceStartedAt) && Number.isFinite(graceExpiresAt) && graceExpiresAt > graceStartedAt;
-        if(!hasGrace){
-          graceStartedAt = now;
-          graceExpiresAt = now + STANDARD_AUTH_GRACE_MS;
-          writeStandardGraceState(graceStartedAt, graceExpiresAt);
-        }
-      }
-    }
-    const graceEligible = tier === "standard";
-    const isInGrace = graceEligible && !strictAuth && Number.isFinite(graceExpiresAt) && now < graceExpiresAt;
-    const isHardExpired = graceEligible && !strictAuth && (!Number.isFinite(graceExpiresAt) || now >= graceExpiresAt);
-    const graceRemainingMinutes = isInGrace
-      ? Math.max(0, Math.ceil((graceExpiresAt - now) / (60 * 1000)))
-      : 0;
-    if(standard?.auth){
-      standard.auth.isInGrace = !!isInGrace;
-      standard.auth.isHardExpired = !!isHardExpired;
-      standard.auth.graceStartedAt = graceEligible && Number.isFinite(graceStartedAt) ? graceStartedAt : null;
-      standard.auth.graceExpiresAt = graceEligible && Number.isFinite(graceExpiresAt) ? graceExpiresAt : null;
-      standard.auth.graceRemainingMinutes = graceRemainingMinutes;
-    }
-    if(tier === "standard"){
-      standard.exportBlockedReason = isHardExpired ? "standard_auth_expired" : null;
-    }else{
-      standard.exportBlockedReason = null;
-    }
+    standard.exportBlockedReason = null;
     return { ...base, tier, demo, standard };
   };
 
@@ -5944,16 +5836,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     if(shouldLog){
       console.log("[License] state refreshed");
     }
-    if(next.tier === "standard"){
-      if(_lastStdHardExpired === false && stdHardExpired === true){
-        if(typeof window.safeToast === "function"){
-          window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
-        }
-      }
-      _lastStdHardExpired = stdHardExpired;
-    }else{
-      _lastStdHardExpired = null;
-    }
     if(isChange) _lastRefreshSummary = summary;
     return payload;
   };
@@ -5972,15 +5854,10 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const guard = (action, ctx)=>{
     try{
       const st = getStateSafeInternal({ touchOnline: false });
-      const { effectiveTier } = getStandardOfflineGatingTier(st);
-      const tier = effectiveTier || "demo";
+      const tier = String(st?.tier || "demo").toLowerCase() === "pro" ? "pro" : "demo";
       const rule = policy[action] || { minTier: "demo" };
       let ok = (tierRank[tier] ?? 0) >= (tierRank[rule.minTier] ?? 0);
       let reason = ok ? undefined : (rule.reason || "restricted");
-      if(action === "exportSingle" && tier === "standard" && st?.standard?.auth?.isHardExpired){
-        ok = false;
-        reason = "standard-auth-expired";
-      }
       if(action === "exportSingle" && tier === "demo" && isDemoLocked(st)){
         ok = false;
         reason = st?.demo?.demoBlockedReason || "demo_expired";
@@ -6060,7 +5937,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       writeCertificate(verified.certificate);
       try{ localStorage?.setItem?.(LS_KEY_LAST, value); }catch(_){ console.warn("[License] non-fatal"); }
       setCache({ tier: verified.tier }, "certificate");
-      if(verified.tier === "standard") touchStandardLastOnlineOkAt(Date.now());
       _refreshState("activation", { touchOnline: true });
       console.log("[License] activate succeeded");
       return { ok: true, tier: verified.tier };
@@ -6190,7 +6066,7 @@ const updateTierBadge = (state)=>{
     if(!badge) return;
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
-    const label = tier === "pro" ? "PRO" : tier === "standard" ? "STANDARD" : "DEMO";
+    const label = tier === "pro" ? "PRO" : "DEMO";
     badge.textContent = label;
     badge.classList.remove("tierBadge--demo", "tierBadge--pro");
     const cls = tier === "pro" ? "tierBadge--pro" : "tierBadge--demo";
@@ -6311,10 +6187,7 @@ const updateDemoRemainingBanner = (state)=>{
     const parts = buildDemoRemainingParts(remainingDays, remainingExports);
     const hasRemaining = parts.length > 0;
     const showDemoRemaining = isDemo && !isDemoLocked && hasRemaining;
-    const bannerMeta = state?.standard?.auth || {};
-    const standardInGrace = tier === "standard" && !!bannerMeta.isInGrace;
-    const standardHardExpired = tier === "standard" && !!bannerMeta.isHardExpired;
-    const hasStandardBanner = standardInGrace || standardHardExpired;
+    const hasStandardBanner = false;
     const hasDemoLockBanner = isDemoLocked;
     let mode = "none";
     if(hasStandardBanner || hasDemoLockBanner){
@@ -6345,10 +6218,6 @@ const LICENSE_EXTRA_KEYS = [
   "wavcue_license_key_lock",
   "wavcue_demo_activated_at",
   "wavcue_demo_export_ok_count",
-  "wavcue_standard_last_online_ok_at",
-  "wavcue_std_grace_started_at",
-  "wavcue_std_grace_expires_at",
-  "wavcue_std_grace_modal_shown_for_started_at",
   LICENSE_CERTIFICATE_KEY,
 ];
 let _licenseRestoreDone = false;
@@ -6489,28 +6358,19 @@ const applyLicenseUi = (state)=>{
   try{
     const tierRaw = state && state.tier ? state.tier : "demo";
     const tier = String(tierRaw).toLowerCase();
-    const { baseTier, effectiveTier, isOnline } = getStandardOfflineGatingTier(state);
-    const gatingTier = effectiveTier || tier;
-    const isStandardOffline = baseTier === "standard" && !isOnline;
     const demoInfo = state?.demo;
     const isDemo = tier === "demo";
-    const isGatingDemo = gatingTier === "demo";
+    const isGatingDemo = tier !== "pro";
     const demoBlockedReason = demoInfo?.demoBlockedReason || null;
     const isDemoLocked = isGatingDemo && !!demoInfo?.isLocked;
     const remainingDays = Number.isFinite(demoInfo?.remainingDays) ? demoInfo.remainingDays : null;
     const remainingExports = Number.isFinite(demoInfo?.remainingExports) ? demoInfo.remainingExports : null;
     const demoParts = buildDemoRemainingParts(remainingDays, remainingExports);
     const showDemoRemaining = isDemo && !isDemoLocked && demoParts.length > 0;
-    const standardAuth = state?.standard?.auth || {};
-    const standardInGrace = tier === "standard" && !!standardAuth.isInGrace;
-    const standardHardExpired = tier === "standard" && !!standardAuth.isHardExpired;
-    const standardExportAllowed = tier !== "standard" || !standardHardExpired;
     const banner = document.getElementById("licenseBanner");
     if(banner){
       let bannerText = "";
       let bannerMeta = "";
-      let isStandardBanner = false;
-      let isGraceBanner = false;
       let isDemoBanner = false;
       let hasChip = false;
       let hasActions = false;
@@ -6528,23 +6388,12 @@ const applyLicenseUi = (state)=>{
           : LICENSE_TEXT.demoExpiredBanner;
         bannerMeta = "";
         isDangerBanner = true;
-      }else if(tier === "standard" && standardInGrace){
-        bannerText = LICENSE_TEXT.standardGraceBanner;
-        if(Number.isFinite(standardAuth.graceRemainingMinutes) && standardAuth.graceRemainingMinutes > 0){
-          bannerMeta = `あと${standardAuth.graceRemainingMinutes}分`;
-        }
-        isStandardBanner = true;
-        isGraceBanner = true;
-      }else if(tier === "standard" && standardHardExpired){
-        bannerText = LICENSE_TEXT.standardAuthBanner;
-        isStandardBanner = true;
       }
       while(banner.firstChild) banner.removeChild(banner.firstChild);
       if(bannerText){
         const body = document.createElement("span");
         body.className = "licenseBannerBody";
         if(isDangerBanner) body.classList.add("licenseBannerBody--danger");
-        if(isGraceBanner) body.classList.add("licenseBannerBody--grace");
         const textSpan = document.createElement("span");
         textSpan.className = "licenseBannerText";
         textSpan.textContent = bannerText;
@@ -6567,7 +6416,7 @@ const applyLicenseUi = (state)=>{
             _lastDemoBannerReasonLogged = reasonCode;
           }
         }
-        if(isDemo || isDemoLocked || isStandardBanner){
+        if(isDemo || isDemoLocked){
           const actions = document.createElement("span");
           actions.className = "licenseBannerActions";
           const openBtn = document.createElement("button");
@@ -6589,7 +6438,7 @@ const applyLicenseUi = (state)=>{
         banner.appendChild(renderDemoRemainingNode(demoParts));
         isDemoBanner = true;
       }
-      banner.classList.toggle("licenseBanner--grace", isGraceBanner);
+      banner.classList.toggle("licenseBanner--grace", false);
       banner.classList.toggle("licenseBanner--demo", isDemoBanner);
       banner.classList.toggle("licenseBanner--withChip", hasChip);
       banner.classList.toggle("licenseBanner--withActions", hasActions);
@@ -6616,9 +6465,6 @@ const applyLicenseUi = (state)=>{
       "pairSeconds",
     ].map(id=> document.getElementById(id));
     lockEditEls.forEach(el=> setDisabled(el, isDemoLocked));
-    if(tier === "standard"){
-      setDisabled(document.getElementById("btnExport"), !standardExportAllowed);
-    }
 
     const presetDisabled = isGatingDemo;
     const presetEls = [
@@ -6651,11 +6497,6 @@ const applyLicenseUi = (state)=>{
     const applyPresetNote = (el)=>{
       if(!el) return;
       if(!el.dataset.demoText) el.dataset.demoText = el.textContent || "";
-      if(isStandardOffline){
-        el.textContent = "オフラインのため一時的にプリセット機能がロックされています。通信が回復すると自動で復帰します。";
-        el.style.display = "block";
-        return;
-      }
       if(isDemo){
         el.textContent = el.dataset.demoText || "";
         el.style.display = "block";
@@ -6700,7 +6541,6 @@ window.addEventListener("online", async ()=>{
   const endVerify = beginLicenseVerification("online-restore");
   try{
     const st = await window.WavCueLicense?.getStateSafe?.();
-    if(st) getStandardOfflineGatingTier(st);
     if(st) applyAllLicenseUi(st);
   }finally{
     endVerify();
@@ -6708,7 +6548,6 @@ window.addEventListener("online", async ()=>{
 });
 window.addEventListener("offline", ()=>{
   const st = window.WavCueLicense?.getStateSafe?.();
-  if(st) getStandardOfflineGatingTier(st);
   if(st) applyAllLicenseUi(st);
 });
 (function(){
@@ -12453,20 +12292,13 @@ async function exportOneWithSave(options){
 
 async function exportWav(){
   const gate = guardExport({ source: "singleExport" });
-  const st = window.WavCueLicense?.getStateSafe?.();
-  const { baseTier, effectiveTier, isOnline } = getStandardOfflineGatingTier(st);
-  const isStandardOffline = baseTier === "standard" && effectiveTier === "demo" && !isOnline;
-  if(gate?.tier === "demo" && !_demoExportNoticeShown && !isStandardOffline){
+  if(gate?.tier === "demo" && !_demoExportNoticeShown){
     _demoExportNoticeShown = true;
     if(window.safeToast) window.safeToast(LICENSE_TEXT.demoNotice, "info");
   }
   if(!gate.ok){
     if(window.safeToast){
-      if(isStandardOffline){
-        console.log("[Export][gate] blocked (STANDARD offline) -> offline toast");
-        window.safeToast(LICENSE_TEXT.standardOfflineToast, "warn");
-      }else if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
-      else if(gate.reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
+      if(gate.reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
       else if(gate.reason === "demo_expired") window.safeToast(LICENSE_TEXT.demoExpiredToast, "warn");
       else window.safeToast(LICENSE_TEXT.exportStandardRequired, "warn");
     }
@@ -12570,14 +12402,13 @@ if($("btnCmcd")) $("btnCmcd").disabled = !state.buffer;
   const loaded = !!state.buffer;
   const st = LicenseCore.peekState?.();
   const demoLocked = st?.tier === "demo" && !!st?.demo?.isLocked;
-  const standardExportAllowed = st?.tier === "standard" ? !st?.standard?.auth?.isHardExpired : true;
   $("btnPlay").disabled = !loaded || state.isPlaying;
   $("btnPause").disabled = !loaded || !state.isPlaying;
   $("btnZoomIn").disabled = !loaded;
   $("btnZoomOut").disabled = !loaded;
   $("btnVZoomIn").disabled = !loaded;
   $("btnVZoomOut").disabled = !loaded;
-  $("btnExport").disabled = !loaded || demoLocked || !standardExportAllowed;
+  $("btnExport").disabled = !loaded || demoLocked;
   if($("btnStdCheck")) $("btnStdCheck").disabled = !loaded || demoLocked;
   $("btnAddCustom").disabled = !loaded || demoLocked;
   $("btnAddPair").disabled = !loaded || demoLocked;
@@ -13994,20 +13825,13 @@ function _ecWire(){
 $("btnExport").addEventListener("click", async ()=>{
   try{
     const gate = guardExport({ source: "exportButton" });
-    const st = window.WavCueLicense?.getStateSafe?.();
-    const { baseTier, effectiveTier, isOnline } = getStandardOfflineGatingTier(st);
-    const isStandardOffline = baseTier === "standard" && effectiveTier === "demo" && !isOnline;
-    if(gate?.tier === "demo" && !_demoExportNoticeShown && !isStandardOffline){
+    if(gate?.tier === "demo" && !_demoExportNoticeShown){
       _demoExportNoticeShown = true;
       if(window.safeToast) window.safeToast(LICENSE_TEXT.demoNotice, "info");
     }
     if(!gate.ok){
       if(window.safeToast){
-        if(isStandardOffline){
-          console.log("[Export][gate] blocked (STANDARD offline) -> offline toast");
-          window.safeToast(LICENSE_TEXT.standardOfflineToast, "warn");
-        }else if(gate.reason === "standard-auth-expired") window.safeToast(LICENSE_TEXT.standardAuthToast, "warn");
-        else if(gate.reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
+        if(gate.reason === "demo_export_limit") window.safeToast(LICENSE_TEXT.demoExportLimitToast, "warn");
         else if(gate.reason === "demo_expired") window.safeToast(LICENSE_TEXT.demoExpiredToast, "warn");
         else window.safeToast(LICENSE_TEXT.exportStandardRequired, "warn");
       }
