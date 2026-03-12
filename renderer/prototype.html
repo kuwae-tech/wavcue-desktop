@@ -5283,8 +5283,19 @@ body, #appRoot, .appRoot, .mainLayout{
    License Core (single safe API)
 ================================ */
 let _lastOfflineDegrade = null;
+// CHECK ONLY / NOT FOR MERGE:
+// 起動直後から最終ライセンス判定をPROへ固定するための開発フック。
+const CHECK_ONLY_FORCE_PRO_ON_BOOT = true;
+let _checkOnlyForceProLogged = false;
 const getStandardOfflineGatingTier = (state)=>{
-  const baseTier = String(state?.tier || "demo").toLowerCase();
+  let baseTier = String(state?.tier || "demo").toLowerCase();
+  if(CHECK_ONLY_FORCE_PRO_ON_BOOT){
+    baseTier = "pro";
+    if(!_checkOnlyForceProLogged){
+      console.log("[CHECK ONLY] FORCE PRO ENABLED");
+      _checkOnlyForceProLogged = true;
+    }
+  }
   const isOnline = navigator.onLine !== false;
   if(baseTier !== "standard"){
     _lastOfflineDegrade = null;
@@ -11899,7 +11910,8 @@ function getProg(){
 }
 async function buildExportWavBytes(opts){
   const targetFileId = opts?.fileId;
-  if(targetFileId && typeof setActiveFile === "function" && state.activeFileId !== targetFileId){
+  const skipActiveSwitch = opts?.skipActiveSwitch === true;
+  if(!skipActiveSwitch && targetFileId && typeof setActiveFile === "function" && state.activeFileId !== targetFileId){
     await setActiveFile(targetFileId, { force:true });
   }
   if(!state.buffer || !state.srcFmtPayload || !state.srcDataPayload){
@@ -12257,7 +12269,7 @@ async function _exportOneWithSaveImpl(options){
     const backupBase = _sanitizeFileSegment(base);
 // --- build replacements (editable chunks only) ---
     if(progressEnabled) getProg().set(0.18, "書き出し中…", "チャンク生成中");
-    const exportBytes = await buildExportWavBytes({ fileId: options?.fileId });
+    const exportBytes = await buildExportWavBytes({ fileId: options?.fileId, skipActiveSwitch: options?.skipActiveSwitch });
     const blob = new Blob([exportBytes], {type:"audio/wav"});
 
     const _saveRes = await saveHandler(blob, suggested, (phase)=>{
@@ -12544,6 +12556,7 @@ async function exportOneToTarget(targetOrOpts, suggestedName){
     progressEnabled: false,
     notifyOnError: false,
     fileId,
+    skipActiveSwitch: !!opts?.skipActiveSwitch,
   });
   const savedName = res?.save?.suggested || res?.save?.filePath || name;
   return { ok: !!res?.ok, error: res?.error, save: res?.save, savedName };
@@ -18041,6 +18054,41 @@ try{
       });
     }catch(_){}
   };
+  const bulkRunCtx = { running: false, mode: null };
+  function applyBulkExportStateFromRec(rec){
+    if(!rec) throw new Error("bulk export source record is missing");
+    const snap = rec._stateSnap || {};
+    const srcAb = rec?.srcAb || snap?.srcAb || null;
+    const srcFmtPayload = rec?.srcFmtPayload || snap?.srcFmtPayload || null;
+    const srcDataPayload = rec?.srcDataPayload || snap?.srcDataPayload || null;
+    if(!srcAb || !srcFmtPayload || !srcDataPayload){
+      throw new Error("書き出し前提データがありません");
+    }
+    state.fileName = rec.name || state.fileName;
+    state.file = rec.file || state.file;
+    state.srcAb = srcAb;
+    state.srcFmtPayload = srcFmtPayload;
+    state.srcDataPayload = srcDataPayload;
+    state.srcBextPayload = rec?.srcBextPayload || snap?.srcBextPayload || state.srcBextPayload;
+    state.srcIXmlPayload = rec?.srcIXmlPayload || snap?.srcIXmlPayload || state.srcIXmlPayload;
+    state.srcCmcdPayload = rec?.srcCmcdPayload || snap?.srcCmcdPayload || state.srcCmcdPayload;
+    state.srcChunks = rec?.srcChunks || snap?.srcChunks || state.srcChunks;
+    state.fileSr = rec?.fileSr || snap?.fileSr || state.fileSr;
+    state.fileBlockAlign = rec?.fileBlockAlign || snap?.fileBlockAlign || state.fileBlockAlign;
+    state.fileTotalSamples = rec?.fileTotalSamples || snap?.fileTotalSamples || state.fileTotalSamples;
+    state._pcmInfo = rec?._pcmInfo || snap?._pcmInfo || state._pcmInfo;
+    state.cuePatchMeta = rec?.cuePatchMeta || snap?.cuePatchMeta || state.cuePatchMeta;
+    state.loadedCueSig = rec?.loadedCueSig || snap?.loadedCueSig || state.loadedCueSig;
+    const recCues = Array.isArray(rec.cuesSnapshot) ? rec.cuesSnapshot : (Array.isArray(rec.cues) ? rec.cues : []);
+    state.cues = recCues.map(c=>({ id: c.id >>> 0, label: String(c.label ?? ""), sec: Number(c.sec ?? 0) }));
+    state.cmcd = rec.cmcd || null;
+    state.cmcdInputs = rec.cmcdInputs || null;
+    state.attachments = Array.isArray(rec.attachments) ? rec.attachments.slice() : [];
+    state.attachCount = state.attachments.length;
+    state.procApplied = false;
+    state.procDataPayload = null;
+    state.procInfo = null;
+  }
   const W = window.WavCue || {};
   const api = W.api || {};
   const loadSingleWav =
@@ -19484,6 +19532,8 @@ try{
     bulkOverlay.start(type, targets.length);
 
     let qcUpdatedRows = 0;
+    bulkRunCtx.running = true;
+    bulkRunCtx.mode = type;
     try{
       let index = 0;
       for(const id of targets){
@@ -19493,7 +19543,11 @@ try{
         try{
           index += 1;
           logJob(`開始: ${type==='qc' ? '一括チェック' : '書き出し'}: ${f.name}`);
-          await setActiveFile(id, {force:true});
+          if(type==='qc'){
+            await setActiveFile(id, {force:true});
+          }else{
+            applyBulkExportStateFromRec(f);
+          }
           updateJobUI(`${type==='qc' ? 'チェック中' : '書き出し中'}: ${f.name}`);
           bulkOverlay.update(job.done, job.total, f.name);
           if(type==='qc'){
@@ -19546,6 +19600,7 @@ try{
               target: exportTarget,
               suggestedName: fileLabel,
               fileId: id,
+              skipActiveSwitch: true,
             });
             if(!res?.ok){
               const msg = res?.error?.message || res?.error || "export failed";
@@ -19641,7 +19696,9 @@ try{
           messages: historyEntry.failureMessages,
         });
       }
-      if(restoreFileId && project.files.some(f=>f.id===restoreFileId) && state.activeFileId !== restoreFileId){
+      bulkRunCtx.running = false;
+      bulkRunCtx.mode = null;
+      if(type!=="export" && restoreFileId && project.files.some(f=>f.id===restoreFileId) && state.activeFileId !== restoreFileId){
         try{
           await setActiveFile(restoreFileId, { force:true });
         }catch(err){
