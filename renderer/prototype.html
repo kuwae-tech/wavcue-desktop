@@ -5361,6 +5361,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     source: "fallback",
     updatedAt: Date.now(),
   };
+  let debugOverrideTier = null;
   const DEMO_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
   const DEMO_EXPORT_MAX = 20;
   const LS_STATE_KEYS = [
@@ -5440,6 +5441,11 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     const s = String(t || "demo").toLowerCase();
     if(s === "pro") return "pro";
     return "demo";
+  };
+  const resolveTierWithDebugOverride = (tier)=>{
+    if(debugOverrideTier === "pro") return "pro";
+    if(debugOverrideTier === "demo") return "demo";
+    return normalizeTier(tier);
   };
 
   const readText = (key)=>{
@@ -5791,7 +5797,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const buildState = (base, options = {})=>{
     const now = Date.now();
-    const tier = normalizeTier(base?.tier);
+    const tier = resolveTierWithDebugOverride(base?.tier);
     const demo = getDemoInfo(now, tier === "demo");
     return { ...base, tier, demo };
   };
@@ -5956,6 +5962,12 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     _refreshState("cert-clear", { touchOnline: false });
   };
   const refreshFromStorageWatch = ()=> _refreshState("storage-watch", { touchOnline: false });
+  const debugSetTier = (nextTier)=>{
+    const tier = normalizeTier(nextTier);
+    debugOverrideTier = tier;
+    return _refreshState("debug", { touchOnline: false });
+  };
+  const debugGetTier = ()=> normalizeTier(getStateSafeInternal({ touchOnline: false })?.tier);
 
 
   return {
@@ -5972,6 +5984,8 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     getServerUrl,
     clearCertificateSafe,
     refreshFromStorageWatch,
+    debugSetTier,
+    debugGetTier,
     LICENSE_TEXT,
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
@@ -5988,6 +6002,8 @@ window.WavCueLicense = {
   getServerUrl: LicenseCore.getServerUrl,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
   refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
+  __debugSetTier: LicenseCore.debugSetTier,
+  __debugGetTier: LicenseCore.debugGetTier,
 };
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ console.warn("[License] non-fatal"); } }, 30000);
@@ -6307,6 +6323,27 @@ function applyAllLicenseUi(state){
   try{ applyLicenseUi(next); }catch(_){ console.warn("[License] non-fatal"); }
   try{ updateLicenseInfo(next); }catch(_){ console.warn("[License] non-fatal"); }
 }
+(function installCheckOnlyTierDebugApi(){
+  if(window.__wavcueDebugSetTier && window.__wavcueDebugGetTier) return;
+  let debugGuideLogged = false;
+  const logDebugGuide = ()=>{
+    if(debugGuideLogged) return;
+    debugGuideLogged = true;
+    console.log('[DEBUG][CHECK ONLY] window.__wavcueDebugSetTier("pro" | "demo") / window.__wavcueDebugGetTier()');
+  };
+  window.__wavcueDebugGetTier = ()=>{
+    const tier = window.WavCueLicense?.__debugGetTier?.();
+    return tier || "demo";
+  };
+  window.__wavcueDebugSetTier = (tier)=>{
+    const next = String(tier || "demo").toLowerCase() === "pro" ? "pro" : "demo";
+    const st = window.WavCueLicense?.__debugSetTier?.(next);
+    if(st) applyAllLicenseUi(st);
+    logDebugGuide();
+    return st;
+  };
+  logDebugGuide();
+})();
 function handleDeactivateSuccess(){
   window.WavCueLicense?.clearCertificateSafe?.();
   try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){ console.warn("[License] non-fatal"); }
