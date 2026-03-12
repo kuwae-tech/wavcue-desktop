@@ -5328,7 +5328,7 @@ const beginLicenseVerification = (reason = "unknown")=>{
 
 const LicenseCore = (()=> {
   const listeners = new Set();
-  const tierRank = { demo: 0, standard: 1, pro: 2 };
+  const tierRank = { demo: 0, pro: 1 };
   const LICENSE_CERT_PUBKEY_PEM = `-----BEGIN PUBLIC KEY-----
 MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 -----END PUBLIC KEY-----`;
@@ -5361,6 +5361,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     source: "fallback",
     updatedAt: Date.now(),
   };
+  let debugOverrideTier = null;
   const DEMO_TRIAL_MS = 7 * 24 * 60 * 60 * 1000;
   const DEMO_EXPORT_MAX = 20;
   const LS_STATE_KEYS = [
@@ -5436,15 +5437,15 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
       demoBlockedReason,
     };
   };
-  const getStandardInfo = ()=> ({ auth: { isValidNow: true } });
-
-  const normalizeTier = (raw)=>{
-    const t = String(raw || "").toLowerCase();
-    if(!t) return null;
-    if(t.includes("pro")) return "pro";
-    if(t.includes("standard") || t.includes("std") || t.includes("wavcue_standard")) return "standard";
-    if(t.includes("demo") || t.includes("trial") || t.includes("free")) return "demo";
-    return null;
+  const normalizeTier = (t)=>{
+    const s = String(t || "demo").toLowerCase();
+    if(s === "pro") return "pro";
+    return "demo";
+  };
+  const resolveTierWithDebugOverride = (tier)=>{
+    if(debugOverrideTier === "pro") return "pro";
+    if(debugOverrideTier === "demo") return "demo";
+    return normalizeTier(tier);
   };
 
   const readText = (key)=>{
@@ -5676,7 +5677,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     const certDeviceId = String(payloadObj.deviceId || "");
     if(!certDeviceId || certDeviceId !== deviceId) return { ok: false, reason: "device-mismatch" };
     const tier = normalizeTier(payloadObj.tier);
-    if(!tier) return { ok: false, reason: "missing-tier" };
     return { ok: true, tier };
   };
   const verifySignatureStub = ({ payloadB64, sigB64, messageBytes, sigBytes })=>{
@@ -5777,7 +5777,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const setCache = (next, source)=>{
     if(!next || !next.tier) return stateCache;
-    stateCache.tier = next.tier;
+    stateCache.tier = normalizeTier(next.tier);
     stateCache.source = source || stateCache.source;
     stateCache.updatedAt = Date.now();
     listeners.forEach((fn)=>{ try{ fn({ ...stateCache }); }catch(_){ console.warn("[License] non-fatal"); } });
@@ -5797,11 +5797,9 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
 
   const buildState = (base, options = {})=>{
     const now = Date.now();
-    const tier = (base && base.tier) ? base.tier : "demo";
+    const tier = resolveTierWithDebugOverride(base?.tier);
     const demo = getDemoInfo(now, tier === "demo");
-    const standard = getStandardInfo(now);
-    standard.exportBlockedReason = null;
-    return { ...base, tier, demo, standard };
+    return { ...base, tier, demo };
   };
 
 
@@ -5821,15 +5819,11 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     stateCache.tier = next.tier;
     stateCache.source = reason || stateCache.source;
     stateCache.updatedAt = Date.now();
-    const payload = { ...stateCache, demo: next.demo, standard: next.standard };
+    const payload = { ...stateCache, demo: next.demo };
     listeners.forEach((fn)=>{ try{ fn(payload); }catch(_){ console.warn("[License] non-fatal"); } });
 
     const demoBlocked = next.demo?.demoBlockedReason || "none";
-    const stdStrict = next.standard?.auth?.isValidNow !== false;
-    const stdInGrace = !!next.standard?.auth?.isInGrace;
-    const stdHardExpired = !!next.standard?.auth?.isHardExpired;
-    const stdBlocked = next.standard?.exportBlockedReason || "none";
-    const summary = `${next.tier}|${demoBlocked}|${stdStrict}|${stdInGrace}|${stdHardExpired}|${stdBlocked}`;
+    const summary = `${next.tier}|${demoBlocked}`;
     const isChange = summary !== _lastRefreshSummary;
     const shouldLog = (reason === "debug" || reason === "key" || reason === "storage-watch")
       || (reason === "tick" && isChange);
@@ -5845,10 +5839,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const isDemoLocked = (st)=> {
     const info = st?.demo || getDemoInfo(Date.now(), true);
     return !!info?.isLocked;
-  };
-  const isStandardAuthFresh = (st)=>{
-    const info = st?.standard || getStandardInfo(Date.now());
-    return !!info?.auth?.isValidNow;
   };
 
   const guard = (action, ctx)=>{
@@ -5972,6 +5962,12 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     _refreshState("cert-clear", { touchOnline: false });
   };
   const refreshFromStorageWatch = ()=> _refreshState("storage-watch", { touchOnline: false });
+  const debugSetTier = (nextTier)=>{
+    const tier = normalizeTier(nextTier);
+    debugOverrideTier = tier;
+    return _refreshState("debug", { touchOnline: false });
+  };
+  const debugGetTier = ()=> normalizeTier(getStateSafeInternal({ touchOnline: false })?.tier);
 
 
   return {
@@ -5981,7 +5977,6 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     setKeySafe,
     onChange,
     isDemoLocked,
-    isStandardAuthFresh,
     recordExportOk,
     resetDemoTrial,
     peekState,
@@ -5989,6 +5984,8 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     getServerUrl,
     clearCertificateSafe,
     refreshFromStorageWatch,
+    debugSetTier,
+    debugGetTier,
     LICENSE_TEXT,
     refreshTick: ()=> _refreshState("tick", { touchOnline: false }),
   };
@@ -6005,6 +6002,8 @@ window.WavCueLicense = {
   getServerUrl: LicenseCore.getServerUrl,
   clearCertificateSafe: LicenseCore.clearCertificateSafe,
   refreshFromStorageWatch: LicenseCore.refreshFromStorageWatch,
+  __debugSetTier: LicenseCore.debugSetTier,
+  __debugGetTier: LicenseCore.debugGetTier,
 };
 LicenseCore.init();
 setInterval(()=>{ try{ LicenseCore.refreshTick?.(); }catch(_){ console.warn("[License] non-fatal"); } }, 30000);
@@ -6324,6 +6323,27 @@ function applyAllLicenseUi(state){
   try{ applyLicenseUi(next); }catch(_){ console.warn("[License] non-fatal"); }
   try{ updateLicenseInfo(next); }catch(_){ console.warn("[License] non-fatal"); }
 }
+(function installCheckOnlyTierDebugApi(){
+  if(window.__wavcueDebugSetTier && window.__wavcueDebugGetTier) return;
+  let debugGuideLogged = false;
+  const logDebugGuide = ()=>{
+    if(debugGuideLogged) return;
+    debugGuideLogged = true;
+    console.log('[DEBUG][CHECK ONLY] window.__wavcueDebugSetTier("pro" | "demo") / window.__wavcueDebugGetTier()');
+  };
+  window.__wavcueDebugGetTier = ()=>{
+    const tier = window.WavCueLicense?.__debugGetTier?.();
+    return tier || "demo";
+  };
+  window.__wavcueDebugSetTier = (tier)=>{
+    const next = String(tier || "demo").toLowerCase() === "pro" ? "pro" : "demo";
+    const st = window.WavCueLicense?.__debugSetTier?.(next);
+    if(st) applyAllLicenseUi(st);
+    logDebugGuide();
+    return st;
+  };
+  logDebugGuide();
+})();
 function handleDeactivateSuccess(){
   window.WavCueLicense?.clearCertificateSafe?.();
   try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){ console.warn("[License] non-fatal"); }
