@@ -6361,13 +6361,6 @@ if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "functio
   };
 }
 
-function updateActivationUi(state){
-  void state;
-}
-
-function openLicenseEntryFlow(){
-  openSettingsModalSafe("license");
-}
 function updateLicenseInfo(state){
   if(settingsDeviceId){
     const deviceId = window.WavCueLicense?.getDeviceId?.();
@@ -6444,11 +6437,7 @@ const applyLicenseUi = (state)=>{
           openBtn.type = "button";
           openBtn.textContent = "設定を開く";
           openBtn.addEventListener("click", ()=>{
-            if(isDemo){
-              openSettingsModalSafe("license");
-              return;
-            }
-            openLicenseEntryFlow();
+            openSettingsModalSafe("license");
           });
           actions.appendChild(openBtn);
           banner.appendChild(actions);
@@ -6544,7 +6533,6 @@ const applyLicenseUi = (state)=>{
     document.querySelectorAll("[data-settings-folder]").forEach((el)=> setDisabled(el, backupDisabled));
     const demoNote = document.getElementById("settingsBackupDemoNote");
     if(demoNote) demoNote.style.display = isDemo ? "block" : "none";
-    updateActivationUi(state);
   }catch(e){
     console.error("[License] non-fatal", e);
   }
