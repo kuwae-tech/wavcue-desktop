@@ -5167,44 +5167,6 @@ body, #appRoot, .appRoot, .mainLayout{
     </div>
   </div>
 </dialog>
-<dialog class="confirmDialog" id="licenseClearConfirm">
-  <div class="modalHead">
-    <div class="title">
-      <b>この端末のPRO利用情報をリセットしますか？</b>
-    </div>
-  </div>
-  <div class="modalBody">
-    <div class="confirmBody">
-      <ul class="confirmList">
-        <li>この端末のPRO利用情報がクリアされ、DEMO表示に戻ります</li>
-        <li>PROはストアアドオンから再開できます</li>
-      </ul>
-      <div class="confirmActions">
-        <button class="btn" id="licenseClearCancel" type="button">キャンセル</button>
-        <button class="btn danger" id="licenseClearConfirmOk" type="button">解除する</button>
-      </div>
-    </div>
-  </div>
-</dialog>
-<dialog class="confirmDialog" id="licenseTransferConfirm">
-  <div class="modalHead">
-    <div class="title">
-      <b>この端末のPRO利用情報を解除しますか？</b>
-    </div>
-  </div>
-  <div class="modalBody">
-    <div class="confirmBody">
-      <ul class="confirmList">
-        <li>この端末のPRO利用情報を解除します</li>
-        <li>解除後、この端末はDEMOに戻ります</li>
-      </ul>
-      <div class="confirmActions">
-        <button class="btn" id="licenseTransferCancel" type="button">キャンセル</button>
-        <button class="btn danger" id="licenseTransferConfirmOk" type="button">実行</button>
-      </div>
-    </div>
-  </div>
-</dialog>
 <!-- ===== /Export Check ===== -->
 <script>
 (function(){
@@ -6308,14 +6270,6 @@ function clearLicenseKeySafe(){
   try{ window.WavCueLicense?.clearCertificateSafe?.(); }catch(_){ console.warn("[License] non-fatal"); }
   try{ window.WavCueLicense?.resetDemoTrial?.(); }catch(_){ console.warn("[License] non-fatal"); }
 }
-function clearLicenseResiduals(){
-  try{
-    LICENSE_STATE_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
-    localStorage?.removeItem?.(LICENSE_STORAGE_KEY);
-    LICENSE_EXTRA_KEYS.forEach((key)=> localStorage?.removeItem?.(key));
-  }catch(_){ console.warn("[License] non-fatal"); }
-  try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){ console.warn("[License] non-fatal"); }
-}
 function applyAllLicenseUi(state){
   const next = state;
   try{ updateTierBadge(next); }catch(_){ console.warn("[License] non-fatal"); }
@@ -6344,16 +6298,6 @@ function applyAllLicenseUi(state){
   };
   logDebugGuide();
 })();
-function handleDeactivateSuccess(){
-  window.WavCueLicense?.clearCertificateSafe?.();
-  try{ localStorage?.removeItem?.(LICENSE_CERTIFICATE_KEY); }catch(_){ console.warn("[License] non-fatal"); }
-  const st = window.WavCueLicense?.getStateSafe?.();
-  if(st) applyAllLicenseUi(st);
-  if(window.safeToast){
-    window.safeToast("この端末のPRO利用情報をリセットしました。", "ok", 3200);
-  }
-  console.log("[License] deactivate succeeded");
-}
 if(window.WavCueLicense && typeof window.WavCueLicense.clearKeySafe !== "function"){
   window.WavCueLicense.clearKeySafe = async ()=>{
     clearLicenseKeySafe();
@@ -12487,12 +12431,6 @@ const settingsResetRecommended = $("settingsResetRecommended");
 const settingsRulesBadge = $("settingsRulesBadge");
 const settingsDeviceId = $("settingsDeviceId");
 const settingsDeviceIdCopy = $("settingsDeviceIdCopy");
-const licenseClearConfirm = $("licenseClearConfirm");
-const licenseClearCancel = $("licenseClearCancel");
-const licenseClearConfirmOk = $("licenseClearConfirmOk");
-const licenseTransferConfirm = $("licenseTransferConfirm");
-const licenseTransferCancel = $("licenseTransferCancel");
-const licenseTransferConfirmOk = $("licenseTransferConfirmOk");
 const settingsTabButtons = document.querySelectorAll("[data-settings-tab]");
 const settingsTabPanels = document.querySelectorAll("[data-settings-tabpanel]");
 let _settingsTabHeightLocked = false;
@@ -12551,12 +12489,6 @@ const copyTextWithToast = async (text, okMessage, failMessage)=>{
       return false;
     }
   }
-};
-
-const normalizeServerUrl = (rawUrl)=>{
-  let next = String(rawUrl || "").trim();
-  while(next.endsWith("/")) next = next.slice(0, -1);
-  return next;
 };
 
 const formatBytes = (bytes)=>{
@@ -12652,15 +12584,6 @@ const closeCleanupConfirm = ()=>{
   if(!settingsCleanupConfirm) return;
   _dialogCloseWithGuard(settingsCleanupConfirm);
 };
-const closeLicenseClearConfirm = ()=>{
-  if(!licenseClearConfirm) return;
-  _dialogCloseWithGuard(licenseClearConfirm);
-};
-const closeLicenseTransferConfirm = ()=>{
-  if(!licenseTransferConfirm) return;
-  _dialogCloseWithGuard(licenseTransferConfirm);
-};
-
 if(settingsButton){
   settingsButton.addEventListener("click", openSettingsDialog);
 }
@@ -12672,76 +12595,6 @@ if(settingsCleanupConfirmCancel){
   settingsCleanupConfirmCancel.addEventListener("click", closeCleanupConfirm);
 }
 settingsCleanupConfirm?.addEventListener("click", (e)=>{ if(e.target === settingsCleanupConfirm){ closeCleanupConfirm(); } });
-licenseClearCancel?.addEventListener("click", closeLicenseClearConfirm);
-licenseClearConfirm?.addEventListener("click", (e)=>{ if(e.target === licenseClearConfirm){ closeLicenseClearConfirm(); } });
-licenseClearConfirmOk?.addEventListener("click", async ()=>{
-  try{
-    await window.WavCueLicense?.clearKeySafe?.();
-    clearLicenseResiduals();
-    const st = await window.WavCueLicense?.getStateSafe?.();
-    if(st) applyAllLicenseUi(st);
-    const tier = String(st?.tier || "demo").toLowerCase();
-    const keyPresent = !!getStoredLicenseKey();
-    console.log("[License] deactivated");
-    closeLicenseClearConfirm();
-    if(tier !== "demo"){
-      try{
-        const reloadKey = "wavcue_force_reload_after_deactivate_v1";
-        if(sessionStorage?.getItem?.(reloadKey) !== "1"){
-          sessionStorage?.setItem?.(reloadKey, "1");
-          location.reload();
-        }
-      }catch(_){}
-    }
-  }catch(e){
-    console.warn("[License] deactivated failed");
-  }
-});
-licenseTransferCancel?.addEventListener("click", closeLicenseTransferConfirm);
-licenseTransferConfirm?.addEventListener("click", (e)=>{ if(e.target === licenseTransferConfirm){ closeLicenseTransferConfirm(); } });
-licenseTransferConfirmOk?.addEventListener("click", async ()=>{
-  closeLicenseTransferConfirm();
-  const serverUrl = normalizeServerUrl(window.WavCueLicense?.getServerUrl?.() || "");
-  if(!serverUrl){
-    if(window.safeToast) window.safeToast("サーバー設定が未完了のため処理できません。", "warn", 2600);
-    return;
-  }
-  if(navigator.onLine === false){
-    if(window.safeToast) window.safeToast("インターネット未接続のため処理できません。接続後に再度お試しください。", "warn", 3200);
-    return;
-  }
-  const licenseKey = getStoredLicenseKey();
-  if(!licenseKey){
-    if(window.safeToast) window.safeToast("必要な情報が未入力です。", "warn", 2600);
-    return;
-  }
-  const deviceId = window.WavCueLicense?.getDeviceId?.();
-  try{
-    const response = await fetch(`${serverUrl}/v1/deactivate`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ licenseKey, deviceId }),
-    });
-    let json;
-    try{
-      json = await response.json();
-    }catch(_){
-      json = null;
-    }
-    if(!response.ok || !json?.ok){
-      const code = json?.code || response.status || "error";
-      const message = json?.message || response.statusText || "deactivate failed";
-      console.log("[License] deactivate failed");
-      if(window.safeToast) window.safeToast(message || "処理に失敗しました。", "warn", 3200);
-      return;
-    }
-    handleDeactivateSuccess();
-  }catch(e){
-    console.log("[License] deactivate failed");
-    if(window.safeToast) window.safeToast("通信に失敗しました。ネットワークをご確認ください。", "warn", 3200);
-  }
-});
-
 settingsTabButtons.forEach((btn)=>{
   btn.addEventListener("click", ()=>{
     const tab = btn.dataset.settingsTab;
