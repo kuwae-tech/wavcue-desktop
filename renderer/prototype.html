@@ -12652,17 +12652,9 @@ const closeCleanupConfirm = ()=>{
   if(!settingsCleanupConfirm) return;
   _dialogCloseWithGuard(settingsCleanupConfirm);
 };
-const openLicenseClearConfirm = ()=>{
-  if(!licenseClearConfirm) return;
-  try{ licenseClearConfirm.showModal(); }catch(_){ licenseClearConfirm.open = true; }
-};
 const closeLicenseClearConfirm = ()=>{
   if(!licenseClearConfirm) return;
   _dialogCloseWithGuard(licenseClearConfirm);
-};
-const openLicenseTransferConfirm = ()=>{
-  if(!licenseTransferConfirm) return;
-  try{ licenseTransferConfirm.showModal(); }catch(_){ licenseTransferConfirm.open = true; }
 };
 const closeLicenseTransferConfirm = ()=>{
   if(!licenseTransferConfirm) return;
