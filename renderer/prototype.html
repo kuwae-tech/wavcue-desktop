@@ -7812,7 +7812,6 @@ if (typeof window.diagState !== "function") {
             }catch(_){ }
             return { id, size, headAscii };
           });
-          console.log("[ARTIFACT][CHUNKS]", { fileId, count: chunks.length, sample });
           let previewed = 0;
           for(const c of chunks){
             if(previewed >= 10) break;
@@ -7828,7 +7827,6 @@ if (typeof window.diagState !== "function") {
               || headAscii.includes("{") || headAscii.includes("Ver") || headAscii.includes("cmcd") || headAscii.includes("素材");
             if(candidate){
               const headText = tryDecodeUtf8(u8, 300).slice(0, 300);
-              console.log("[ARTIFACT][PREVIEW]", { fileId, id, headText });
               previewed += 1;
             }
           }
@@ -7918,11 +7916,6 @@ if (typeof window.diagState !== "function") {
         rec.attachments = Array.isArray(ac) ? ac : (ac ? [ac] : []);
       }
 
-      console.log("[MIGRATE]", "normalizeRecArtifacts", {
-        fileId: rec.fileId || rec.id || null,
-        cmcdLen: rec.cmcd ? rec.cmcd.length : 0,
-        pdfCount: rec.attachments ? rec.attachments.length : 0
-      });
       return rec;
     }catch(e){
       console.error("[MIGRATE]", "normalizeRecArtifacts:error", e);
@@ -10602,11 +10595,6 @@ function normalizeRecArtifacts(rec, stateLike){
     rec.attachments = Array.isArray(rec.attachments) ? rec.attachments : [];
   }
   try{
-    console.log("[MIGRATE]", "normalizeRecArtifacts", {
-      fileId: rec.fileId || rec.id,
-      cmcdLen: rec.cmcd.length,
-      pdfCount: rec.attachments.length,
-    });
     if(imported){
       console.log("[MIGRATE]", "imported", {
         fileId: rec.fileId || rec.id,
@@ -18391,7 +18379,6 @@ try{
       rec.status.qcReason = reason;
       rec.qcResult = qcResult;
       if(opts?.source === "bulk"){
-        console.log(`[QC][apply] fileId=${rec.id} ok=${ng.length === 0} field=qcResult`);
       }
     }
   }
@@ -18594,11 +18581,6 @@ try{
       if(!rec) return;
       if (typeof window.diagLog === "function") window.diagLog("[ACTIVE]", "start", window.diagState({ fileId: id, hasGetState: (typeof window.getState === "function") }));
       console.log("[Pro] setActiveFile start", { id, name: rec.name, force: !!opts?.force });
-      console.log("[FixCommitB] restore-check", {
-        fileId: rec.id,
-        isReplacedFile: !!rec._fixReplacedFile,
-        srcAbLen: rec?.srcAb?.byteLength || rec?._stateSnap?.srcAb?.byteLength || null,
-      });
 
       if(!opts?.skipSave){
         proSaveActiveEdits("before-switch", true);
@@ -18697,10 +18679,8 @@ try{
         }else{
           cmcdInput.value = rec.cmcd || "";
         }
-          console.log("[CMCD]", "restore", { fileId: rec.id, value: cmcdInput.value });
         }else if(typeof window._cmcdApplyValuesToInputs === "function"){
           window._cmcdApplyValuesToInputs(rec.cmcd || null);
-          console.log("[CMCD]", "restore", { fileId: rec.id, value: rec.cmcd || "" });
         }else if(typeof window._cmcdCaptureInputs === "function"){
           rec.cmcd = window._cmcdCaptureInputs();
         }
@@ -18723,16 +18703,10 @@ try{
         console.error("[ACTIVE] pdf restore error", err);
       }
       try{
-        console.log("[PDF]", "restore", {
-          fileId: rec.id,
-          count: rec.attachments?.length || 0,
-          names: (rec.attachments || []).map(a=>a?.name || a?.fileName || a?.filename || "").filter(Boolean).slice(0,3),
-        });
-        console.log("[ACTIVE]", "restore", {
-          fileId: rec.id,
-          hasCmcd: !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs)),
-          pdfCount: rec.attachments?.length || 0,
-        });
+        const _restorePdfNames = (rec.attachments || []).map(a=>a?.name || a?.fileName || a?.filename || "").filter(Boolean).slice(0,3);
+        const _restoreHasCmcd = !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs));
+        void _restorePdfNames;
+        void _restoreHasCmcd;
       }catch(error){
         console.warn("[ACTIVE] restore state summary log failed", { fileId: rec?.id }, error);
       }
@@ -18918,7 +18892,6 @@ try{
         exportList.innerHTML = "";
       }
     }
-    console.log(`[History] render entry id=${entry.id} ok=${okCount} ng=${ngCount} fail=${failCount}`);
     const retryBtn = $("proJobRetryFailed");
     const cancelBtn = $("proJobCancel");
     if(retryBtn) retryBtn.disabled = !entry.failedIds?.length || entry.running;
@@ -19224,7 +19197,6 @@ try{
           if(type==='export'){
             const fileLabel = f.name || state.fileName || "export.wav";
             const fileStartedAt = Date.now();
-            console.log(`[BULK] file ${index}/${targets.length} begin id=${id} name=${fileLabel}`);
             const res = await window.WavCueExportCore.exportOneToTarget({
               target: exportTarget,
               suggestedName: fileLabel,
@@ -19236,7 +19208,6 @@ try{
             }
             f.status.exported = true;
             historyEntry.exportedNames.push(res?.savedName || fileLabel || "exported");
-            console.log(`[BULK] file ${index}/${targets.length} ok ms=${Date.now() - fileStartedAt}`);
           }
           job.ok++;
           if(type === "qc"){
@@ -19254,7 +19225,6 @@ try{
           }
           if(type === "export"){
             const stack = e?.stack ? String(e.stack) : "";
-            console.log(`[BULK] file ${index}/${targets.length} ng reason=${errMsg} stack=${stack}`);
           }
         }finally{
           job.done++;
