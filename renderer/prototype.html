@@ -6482,7 +6482,7 @@ const applyLicenseUi = (state)=>{
   }catch(e){
     console.error("[License] non-fatal", e);
   }
-  try{ updateDemoRemainingBanner(state); }catch(_){}
+  try{ updateDemoRemainingBanner(state); }catch(err){ console.warn("[UI] demo remaining banner update failed", err); }
 };
 
 Promise.resolve().then(restoreSavedLicenseKey).catch((e)=>{
@@ -7253,11 +7253,11 @@ function toast(msg, type="ok", timeout=2600){
   if(settingsToastDebug) settingsToastDebug.textContent = `debug line: ${msg}`;
 
   // fade-in (no transform animation)
-  requestAnimationFrame(()=>{ try{ t.classList.add("in"); }catch(_){ } });
+  requestAnimationFrame(()=>{ try{ t.classList.add("in"); }catch(err){ console.warn("[UI] toast fade-in class apply failed", err); } });
 
   window.setTimeout(()=>{
     t.classList.add("out");
-    window.setTimeout(()=>{ try{ t.remove(); }catch(_){ } }, 200);
+    window.setTimeout(()=>{ try{ t.remove(); }catch(err){ console.warn("[UI] toast element remove failed", err); } }, 200);
   }, timeout);
 }
 
@@ -7288,7 +7288,9 @@ function maybeToastFromLog(msg){
       }
       return;
     }
-  }catch(_){}
+  }catch(err){
+    console.warn("[UI] toast log filter failed", err);
+  }
 }
 
 /* ===== /ProTools+ v2 UX helpers ===== */
