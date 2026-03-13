@@ -5517,7 +5517,9 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     try{
       if(typeof cert === "string") writeText(LS_CERTIFICATE, cert);
       else writeText(LS_CERTIFICATE, JSON.stringify(cert));
-    }catch(_){}
+    }catch(err){
+      console.error("[License] writeCertificate failed", { key: LS_CERTIFICATE, certType: typeof cert }, err);
+    }
   };
   const clearCertificate = ()=>{
     writeText(LS_CERTIFICATE, null);
@@ -7003,7 +7005,9 @@ function _captureUndoState(){
       const k = el.getAttribute("data-cmcd");
       if(k) cmcd[k] = (el.value ?? "").toString();
     });
-  }catch(_){}
+  }catch(err){
+    console.error("[CMCD] _captureUndoState failed to read input values", err);
+  }
 
   const cues = (Array.isArray(state.cues) ? state.cues : []).map(c=>({
     id: c.id >>> 0,
