@@ -16246,10 +16246,10 @@ try{ const vp = document.getElementById("verPill"); if(vp) vp.textContent = APP_
   const dlg = document.getElementById("changelogDialog");
   const close = document.getElementById("btnChangelogClose");
   if(btn && dlg){
-    btn.addEventListener("click", ()=>{ try{ dlg.showModal(); }catch(_){ dlg.open=true; } });
+    btn.addEventListener("click", ()=>{ try{ dlg.showModal(); }catch(err){ console.warn("[UI] changelog dialog showModal failed", err); dlg.open=true; } });
   }
   if(close && dlg){
-    close.addEventListener("click", ()=>{ try{ dlg.close(); }catch(_){ dlg.open=false; } });
+    close.addEventListener("click", ()=>{ try{ dlg.close(); }catch(err){ console.warn("[UI] changelog dialog close failed", err); dlg.open=false; } });
   }
   dlg?.addEventListener("click", (e)=>{ if(e.target===dlg){ try{ dlg.close(); }catch(_){ dlg.open=false; } } });
 })();
@@ -17697,20 +17697,20 @@ try{
       t.appendChild(ic);
       t.appendChild(m);
       host.appendChild(t);
-      requestAnimationFrame(()=>{ try{ t.classList.add("in"); }catch(_){ } });
+      requestAnimationFrame(()=>{ try{ t.classList.add("in"); }catch(err){ console.warn("[UI] batch toast fade-in failed", err); } });
       let removed = false;
       const removeNow = ()=>{
         if(removed) return;
         removed = true;
         t.classList.add("out");
-        window.setTimeout(()=>{ try{ t.remove(); }catch(_){ } }, 200);
+        window.setTimeout(()=>{ try{ t.remove(); }catch(err){ console.warn("[UI] batch toast remove failed", err); } }, 200);
       };
       const timerId = window.setTimeout(removeNow, timeout);
       t.addEventListener("click", ()=>{
         window.clearTimeout(timerId);
         removeNow();
       });
-    }catch(_){}
+    }catch(err){ console.warn("[UI] batch toast show failed", err); }
   };
   const W = window.WavCue || {};
   const api = W.api || {};
