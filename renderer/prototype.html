@@ -5459,7 +5459,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     const existing = readText(LS_DEVICE_ID).trim();
     if(existing) return existing;
     let next = "";
-    if(typeof crypto !== "undefined" && crypto?.randomUUID){
+    if(globalThis.crypto?.randomUUID){
       next = crypto.randomUUID();
     }else{
       const bytes = getCryptoModule()?.randomBytes?.(16);
@@ -5480,9 +5480,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     return next;
   };
   const getServerUrl = ()=>{
-    const envUrl = (typeof process !== "undefined" && process?.env?.LICENSE_SERVER_URL)
-      ? String(process.env.LICENSE_SERVER_URL || "").trim()
-      : "";
+    const envUrl = String(globalThis.process?.env?.LICENSE_SERVER_URL || "").trim();
     return envUrl;
   };
   const readCertificate = ()=>{
@@ -18703,14 +18701,6 @@ try{
         rec.attachCount = Array.isArray(rec.attachments) ? rec.attachments.length : 0;
       }catch(err){
         console.error("[ACTIVE] pdf restore error", err);
-      }
-      try{
-        const _restorePdfNames = (rec.attachments || []).map(a=>a?.name || a?.fileName || a?.filename || "").filter(Boolean).slice(0,3);
-        const _restoreHasCmcd = !!(rec.cmcdInputs && window._cmcdInputsHasValues(rec.cmcdInputs));
-        void _restorePdfNames;
-        void _restoreHasCmcd;
-      }catch(error){
-        console.warn("[ACTIVE] restore state summary log failed", { fileId: rec?.id }, error);
       }
       const skipBulkUiRefresh = !!state._bulkJobRunning;
       if(!skipBulkUiRefresh && typeof window.requestFullRefresh === "function"){
