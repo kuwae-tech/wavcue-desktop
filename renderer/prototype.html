@@ -6823,8 +6823,8 @@ const _prog = (()=> {
       cancelBtn.addEventListener('click', ()=>{
         cancelled = true;
         try{ if(abortCtrl) abortCtrl.abort(); }catch(_){ }
-        try{ cancelBtn.style.display = 'none'; }catch(_){ }
-        try{ if(hint) hint.textContent = 'キャンセルしました。'; }catch(_){ }
+        try{ cancelBtn.style.display = 'none'; }catch(err){ console.warn("[UI] progress cancel button hide failed", err); }
+        try{ if(hint) hint.textContent = 'キャンセルしました。'; }catch(err){ console.warn("[UI] progress cancel hint update failed", err); }
       });
     }
   }
@@ -6870,7 +6870,7 @@ const _prog = (()=> {
             hint.textContent = "処理が長い場合があります（重い処理中）";
           }
           if(cancelBtn) cancelBtn.style.display = "inline-flex";
-        }catch(_){}
+        }catch(err){ console.warn("[UI] progress watchdog hint update failed", err); }
       }
     }, 500);
   }
@@ -6895,7 +6895,7 @@ const _prog = (()=> {
     visible = false;
     _stopWatchdog();
     abortCtrl = null;
-    if(cancelBtn) try{ cancelBtn.style.display = 'none'; }catch(_){ }
+    if(cancelBtn) try{ cancelBtn.style.display = 'none'; }catch(err){ console.warn("[UI] progress cancel button reset failed", err); }
     ov.classList.remove("show");
   }
 
