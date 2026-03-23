@@ -12562,7 +12562,7 @@ const openSettingsDialog = async ()=>{
   await refreshSettingsData();
   const storedTab = getStoredSettingsTab();
   setSettingsTab("backup");
-  try{ settingsDialog.showModal(); }catch(_){ settingsDialog.open = true; }
+  try{ settingsDialog.showModal(); }catch(err){ console.warn("[UI] settings dialog showModal failed", err); settingsDialog.open = true; }
   requestAnimationFrame(()=>{
     lockSettingsTabHeight();
     setSettingsTab(storedTab);
@@ -12571,7 +12571,7 @@ const openSettingsDialog = async ()=>{
 
 const openCleanupConfirm = ()=>{
   if(!settingsCleanupConfirm) return;
-  try{ settingsCleanupConfirm.showModal(); }catch(_){ settingsCleanupConfirm.open = true; }
+  try{ settingsCleanupConfirm.showModal(); }catch(err){ console.warn("[UI] settings cleanup confirm showModal failed", err); settingsCleanupConfirm.open = true; }
 };
 
 const closeCleanupConfirm = ()=>{
@@ -15969,8 +15969,8 @@ if($("sc_pm_delete")){
   // Close when clicking outside the modal content (dialog backdrop)
   if(dlg && !dlg.dataset.backdropClose){
     dlg.dataset.backdropClose = "1";
-    dlg.addEventListener("click", (e)=>{ if(e.target===dlg) { try{ dlg.close(); }catch(_){} } });
-    dlg.addEventListener("cancel", (e)=>{ e.preventDefault(); try{ dlg.close(); }catch(_){} });
+    dlg.addEventListener("click", (e)=>{ if(e.target===dlg) { try{ dlg.close(); }catch(err){ console.warn("[UI] sc dialog backdrop close failed", err); } } });
+    dlg.addEventListener("cancel", (e)=>{ e.preventDefault(); try{ dlg.close(); }catch(err){ console.warn("[UI] sc dialog cancel close failed", err); } });
   }
 
   if($("sc_fix")){
@@ -16251,7 +16251,7 @@ try{ const vp = document.getElementById("verPill"); if(vp) vp.textContent = APP_
   if(close && dlg){
     close.addEventListener("click", ()=>{ try{ dlg.close(); }catch(err){ console.warn("[UI] changelog dialog close failed", err); dlg.open=false; } });
   }
-  dlg?.addEventListener("click", (e)=>{ if(e.target===dlg){ try{ dlg.close(); }catch(_){ dlg.open=false; } } });
+  dlg?.addEventListener("click", (e)=>{ if(e.target===dlg){ try{ dlg.close(); }catch(err){ console.warn("[UI] changelog dialog backdrop close failed", err); dlg.open=false; } } });
 })();
 
 // ===== Diagnostic copy =====
