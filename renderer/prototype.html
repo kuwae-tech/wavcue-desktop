@@ -5757,7 +5757,7 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
     return { ...stateCache };
   };
 
-  const buildState = (base, options = {})=>{
+  const buildState = (base)=>{
     const now = Date.now();
     const tier = resolveTierWithDebugOverride(base?.tier);
     const demo = getDemoInfo(now, tier === "demo");
@@ -5768,10 +5768,10 @@ MCowBQYDK2VwAyEAz0uQesDPdIYyK+5W6Gm3NtXKty1HUEnljGZbp5Qoshs=
   const getStateSafeInternal = (options = {})=>{
     try{
       const certState = loadCertificateState({ logBoot: false });
-      return buildState({ ...stateCache, ...certState }, options);
+      return buildState({ ...stateCache, ...certState });
     }catch(e){
       console.error("[License] non-fatal", e);
-      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() }, options);
+      return buildState({ tier: "demo", source: "fallback", updatedAt: Date.now() });
     }
   };
 
