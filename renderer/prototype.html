@@ -6202,7 +6202,7 @@ function setSettingsTab(tabName){
   document.querySelectorAll("[data-settings-tabpanel]").forEach((panel)=>{
     panel.classList.toggle("active", panel.dataset.settingsTabpanel === tab);
   });
-  try{ localStorage?.setItem?.(SETTINGS_TAB_KEY, tab); }catch(_){}
+  try{ localStorage?.setItem?.(SETTINGS_TAB_KEY, tab); }catch(err){ console.warn("[UI] settings tab persist failed", err); }
   return tab;
 }
 
