@@ -15335,6 +15335,15 @@ if(!sil.hasSound){
     result: qcResult || {}
   };
   state.scLast = {presetId: state.qcPresetId, fileKey: _scCurrentFileKey(), lufs, tpDb, sr, bd, chN, clipDetected, headSilenceSec: sil.headSec, tailSilenceSec: sil.tailSec, silenceMinSec: silMin, silenceMaxSec: silMax, silenceAllowSec: silMax, effectiveMonoWarn: !!effMonoWarn, effectiveMonoCorr: effMono?.corr ?? null, effectiveMonoDiffRatio: effMono?.diffRatio ?? null};
+  try{
+    const activeId = window.__wavcueProGetActiveId?.();
+    if(activeId != null && typeof window.__wavcueProReflectSingleQcResult === "function"){
+      window.__wavcueProReflectSingleQcResult(activeId, qcResult);
+    }
+  }catch(err){
+    console.warn("[QC] single result reflect failed", err);
+    return;
+  }
 }
 try{ window._scRunMeasureAndRender = _scRunMeasureAndRender; }catch(_){}
 
@@ -18171,6 +18180,18 @@ try{
   window.updateBadges = window.updateBadges || proUpdateBadges;
   window.__wavcueProGetActiveId = window.__wavcueProGetActiveId || (()=> project.activeId);
   window.__wavcueProGetRecById = window.__wavcueProGetRecById || ((id)=> project.files.find(f=>f.id===id) || null);
+  window.__wavcueProReflectSingleQcResult = window.__wavcueProReflectSingleQcResult || ((id, qcResult)=>{
+    try{
+      const rec = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById(id) : null;
+      if(!rec) return false;
+      applyQcResultToRec(rec, qcResult, { source: "single" });
+      render();
+      return true;
+    }catch(err){
+      console.warn("[Pro] reflect single qc result failed", err);
+      return false;
+    }
+  });
   window.__wavcueProAfterFix = window.__wavcueProAfterFix || ((id)=>{
     const rec = project.files.find(f=>f.id===id) || null;
     proUpdateAfterFix(rec);
