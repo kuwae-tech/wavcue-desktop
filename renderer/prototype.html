@@ -15336,8 +15336,10 @@ if(!sil.hasSound){
   };
   state.scLast = {presetId: state.qcPresetId, fileKey: _scCurrentFileKey(), lufs, tpDb, sr, bd, chN, clipDetected, headSilenceSec: sil.headSec, tailSilenceSec: sil.tailSec, silenceMinSec: silMin, silenceMaxSec: silMax, silenceAllowSec: silMax, effectiveMonoWarn: !!effMonoWarn, effectiveMonoCorr: effMono?.corr ?? null, effectiveMonoDiffRatio: effMono?.diffRatio ?? null};
   try{
-    const activeId = project?.activeId ?? null;
-    const rec = activeId ? project.files.find(f=>f.id===activeId) : null;
+    const getActiveId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId : null;
+    const getRecById = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById : null;
+    const activeId = getActiveId ? getActiveId() : null;
+    const rec = (activeId != null && getRecById) ? getRecById(activeId) : null;
     if(rec){
       if(typeof proApplyQcResult === "function"){
         proApplyQcResult(rec, qcResult);
