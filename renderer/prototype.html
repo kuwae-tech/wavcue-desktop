@@ -3297,6 +3297,46 @@ body, #appRoot, .appRoot, .mainLayout{
 .proPopRow{ display:flex; justify-content:space-between; gap:8px; }
 .proPopItem{ padding:6px 8px; border-radius:10px; background:rgba(255,255,255,0.06); }
 .proPopItem button{ all:unset; cursor:pointer; color:inherit; }
+.proFileRow.contextTarget{
+  outline:1px solid rgba(125,211,252,.55);
+  outline-offset:-1px;
+}
+.proContextMenu{
+  position:fixed;
+  z-index:10030;
+  min-width:220px;
+  max-width:min(320px, calc(100vw - 16px));
+  border:1px solid rgba(148,163,184,.35);
+  border-radius:12px;
+  background:rgba(12,18,28,.98);
+  box-shadow:0 18px 40px rgba(0,0,0,.5);
+  padding:6px;
+}
+.proContextMenu.hidden{ display:none; }
+.proContextMenuTitle{
+  font-size:11px;
+  color:var(--muted);
+  padding:4px 8px 6px;
+  border-bottom:1px solid rgba(255,255,255,.08);
+  margin-bottom:4px;
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+.proContextMenuItem{
+  width:100%;
+  border:0;
+  background:transparent;
+  color:var(--text);
+  text-align:left;
+  border-radius:8px;
+  padding:8px 10px;
+  font-size:12px;
+  cursor:pointer;
+}
+.proContextMenuItem:hover{
+  background:rgba(255,255,255,.10);
+}
 .proHistoryLayout{
   display:grid;
   grid-template-columns:minmax(200px, 260px) minmax(0,1fr);
@@ -17575,6 +17615,7 @@ try{
     filter:{status:'all'},
     lastClickIndex:null,
     popover:{openType:null, openFileId:null, anchorEl:null},
+    contextMenu:{open:false, fileId:null, rowEl:null, x:0, y:0},
     historyTriggerLogged:false
   };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
@@ -19386,6 +19427,155 @@ try{
     project.popover.openFileId = null;
     project.popover.anchorEl = null;
   }
+  function closeRowContextMenu(){
+    const menu = $("proRowContextMenu");
+    if(menu){
+      menu.classList.add("hidden");
+      menu.setAttribute("aria-hidden", "true");
+    }
+    if(project.contextMenu.rowEl){
+      project.contextMenu.rowEl.classList.remove("contextTarget");
+    }
+    project.contextMenu.open = false;
+    project.contextMenu.fileId = null;
+    project.contextMenu.rowEl = null;
+  }
+  function positionRowContextMenu(x, y){
+    const menu = $("proRowContextMenu");
+    if(!menu) return;
+    menu.style.left = "0px";
+    menu.style.top = "0px";
+    menu.style.visibility = "hidden";
+    menu.classList.remove("hidden");
+    const rect = menu.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+    const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
+    const left = Math.max(8, Math.min(Math.round(x), maxLeft));
+    const top = Math.max(8, Math.min(Math.round(y), maxTop));
+    menu.style.left = `${left}px`;
+    menu.style.top = `${top}px`;
+    menu.style.visibility = "visible";
+  }
+  function openRowContextMenu(fileId, rowEl, x, y){
+    const menu = $("proRowContextMenu");
+    if(!menu) return;
+    const rec = project.files.find(f=>f.id===fileId);
+    if(!rec) return;
+    if(project.contextMenu.rowEl && project.contextMenu.rowEl !== rowEl){
+      project.contextMenu.rowEl.classList.remove("contextTarget");
+    }
+    project.contextMenu.open = true;
+    project.contextMenu.fileId = fileId;
+    project.contextMenu.rowEl = rowEl || null;
+    project.contextMenu.x = x;
+    project.contextMenu.y = y;
+    if(rowEl) rowEl.classList.add("contextTarget");
+    const title = $("proRowContextTitle");
+    if(title) title.textContent = rec.name || "";
+    menu.setAttribute("aria-hidden", "false");
+    positionRowContextMenu(x, y);
+  }
+  async function renameFileById(fileId){
+    const rec = project.files.find(f=>f.id===fileId);
+    if(!rec) return false;
+    const nextNameRaw = window.prompt("新しいファイル名を入力してください", rec.name || "");
+    if(nextNameRaw == null) return false;
+    const nextName = String(nextNameRaw);
+    if(!nextName.trim()){
+      if(window.safeToast) window.safeToast("ファイル名を入力してください。", "warn");
+      return false;
+    }
+    rec.name = nextName;
+    if(project.activeId === rec.id){
+      state.fileName = nextName;
+    }
+    render();
+    return true;
+  }
+  async function resetFileEditsById(fileId){
+    const rec = project.files.find(f=>f.id===fileId);
+    if(!rec?.file) return false;
+    if(typeof loadSingleWav !== "function"){
+      console.warn("[Pro] reset edits skipped: loadSingleWav is missing");
+      return false;
+    }
+    const restoreId = project.activeId;
+    try{
+      if(restoreId !== fileId){
+        await setActiveFile(fileId, { force:true, skipSave:true });
+      }
+      await loadSingleWav(rec.file);
+      project.lastLoadedId = rec.id;
+      const snap = (typeof window.safeCloneLite === "function")
+        ? window.safeCloneLite(window.WavCue?.state || null)
+        : (window.WavCue?.state || null);
+      rec._stateSnap = snap || rec._stateSnap;
+      proSyncRecFromState(rec, "context:reset", { markEdited:false });
+      rec.status.edited = false;
+      rec.dirty = false;
+      syncActiveQcFromRec(rec);
+      render();
+      if(restoreId && restoreId !== fileId && project.files.some(f=>f.id===restoreId)){
+        await setActiveFile(restoreId, { force:true, skipSave:true });
+      }else{
+        proForceRedraw("context:reset");
+      }
+      return true;
+    }catch(err){
+      console.error("[Pro] reset edits failed", err);
+      return false;
+    }
+  }
+  async function removeFileFromListById(fileId){
+    const idx = project.files.findIndex(f=>f.id===fileId);
+    if(idx < 0) return false;
+    const rec = project.files[idx];
+    const ok = window.confirm(`ファイルリストから削除しますか？\n${rec?.name || ""}`);
+    if(!ok) return false;
+    const wasActive = project.activeId === fileId;
+    project.files.splice(idx, 1);
+    project.selectedIds.delete(fileId);
+    if(project.lastClickIndex != null){
+      project.lastClickIndex = Math.min(project.lastClickIndex, Math.max(project.files.length - 1, 0));
+    }
+    if(!project.files.length){
+      project.activeId = null;
+      state.activeFileId = null;
+      project.lastLoadedId = null;
+      project.selectedIds.clear();
+      render();
+      return true;
+    }
+    if(wasActive){
+      const fallback = project.files[Math.min(idx, project.files.length - 1)] || project.files[0];
+      if(fallback){
+        await setActiveFile(fallback.id, { force:true, skipSave:true });
+      }else{
+        render();
+      }
+      return true;
+    }
+    render();
+    return true;
+  }
+  async function runSingleQcById(fileId){
+    if(!project.files.some(f=>f.id===fileId)) return false;
+    try{
+      await runJob("qc", [fileId]);
+      return true;
+    }catch(err){
+      console.error("[Pro] single qc failed", err);
+      return false;
+    }
+  }
+  async function handleRowContextCommand(cmd, fileId){
+    if(!cmd || !fileId) return false;
+    if(cmd === "rename") return renameFileById(fileId);
+    if(cmd === "reset") return resetFileEditsById(fileId);
+    if(cmd === "remove") return removeFileFromListById(fileId);
+    if(cmd === "single-qc") return runSingleQcById(fileId);
+    return false;
+  }
   function openPopover(type, fileId, anchorEl){
     const pop = $('proGlobalPopover');
     if(!pop) return;
@@ -19531,6 +19721,14 @@ try{
         console.log('[Pro] row dblclick', id);
         void setActiveFile(id, {force:true});
       });
+      row.addEventListener('contextmenu', (e)=>{
+        e.preventDefault();
+        e.stopPropagation();
+        const id = row.getAttribute('data-id');
+        if(!id) return;
+        closePopover();
+        openRowContextMenu(id, row, e.clientX, e.clientY);
+      });
     });
 
     Array.from(list.querySelectorAll('.proFileActionBtn')).forEach(btn=>{
@@ -19547,6 +19745,17 @@ try{
     if(project.popover.openType && project.popover.anchorEl && !document.body.contains(project.popover.anchorEl)){
       closePopover();
     }
+    if(project.contextMenu.open){
+      const liveRow = project.contextMenu.fileId
+        ? list.querySelector(`.proFileRow[data-id="${project.contextMenu.fileId}"]`)
+        : null;
+      if(!liveRow){
+        closeRowContextMenu();
+      }else{
+        project.contextMenu.rowEl = liveRow;
+        liveRow.classList.add("contextTarget");
+      }
+    }
   }
   function bind(){
     try{
@@ -19554,6 +19763,8 @@ try{
       if(dlg && dlg.parentElement !== document.body) document.body.appendChild(dlg);
       const pop = document.getElementById("proGlobalPopover");
       if(pop && pop.parentElement !== document.body) document.body.appendChild(pop);
+      const rowMenu = document.getElementById("proRowContextMenu");
+      if(rowMenu && rowMenu.parentElement !== document.body) document.body.appendChild(rowMenu);
       const toastRoot = document.getElementById("toastRoot");
       if(toastRoot && toastRoot.parentElement !== document.body) document.body.appendChild(toastRoot);
     }catch(error){
@@ -19625,10 +19836,39 @@ try{
       if(pop.contains(e.target)) return;
       closePopover();
     });
-    document.addEventListener('keydown', (e)=>{ if(e.key==="Escape") closePopover(); });
-    window.addEventListener('resize', ()=>{ if(project.popover.openType) positionPopover(); });
-    window.addEventListener('scroll', ()=>{ if(project.popover.openType) positionPopover(); }, {passive:true});
-    $('proFileListWrap')?.addEventListener('scroll', ()=>{ if(project.popover.openType) positionPopover(); }, {passive:true});
+    document.addEventListener('click', (e)=>{
+      const menu = $("proRowContextMenu");
+      if(!menu || menu.classList.contains("hidden")) return;
+      if(menu.contains(e.target)) return;
+      closeRowContextMenu();
+    });
+    $("proRowContextMenu")?.addEventListener("click", (e)=>{
+      const btn = e.target.closest("[data-cmd]");
+      if(!btn) return;
+      const cmd = btn.getAttribute("data-cmd");
+      const fileId = project.contextMenu.fileId;
+      closeRowContextMenu();
+      handleRowContextCommand(cmd, fileId).catch((err)=>{
+        console.error("[Pro] context command failed", err);
+      });
+    });
+    document.addEventListener('keydown', (e)=>{
+      if(e.key!=="Escape") return;
+      closePopover();
+      closeRowContextMenu();
+    });
+    window.addEventListener('resize', ()=>{
+      if(project.popover.openType) positionPopover();
+      if(project.contextMenu.open) positionRowContextMenu(project.contextMenu.x, project.contextMenu.y);
+    });
+    window.addEventListener('scroll', ()=>{
+      if(project.popover.openType) positionPopover();
+      if(project.contextMenu.open) positionRowContextMenu(project.contextMenu.x, project.contextMenu.y);
+    }, {passive:true});
+    $('proFileListWrap')?.addEventListener('scroll', ()=>{
+      if(project.popover.openType) positionPopover();
+      if(project.contextMenu.open) positionRowContextMenu(project.contextMenu.x, project.contextMenu.y);
+    }, {passive:true});
 
     updateJobUI();
     render();
@@ -19704,6 +19944,13 @@ try{
     <div id="proPopTitle" class="proPopTitle"></div>
     <div id="proPopBody" class="proPopBody"></div>
   </div>
+</div>
+<div id="proRowContextMenu" class="proContextMenu hidden" role="menu" aria-hidden="true">
+  <div id="proRowContextTitle" class="proContextMenuTitle"></div>
+  <button type="button" class="proContextMenuItem" data-cmd="rename" role="menuitem">ファイル名変更</button>
+  <button type="button" class="proContextMenuItem" data-cmd="reset" role="menuitem">編集リセット</button>
+  <button type="button" class="proContextMenuItem" data-cmd="remove" role="menuitem">ファイルリストから削除</button>
+  <button type="button" class="proContextMenuItem" data-cmd="single-qc" role="menuitem">単体規格チェック</button>
 </div>
 <div aria-atomic="true" aria-live="polite" class="toastHost" id="toastRoot"></div>
 <dialog id="toastLayer" class="toastLayer" aria-live="polite" aria-atomic="true">
