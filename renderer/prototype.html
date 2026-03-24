@@ -15336,20 +15336,16 @@ if(!sil.hasSound){
   };
   state.scLast = {presetId: state.qcPresetId, fileKey: _scCurrentFileKey(), lufs, tpDb, sr, bd, chN, clipDetected, headSilenceSec: sil.headSec, tailSilenceSec: sil.tailSec, silenceMinSec: silMin, silenceMaxSec: silMax, silenceAllowSec: silMax, effectiveMonoWarn: !!effMonoWarn, effectiveMonoCorr: effMono?.corr ?? null, effectiveMonoDiffRatio: effMono?.diffRatio ?? null};
   try{
-    const getActiveId = (typeof window.__wavcueProGetActiveId === "function") ? window.__wavcueProGetActiveId : null;
-    const getRecById = (typeof window.__wavcueProGetRecById === "function") ? window.__wavcueProGetRecById : null;
-    const activeId = getActiveId ? getActiveId() : null;
-    const rec = (activeId != null && getRecById) ? getRecById(activeId) : null;
+    const activeId = window.__wavcueProGetActiveId?.();
+    const rec = (activeId != null) ? window.__wavcueProGetRecById?.(activeId) : null;
     if(rec){
-      if(typeof proApplyQcResult === "function"){
-        proApplyQcResult(rec, qcResult);
-      }else{
-        applyQcResultToRec(rec, qcResult, { source: "single" });
-      }
-      if(typeof render === "function") render();
+      rec.qcResult = qcResult;
+      if(typeof window.renderWaveform === "function") window.renderWaveform();
+      if(typeof window.renderCueList === "function") window.renderCueList();
     }
   }catch(err){
     console.warn("[QC] single result reflect failed", err);
+    return;
   }
 }
 try{ window._scRunMeasureAndRender = _scRunMeasureAndRender; }catch(_){}
