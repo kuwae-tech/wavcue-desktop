@@ -7258,6 +7258,7 @@ function log(msg){
   if(box) box.prepend(line);
   const box2 = $("logBox2");
   if(box2){ const line2 = line.cloneNode(true); box2.prepend(line2); }
+  try{ maybeToastFromLog(msg); }catch(err){ console.warn("[UI] maybeToastFromLog failed", err); return; }
 }
 
 
@@ -7354,8 +7355,6 @@ function maybeToastFromLog(msg){
 }
 
 /* ===== /ProTools+ v2 UX helpers ===== */
-  try{ maybeToastFromLog(msg); }catch(_){ }
-}
 
 /* --- WavCue diagnostics (no behavior change) --- */
 (function(){
