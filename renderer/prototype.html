@@ -14518,6 +14518,28 @@ function _scGetPresetById(id){
   const list = _qcGetAllPresets();
   return list.find(p=>p.id===id) || list[0] || null;
 }
+function _scResolvePreferredQcPresetId(list){
+  const presets = Array.isArray(list) ? list : [];
+  if(!presets.length) return null;
+  const isValid = (id)=> !!(id && presets.some(p=>p.id===id));
+  const saved = (()=>{ try{ return localStorage?.getItem?.(QC_LAST_PRESET_STORAGE_KEY) || ""; }catch(_){ return ""; } })();
+  if(isValid(saved)) return saved;
+  if(isValid(state.qcPresetId)) return state.qcPresetId;
+  if(isValid(CFG.QC_DEFAULT_PRESET_ID)) return CFG.QC_DEFAULT_PRESET_ID;
+  return presets[0].id;
+}
+function _scSyncQcPresetSelection(opts){
+  _qcEnsureLoaded();
+  const list = _qcGetAllPresets();
+  const resolved = _scResolvePreferredQcPresetId(list);
+  state.qcPresetId = resolved || null;
+  if(opts?.syncUi){
+    const sel = $("sc_preset");
+    if(sel && state.qcPresetId) sel.value = state.qcPresetId;
+  }
+  return state.qcPresetId;
+}
+window._scSyncQcPresetSelection = _scSyncQcPresetSelection;
 function _scPopulatePresetSelect(){
   const list = _qcGetAllPresets();
 
@@ -14532,10 +14554,8 @@ function _scPopulatePresetSelect(){
       opt.textContent = p.name + (isCustom ? "（カスタム）" : "");
       sel.appendChild(opt);
     }
-    const saved = (()=>{ try{ return localStorage?.getItem?.(QC_LAST_PRESET_STORAGE_KEY) || ""; }catch(_){ return ""; } })();
-    const preferred = (saved && list.some(p=>p.id===saved)) ? saved : "";
-    const cur = preferred || state.qcPresetId || CFG.QC_DEFAULT_PRESET_ID || (list[0] && list[0].id);
-    if(cur) sel.value = cur;
+    _scSyncQcPresetSelection({syncUi:true});
+    if(!sel.value && state.qcPresetId) sel.value = state.qcPresetId;
     state.qcPresetId = sel.value || state.qcPresetId || null;
   }
 
@@ -15709,8 +15729,8 @@ function _scWire(){
   if(btn && dlg){
     btn.addEventListener("click", ()=>{
       try{
-        _qcEnsureLoaded();
         _scPopulatePresetSelect();
+        _scSyncQcPresetSelection({syncUi:true});
         state.qcPresetId = $("sc_preset")?.value || state.qcPresetId || CFG.QC_DEFAULT_PRESET_ID;
         _scRenderTargets(_scGetPresetById(state.qcPresetId));
         _scUpdatePresetDesc();
@@ -19148,6 +19168,15 @@ try{
 
     logJob(`対象件数: ${targets.length}`);
     logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
+    if(type==='qc'){
+      const syncQcPresetSelection = (typeof window._scSyncQcPresetSelection === "function") ? window._scSyncQcPresetSelection : null;
+      if(!syncQcPresetSelection){
+        throw new Error("QC失敗: _scSyncQcPresetSelection が未定義です");
+      }
+      const presetId = syncQcPresetSelection({syncUi:false});
+      console.log(`[QC][bulk] preset=${presetId || ""}`);
+      logJob(`QC preset: ${presetId || "-"}`);
+    }
     updateJobUI();
     bulkOverlay.start(type, targets.length);
 
