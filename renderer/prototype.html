@@ -14539,6 +14539,7 @@ function _scSyncQcPresetSelection(opts){
   }
   return state.qcPresetId;
 }
+window._scSyncQcPresetSelection = _scSyncQcPresetSelection;
 function _scPopulatePresetSelect(){
   const list = _qcGetAllPresets();
 
@@ -19168,7 +19169,11 @@ try{
     logJob(`対象件数: ${targets.length}`);
     logJob(`開始: ${type==='qc' ? '一括チェック' : '一括書き出し'} (${targets.length}件)`);
     if(type==='qc'){
-      const presetId = _scSyncQcPresetSelection({syncUi:false});
+      const syncQcPresetSelection = (typeof window._scSyncQcPresetSelection === "function") ? window._scSyncQcPresetSelection : null;
+      if(!syncQcPresetSelection){
+        throw new Error("QC失敗: _scSyncQcPresetSelection が未定義です");
+      }
+      const presetId = syncQcPresetSelection({syncUi:false});
       console.log(`[QC][bulk] preset=${presetId || ""}`);
       logJob(`QC preset: ${presetId || "-"}`);
     }
