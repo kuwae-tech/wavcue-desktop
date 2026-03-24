@@ -3337,6 +3337,27 @@ body, #appRoot, .appRoot, .mainLayout{
 .proContextMenuItem:hover{
   background:rgba(255,255,255,.10);
 }
+.proRenamePopover{
+  position:fixed;
+  z-index:10035;
+  min-width:260px;
+  max-width:min(360px, calc(100vw - 16px));
+  border:1px solid rgba(148,163,184,.35);
+  border-radius:12px;
+  background:rgba(12,18,28,.98);
+  box-shadow:0 18px 40px rgba(0,0,0,.5);
+  padding:10px;
+}
+.proRenamePopover.hidden{ display:none; }
+.proRenameInput{
+  width:100%;
+  border:1px solid rgba(255,255,255,.2);
+  background:rgba(255,255,255,.06);
+  color:var(--text);
+  border-radius:8px;
+  padding:8px 10px;
+  font-size:12px;
+}
 .proHistoryLayout{
   display:grid;
   grid-template-columns:minmax(200px, 260px) minmax(0,1fr);
@@ -17616,6 +17637,7 @@ try{
     lastClickIndex:null,
     popover:{openType:null, openFileId:null, anchorEl:null},
     contextMenu:{open:false, fileId:null, rowEl:null, x:0, y:0},
+    renamePopover:{open:false, fileId:null, anchorEl:null, x:0, y:0},
     historyTriggerLogged:false
   };
   const job = { running:false, cancel:false, failed:[], done:0, total:0, ok:0 };
@@ -19440,6 +19462,50 @@ try{
     project.contextMenu.fileId = null;
     project.contextMenu.rowEl = null;
   }
+  function closeRenamePopover(){
+    const pop = $("proRenamePopover");
+    if(!pop) return;
+    pop.classList.add("hidden");
+    pop.setAttribute("aria-hidden", "true");
+    project.renamePopover.open = false;
+    project.renamePopover.fileId = null;
+    project.renamePopover.anchorEl = null;
+  }
+  function positionRenamePopover(x, y){
+    const pop = $("proRenamePopover");
+    if(!pop) return;
+    pop.style.left = "0px";
+    pop.style.top = "0px";
+    pop.style.visibility = "hidden";
+    pop.classList.remove("hidden");
+    const rect = pop.getBoundingClientRect();
+    const maxLeft = Math.max(8, window.innerWidth - rect.width - 8);
+    const maxTop = Math.max(8, window.innerHeight - rect.height - 8);
+    const left = Math.max(8, Math.min(Math.round(x), maxLeft));
+    const top = Math.max(8, Math.min(Math.round(y), maxTop));
+    pop.style.left = `${left}px`;
+    pop.style.top = `${top}px`;
+    pop.style.visibility = "visible";
+  }
+  function openRenamePopover(fileId, anchorEl){
+    const rec = project.files.find(f=>f.id===fileId);
+    const pop = $("proRenamePopover");
+    const input = $("proRenameInput");
+    if(!rec || !pop || !input) return;
+    const anchorRect = anchorEl?.getBoundingClientRect?.();
+    const baseX = anchorRect ? (anchorRect.left + 8) : 16;
+    const baseY = anchorRect ? (anchorRect.bottom + 6) : 16;
+    project.renamePopover.open = true;
+    project.renamePopover.fileId = fileId;
+    project.renamePopover.anchorEl = anchorEl || null;
+    project.renamePopover.x = baseX;
+    project.renamePopover.y = baseY;
+    input.value = rec.name || "";
+    pop.setAttribute("aria-hidden", "false");
+    positionRenamePopover(baseX, baseY);
+    input.focus();
+    input.select();
+  }
   function positionRowContextMenu(x, y){
     const menu = $("proRowContextMenu");
     if(!menu) return;
@@ -19476,20 +19542,16 @@ try{
     positionRowContextMenu(x, y);
   }
   async function renameFileById(fileId){
-    const rec = project.files.find(f=>f.id===fileId);
-    if(!rec) return false;
-    const nextNameRaw = window.prompt("新しいファイル名を入力してください", rec.name || "");
-    if(nextNameRaw == null) return false;
-    const nextName = String(nextNameRaw);
-    if(!nextName.trim()){
-      if(window.safeToast) window.safeToast("ファイル名を入力してください。", "warn");
-      return false;
+    const row = project.contextMenu.rowEl;
+    if(!row){
+      const list = $("proFileList");
+      if(!list) return false;
+      const fallbackRow = list.querySelector(`.proFileRow[data-id="${fileId}"]`);
+      if(!fallbackRow) return false;
+      openRenamePopover(fileId, fallbackRow);
+      return true;
     }
-    rec.name = nextName;
-    if(project.activeId === rec.id){
-      state.fileName = nextName;
-    }
-    render();
+    openRenamePopover(fileId, row);
     return true;
   }
   async function resetFileEditsById(fileId){
@@ -19539,10 +19601,7 @@ try{
       project.lastClickIndex = Math.min(project.lastClickIndex, Math.max(project.files.length - 1, 0));
     }
     if(!project.files.length){
-      project.activeId = null;
-      state.activeFileId = null;
-      project.lastLoadedId = null;
-      project.selectedIds.clear();
+      clearProjectWhenEmpty();
       render();
       return true;
     }
@@ -19561,12 +19620,75 @@ try{
   async function runSingleQcById(fileId){
     if(!project.files.some(f=>f.id===fileId)) return false;
     try{
-      await runJob("qc", [fileId]);
+      if(project.activeId !== fileId){
+        await setActiveFile(fileId, { force:true });
+      }
+      const runSingle = (typeof window._scRunMeasureAndRender === "function") ? window._scRunMeasureAndRender : null;
+      if(typeof runSingle !== "function"){
+        throw new Error("single QC failed: _scRunMeasureAndRender is missing");
+      }
+      runSingle({ switchToResults:false });
       return true;
     }catch(err){
       console.error("[Pro] single qc failed", err);
       return false;
     }
+  }
+  function clearProjectWhenEmpty(){
+    project.activeId = null;
+    state.activeFileId = null;
+    project.lastLoadedId = null;
+    project.selectedIds.clear();
+    project.lastClickIndex = null;
+    if(project.contextMenu.rowEl){
+      project.contextMenu.rowEl.classList.remove("contextTarget");
+    }
+    closePopover();
+    closeRowContextMenu();
+    closeRenamePopover();
+    if(state.audioEl){
+      state.audioEl.pause();
+      state.audioEl.removeAttribute("src");
+      state.audioEl.load();
+      state.audioEl.currentTime = 0;
+    }
+    if(state.audioUrl){
+      URL.revokeObjectURL(state.audioUrl);
+      state.audioUrl = null;
+    }
+    if(state.previewUrl){
+      URL.revokeObjectURL(state.previewUrl);
+      state.previewUrl = null;
+    }
+    if(typeof stopRaf === "function") stopRaf();
+    state.isPlaying = false;
+    state.playheadSec = 0;
+    state.playStartSec = 0;
+    state.file = null;
+    state.fileName = "";
+    state.buffer = null;
+    state.peaks = null;
+    state.srcAb = null;
+    state.srcChunks = null;
+    state.qcHasRun = false;
+    state.scLast = null;
+    window.__wavcueLastQc = null;
+    state.cues = [];
+    state.nextCueId = 1;
+    if(Array.isArray(state.attachments)){
+      state.attachments = [];
+    }
+    state.attachSel = 0;
+    if(typeof attachSyncLegacy === "function") attachSyncLegacy();
+    if(typeof attachRenderList === "function") attachRenderList();
+    if(typeof _pdfUI_set === "function") _pdfUI_set(null);
+    const fileNameEl = $("fileName");
+    if(fileNameEl) fileNameEl.textContent = "-";
+    setStatus("ファイル未選択", "idle");
+    if(typeof _scResetResultsBlank === "function") _scResetResultsBlank();
+    if(typeof renderCues === "function") renderCues();
+    if(typeof drawAll === "function") drawAll();
+    if(typeof updateButtons === "function") updateButtons();
   }
   async function handleRowContextCommand(cmd, fileId){
     if(!cmd || !fileId) return false;
@@ -19734,7 +19856,7 @@ try{
     Array.from(list.querySelectorAll('.proFileActionBtn')).forEach(btn=>{
       btn.addEventListener('click', (e)=>{
         e.stopPropagation();
-        const row = btn.closest('.proFileRow');
+      const row = btn.closest('.proFileRow');
         if(!row) return;
         const id = row.getAttribute('data-id');
         const action = btn.getAttribute('data-action');
@@ -19765,6 +19887,8 @@ try{
       if(pop && pop.parentElement !== document.body) document.body.appendChild(pop);
       const rowMenu = document.getElementById("proRowContextMenu");
       if(rowMenu && rowMenu.parentElement !== document.body) document.body.appendChild(rowMenu);
+      const renamePop = document.getElementById("proRenamePopover");
+      if(renamePop && renamePop.parentElement !== document.body) document.body.appendChild(renamePop);
       const toastRoot = document.getElementById("toastRoot");
       if(toastRoot && toastRoot.parentElement !== document.body) document.body.appendChild(toastRoot);
     }catch(error){
@@ -19847,27 +19971,68 @@ try{
       if(!btn) return;
       const cmd = btn.getAttribute("data-cmd");
       const fileId = project.contextMenu.fileId;
+      const rowEl = project.contextMenu.rowEl;
       closeRowContextMenu();
+      if(cmd === "rename" && fileId){
+        openRenamePopover(fileId, rowEl);
+        return;
+      }
       handleRowContextCommand(cmd, fileId).catch((err)=>{
         console.error("[Pro] context command failed", err);
       });
+    });
+    $("proRenameInput")?.addEventListener("keydown", (e)=>{
+      if(e.key === "Escape"){
+        e.preventDefault();
+        closeRenamePopover();
+        return;
+      }
+      if(e.key !== "Enter") return;
+      e.preventDefault();
+      const fileId = project.renamePopover.fileId;
+      if(!fileId) return;
+      const rec = project.files.find(f=>f.id===fileId);
+      if(!rec) return;
+      const input = $("proRenameInput");
+      if(!input) return;
+      const nextName = String(input.value || "");
+      if(!nextName.trim()){
+        if(window.safeToast) window.safeToast("ファイル名を入力してください。", "warn");
+        return;
+      }
+      rec.name = nextName;
+      if(project.activeId === rec.id){
+        state.fileName = nextName;
+      }
+      closeRenamePopover();
+      render();
     });
     document.addEventListener('keydown', (e)=>{
       if(e.key!=="Escape") return;
       closePopover();
       closeRowContextMenu();
+      closeRenamePopover();
+    });
+    document.addEventListener("click", (e)=>{
+      const pop = $("proRenamePopover");
+      if(!pop || pop.classList.contains("hidden")) return;
+      if(pop.contains(e.target)) return;
+      closeRenamePopover();
     });
     window.addEventListener('resize', ()=>{
       if(project.popover.openType) positionPopover();
       if(project.contextMenu.open) positionRowContextMenu(project.contextMenu.x, project.contextMenu.y);
+      if(project.renamePopover.open) positionRenamePopover(project.renamePopover.x, project.renamePopover.y);
     });
     window.addEventListener('scroll', ()=>{
       if(project.popover.openType) positionPopover();
       if(project.contextMenu.open) positionRowContextMenu(project.contextMenu.x, project.contextMenu.y);
+      if(project.renamePopover.open) positionRenamePopover(project.renamePopover.x, project.renamePopover.y);
     }, {passive:true});
     $('proFileListWrap')?.addEventListener('scroll', ()=>{
       if(project.popover.openType) positionPopover();
       if(project.contextMenu.open) positionRowContextMenu(project.contextMenu.x, project.contextMenu.y);
+      if(project.renamePopover.open) positionRenamePopover(project.renamePopover.x, project.renamePopover.y);
     }, {passive:true});
 
     updateJobUI();
@@ -19951,6 +20116,9 @@ try{
   <button type="button" class="proContextMenuItem" data-cmd="reset" role="menuitem">編集リセット</button>
   <button type="button" class="proContextMenuItem" data-cmd="remove" role="menuitem">ファイルリストから削除</button>
   <button type="button" class="proContextMenuItem" data-cmd="single-qc" role="menuitem">単体規格チェック</button>
+</div>
+<div id="proRenamePopover" class="proRenamePopover hidden" role="dialog" aria-hidden="true" aria-label="ファイル名変更">
+  <input id="proRenameInput" class="proRenameInput" type="text" autocomplete="off" />
 </div>
 <div aria-atomic="true" aria-live="polite" class="toastHost" id="toastRoot"></div>
 <dialog id="toastLayer" class="toastLayer" aria-live="polite" aria-atomic="true">
