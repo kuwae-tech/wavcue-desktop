@@ -7258,6 +7258,7 @@ function log(msg){
   if(box) box.prepend(line);
   const box2 = $("logBox2");
   if(box2){ const line2 = line.cloneNode(true); box2.prepend(line2); }
+}
 
 
 
@@ -19500,6 +19501,7 @@ try{
     project.renamePopover.anchorEl = anchorEl || null;
     project.renamePopover.x = baseX;
     project.renamePopover.y = baseY;
+    console.log(`[Pro][rename] open fileId=${fileId}`);
     input.value = rec.name || "";
     pop.setAttribute("aria-hidden", "false");
     positionRenamePopover(baseX, baseY);
@@ -19684,7 +19686,11 @@ try{
     if(typeof _pdfUI_set === "function") _pdfUI_set(null);
     const fileNameEl = $("fileName");
     if(fileNameEl) fileNameEl.textContent = "-";
-    setStatus("ファイル未選択", "idle");
+    const statusEl = $("statusPill");
+    if(statusEl){
+      statusEl.textContent = "ファイル未選択";
+      statusEl.style.borderColor = "rgba(148,163,184,.22)";
+    }
     if(typeof _scResetResultsBlank === "function") _scResetResultsBlank();
     if(typeof renderCues === "function") renderCues();
     if(typeof drawAll === "function") drawAll();
@@ -19972,11 +19978,12 @@ try{
       const cmd = btn.getAttribute("data-cmd");
       const fileId = project.contextMenu.fileId;
       const rowEl = project.contextMenu.rowEl;
-      closeRowContextMenu();
       if(cmd === "rename" && fileId){
         openRenamePopover(fileId, rowEl);
+        closeRowContextMenu();
         return;
       }
+      closeRowContextMenu();
       handleRowContextCommand(cmd, fileId).catch((err)=>{
         console.error("[Pro] context command failed", err);
       });
@@ -20004,6 +20011,7 @@ try{
       if(project.activeId === rec.id){
         state.fileName = nextName;
       }
+      console.log(`[Pro][rename] commit fileId=${fileId} name=${nextName}`);
       closeRenamePopover();
       render();
     });
